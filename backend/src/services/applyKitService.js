@@ -1,31 +1,54 @@
 import crypto from 'node:crypto';
 import { and, desc, eq, gte, isNull } from 'drizzle-orm';
-import { GoogleGenAI } from '@google/genai';
 import { z } from 'zod';
 import { analyses, generatedContent } from '../db/schema.js';
 import { env } from '../config/env.js';
 import { requestQueue } from '../utils/requestQueue.js';
+import { getGeminiKeys, callGeminiWithRotation } from '../utils/geminiClient.js';
 
 const IDEMPOTENCY_WINDOW_MS = 60 * 1000;
-const BACKOFF_BASE_MS = 200;
 const inflightRequests = new Map();
-let nextKeyIndex = 0;
 
 const learningPathSchema = z.array(
   z.object({
     skill: z.string().trim().min(1),
-    resource_url: z.string().trim().url(),
-    estimated_hours: z.number().int().positive()
+    total_honest_hours: z.number().int().positive(),
+    sources: z.array(
+      z.object({
+        type: z.enum(['youtube', 'course', 'docs', 'site', 'bootcamp']),
+        title: z.string().trim().min(1),
+        url: z.string().trim().url(),
+        free: z.boolean()
+      })
+    ).min(1),
+    day_plan: z.array(
+      z.object({
+        day: z.number().int().positive(),
+        goal: z.string().trim().min(1),
+        duration_minutes: z.number().int().positive()
+      })
+    ).min(1),
+    self_study_prompt: z.string().trim().min(1)
   })
 );
 
 const interviewQuestionsSchema = z.array(z.string().trim().min(1)).length(5);
 
-function sleep(durationMs) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, durationMs);
-  });
-}
+const PROMPT_PREAMBLE = [
+  'You must strictly follow the output format. Any deviation will break the system using your response.',
+  'Do not include markdown, JSON, code blocks, or extra explanations.',
+  '',
+  'IMPORTANT:',
+  'You are generating output for a system that processes multiple requests with shared context.',
+  'Be concise, deterministic, and avoid unnecessary verbosity.',
+  '',
+  'Consistency Rule:',
+  'For the same input, always produce the same structure and similar wording.',
+  'Do not vary formatting, section names, or ordering.',
+  '',
+  'Do not generate generic advice. Every point must be tied to the provided resume, job description, or gap analysis.',
+  ''
+].join('\n');
 
 function createServiceError(message, statusCode) {
   const error = new Error(message);
@@ -33,26 +56,12 @@ function createServiceError(message, statusCode) {
   return error;
 }
 
-function getGeminiKeys(keys = env.geminiKeys) {
-  const availableKeys = (keys || []).filter(Boolean);
-
-  if (!availableKeys.length) {
-    throw createServiceError('Gemini keys are not configured yet.', 503);
+function getModelForContentType(contentType) {
+  if (contentType === 'rejection_reasons') {
+    return env.geminiModel1;
   }
 
-  return availableKeys;
-}
-
-function createGeminiClient(apiKey, clientFactory) {
-  if (clientFactory) {
-    return clientFactory(apiKey);
-  }
-
-  return new GoogleGenAI({ apiKey });
-}
-
-function isRateLimitError(error) {
-  return error?.status === 429 || error?.code === 429 || error?.response?.status === 429;
+  return env.geminiModel2;
 }
 
 function buildIdempotencyKey(userId, analysisId, contentType) {
@@ -127,6 +136,7 @@ function buildPrompt({ analysis, contentType, jobContext }) {
 
   if (contentType === 'cover_letter') {
     return [
+      PROMPT_PREAMBLE,
       'You are writing a tailored cover letter for Aptico.',
       'Return only the final cover letter text. No markdown. No placeholders.',
       `Target company: ${companyName}`,
@@ -140,6 +150,7 @@ function buildPrompt({ analysis, contentType, jobContext }) {
 
   if (contentType === 'cold_email') {
     return [
+      PROMPT_PREAMBLE,
       'You are writing a concise, personalized cold email for a job application.',
       'Return only the final email body text. No subject line. No markdown. No placeholders.',
       `Target company: ${companyName}`,
@@ -153,6 +164,7 @@ function buildPrompt({ analysis, contentType, jobContext }) {
 
   if (contentType === 'interview_questions') {
     return [
+      PROMPT_PREAMBLE,
       'Generate interview questions tailored to the provided job description.',
       'Return only a JSON array of exactly 5 strings.',
       `Job description: ${analysis.jdText}`,
@@ -163,81 +175,189 @@ function buildPrompt({ analysis, contentType, jobContext }) {
 
   if (contentType === 'learning_path') {
     return [
-      'Create a skill gap learning path from the gap analysis JSON.',
-      'Return only valid JSON with this exact structure: [{ "skill": string, "resource_url": string, "estimated_hours": number }]',
+      PROMPT_PREAMBLE,
+      'Create a skill gap learning path from the gap analysis JSON below.',
+      'Return only valid JSON matching the provided schema.',
+      '',
+      `Resume text: ${analysis.resumeText}`,
+      `Job description: ${jobDescription}`,
       `Gap analysis JSON: ${gapSummary}`,
-      'Focus on the missing skills implied by the analysis and give realistic public resource URLs.'
+      '',
+      'For EACH missing skill from the gap analysis:',
+      '',
+      '1. total_honest_hours:',
+      '   - Must be realistic (no underestimation).',
+      '   - If skill requires deep understanding, assign 50–120 hours.',
+      '',
+      '2. sources (MANDATORY COMPOSITION):',
+      '   - At least 1 YouTube resource (type: "youtube").',
+      '   - At least 1 official documentation link (type: "docs").',
+      '   - At least 1 free course from freeCodeCamp / Coursera free / Odin Project / MDN etc. (type: "course").',
+      '   - At least 1 bootcamp-style resource (type: "bootcamp").',
+      '   - Correctly mark free: true or false.',
+      '',
+      '3. day_plan:',
+      '   - Each entry MUST be a concrete task, not a topic.',
+      '   - BAD: "Learn React basics"',
+      '   - GOOD: "Watch React hooks video and build a counter app"',
+      '   - Duration MUST be between 30 and 90 minutes.',
+      '',
+      '4. self_study_prompt:',
+      '   - MUST include: skill name, user\'s current level (infer from resume), target level (from job description).',
+      '   - MUST instruct an AI tutor to: teach step-by-step, ask questions, give exercises, adapt based on answers.'
+    ].join('\n');
+  }
+
+  if (contentType === 'rejection_reasons') {
+    return [
+      PROMPT_PREAMBLE,
+      'Simulate both an ATS (automated tracking system) scan and a human recruiter eye scan of the resume.',
+      'Return ONLY plain text. NO markdown, NO JSON, NO extra commentary.',
+      '',
+      'The output MUST EXACTLY follow this format:',
+      '',
+      'ATS SCAN',
+      '- <point>',
+      '- <point>',
+      '',
+      'RECRUITER SCAN (first 10 seconds)',
+      '- <point>',
+      '- <point>',
+      '',
+      'VERDICT',
+      '<single paragraph>',
+      '',
+      'STRICT RULES:',
+      '- Do NOT add any headings other than the three above.',
+      '- Do NOT add explanations before or after the sections.',
+      '- Each bullet must be specific and reference exact resume issues.',
+      '- You MUST quote or describe exact resume lines causing rejection.',
+      '- Tone must be blunt and direct.',
+      '- NEVER use phrases like "consider improving", "you may want to", or "try to".',
+      '',
+      `Resume text: ${analysis.resumeText}`,
+      `Job description: ${jobDescription}`,
+      `Gap analysis JSON: ${gapSummary}`,
+      '',
+      'Be specific, blunt, and name exact lines from the resume where problems occur.',
+      'Do NOT sugarcoat. Say what is wrong directly.'
+    ].join('\n');
+  }
+
+  if (contentType === 'salary_coach') {
+    return [
+      PROMPT_PREAMBLE,
+      'Estimate a realistic salary/stipend range for this exact role and company based on the job description, role title, required skills, and company size signals.',
+      'Return ONLY plain text. NO markdown, NO JSON, NO extra commentary.',
+      '',
+      'The output MUST EXACTLY follow this format:',
+      '',
+      'ESTIMATED RANGE',
+      '₹<min>–₹<max> (or LPA format if full-time)',
+      '',
+      'WHY THIS RANGE',
+      '<2–3 sentences>',
+      '',
+      'YOUR NEGOTIATION POSITION',
+      '<STRONG | NEUTRAL | WEAK>: <one short explanation>',
+      '',
+      'EXACT PHRASES TO USE',
+      '1. <email sentence>',
+      '2. <call sentence>',
+      '3. <counter-offer sentence>',
+      '',
+      'WHAT NOT TO SAY',
+      '1. <bad phrase>',
+      '2. <bad phrase>',
+      '',
+      'STRICT RULES:',
+      '- Do NOT add extra sections.',
+      '- Do NOT explain outside the format.',
+      '- Keep phrases natural, not robotic.',
+      '- Negotiation position MUST start with STRONG / NEUTRAL / WEAK in uppercase.',
+      '- Base the salary range on the JD signals, not generic averages.',
+      '',
+      `Resume text: ${analysis.resumeText}`,
+      `Target company: ${companyName}`,
+      `Target role: ${roleTitle}`,
+      `Job description: ${jobDescription}`,
+      `Gap analysis JSON: ${gapSummary}`
     ].join('\n');
   }
 
   throw createServiceError('Unsupported content type.', 400);
 }
 
-async function callGemini({ prompt, contentType, geminiKeys, clientFactory, logger }) {
-  const keys = getGeminiKeys(geminiKeys);
-  const startIndex = nextKeyIndex % keys.length;
-  let lastError = null;
-
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const keyIndex = (startIndex + attempt) % keys.length;
-    const client = createGeminiClient(keys[keyIndex], clientFactory);
-
-    try {
-      const config =
-        contentType === 'learning_path'
-          ? {
-              responseMimeType: 'application/json',
-              responseJsonSchema: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  required: ['skill', 'resource_url', 'estimated_hours'],
-                  properties: {
-                    skill: { type: 'string' },
-                    resource_url: { type: 'string' },
-                    estimated_hours: { type: 'integer' }
-                  }
+function getConfigForContentType(contentType) {
+  if (contentType === 'learning_path') {
+    return {
+      responseMimeType: 'application/json',
+      responseJsonSchema: {
+        type: 'array',
+        items: {
+          type: 'object',
+          required: ['skill', 'total_honest_hours', 'sources', 'day_plan', 'self_study_prompt'],
+          properties: {
+            skill: { type: 'string' },
+            total_honest_hours: { type: 'integer' },
+            sources: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['type', 'title', 'url', 'free'],
+                properties: {
+                  type: { type: 'string', enum: ['youtube', 'course', 'docs', 'site', 'bootcamp'] },
+                  title: { type: 'string' },
+                  url: { type: 'string' },
+                  free: { type: 'boolean' }
                 }
               }
-            }
-          : contentType === 'interview_questions'
-            ? {
-                responseMimeType: 'application/json',
-                responseJsonSchema: {
-                  type: 'array',
-                  minItems: 5,
-                  maxItems: 5,
-                  items: {
-                    type: 'string'
-                  }
+            },
+            day_plan: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['day', 'goal', 'duration_minutes'],
+                properties: {
+                  day: { type: 'integer' },
+                  goal: { type: 'string' },
+                  duration_minutes: { type: 'integer' }
                 }
               }
-            : undefined;
-
-      const response = await client.models.generateContent({
-        model: env.geminiModel,
-        contents: prompt,
-        config
-      });
-
-      nextKeyIndex = (keyIndex + 1) % keys.length;
-      return response.text;
-    } catch (error) {
-      lastError = error;
-
-      if (!isRateLimitError(error) || attempt === 2) {
-        throw error;
+            },
+            self_study_prompt: { type: 'string' }
+          }
+        }
       }
-
-      logger?.warn?.(`Apply Kit Gemini key ${keyIndex + 1} hit 429. Rotating to the next key.`);
-      await sleep(BACKOFF_BASE_MS * 2 ** attempt);
-    }
+    };
   }
 
-  throw lastError;
+  if (contentType === 'interview_questions') {
+    return {
+      responseMimeType: 'application/json',
+      responseJsonSchema: {
+        type: 'array',
+        minItems: 5,
+        maxItems: 5,
+        items: {
+          type: 'string'
+        }
+      }
+    };
+  }
+
+  return undefined;
 }
 
 function parseGeneratedOutput(contentType, rawText) {
+  if (contentType === 'rejection_reasons') {
+    return String(rawText).trim();
+  }
+
+  if (contentType === 'salary_coach') {
+    return String(rawText).trim();
+  }
+
   if (contentType === 'interview_questions') {
     try {
       return interviewQuestionsSchema.parse(JSON.parse(rawText));
@@ -333,13 +453,18 @@ export async function generateApplyKitContent({
 
   const task = (async () => {
     const prompt = buildPrompt({ analysis, contentType, jobContext });
+    const model = getModelForContentType(contentType);
+    const config = getConfigForContentType(contentType);
+    const keys = getGeminiKeys(geminiKeys);
+
     const rawText = await requestQueue.enqueue(() =>
-      callGemini({
+      callGeminiWithRotation({
         prompt,
-        contentType,
-        geminiKeys,
+        model,
+        keys,
         clientFactory,
-        logger
+        logger,
+        config
       })
     );
 

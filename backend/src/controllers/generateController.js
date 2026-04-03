@@ -3,7 +3,7 @@ import { generateApplyKitContent } from '../services/applyKitService.js';
 
 const requestSchema = z.object({
   analysis_id: z.string().trim().min(1),
-  content_type: z.enum(['cover_letter', 'cold_email', 'interview_questions', 'learning_path']),
+  content_type: z.enum(['cover_letter', 'cold_email', 'interview_questions', 'learning_path', 'rejection_reasons', 'salary_coach']),
   job_id: z.string().trim().optional(),
   job_title: z.string().trim().optional(),
   company: z.string().trim().optional(),

@@ -95,10 +95,10 @@ export function buildServer() {
     }
   });
 
-  app.get('/ping', async () => ({
-    status: 'ok',
-    timestamp: new Date().toISOString()
-  }));
+  // app.get('/ping', async () => ({
+  //   status: 'ok',
+  //   timestamp: new Date().toISOString()
+  // }));
 
   app.register(authRoutes, { prefix: '/api/auth' });
   app.register(analyzeRoutes, { prefix: '/api/analyze' });

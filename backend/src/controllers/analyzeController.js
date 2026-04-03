@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { analyses } from '../db/schema.js';
 import { analyzeResumeWithGemini } from '../services/geminiService.js';
 import { decodePdfFile, parsePdfBuffer } from '../services/pdfService.js';
-
+import { env } from '../config/env.js';
 const MAX_PDF_BYTES = 1 * 1024 * 1024;
 
 const requestSchema = z.object({
@@ -42,6 +42,7 @@ export async function analyzeController(request, reply) {
       resumeText: parsedPdf.text,
       jobDescription: body.jobDescription,
       redisService: request.server.services?.redis,
+      geminiKeys: env.geminiKeys,
       logger: request.log
     });
 

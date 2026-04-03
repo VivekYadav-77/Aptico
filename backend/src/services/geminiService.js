@@ -1,10 +1,9 @@
 import crypto from 'node:crypto';
-import { GoogleGenAI } from '@google/genai';
 import { z } from 'zod';
 import { env } from '../config/env.js';
+import { getGeminiKeys, callGeminiWithRotation } from '../utils/geminiClient.js';
 
 const CACHE_TTL_SECONDS = 2 * 60 * 60;
-const BACKOFF_BASE_MS = 200;
 
 const analysisSchema = z.object({
   companyName: z.string().trim(),
@@ -91,14 +90,6 @@ const responseJsonSchema = {
   }
 };
 
-let nextKeyIndex = 0;
-
-function sleep(durationMs) {
-  return new Promise((resolve) => {
-    setTimeout(resolve, durationMs);
-  });
-}
-
 function buildPrompt({ resumeText, jobDescription }) {
   return [
     'You are Aptico, an AI career analysis engine.',
@@ -116,68 +107,6 @@ function buildPrompt({ resumeText, jobDescription }) {
 
 function createPromptHash(prompt) {
   return crypto.createHash('sha256').update(prompt).digest('hex');
-}
-
-function getGeminiKeys(keys = env.geminiKeys) {
-  const availableKeys = (keys || []).filter(Boolean);
-
-  if (!availableKeys.length) {
-    const error = new Error('Gemini keys are not configured yet.');
-    error.statusCode = 503;
-    throw error;
-  }
-
-  return availableKeys;
-}
-
-function createClient(apiKey, clientFactory) {
-  if (clientFactory) {
-    return clientFactory(apiKey);
-  }
-
-  return new GoogleGenAI({ apiKey });
-}
-
-function isRateLimitError(error) {
-  return error?.status === 429 || error?.code === 429 || error?.response?.status === 429;
-}
-
-async function callGeminiWithRotation({ prompt, keys, clientFactory, logger }) {
-  const totalKeys = keys.length;
-  const startingIndex = nextKeyIndex % totalKeys;
-  let lastError = null;
-
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const keyIndex = (startingIndex + attempt) % totalKeys;
-    const apiKey = keys[keyIndex];
-    const client = createClient(apiKey, clientFactory);
-
-    try {
-      const response = await client.models.generateContent({
-        model: env.geminiModel,
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseJsonSchema
-        }
-      });
-
-      nextKeyIndex = (keyIndex + 1) % totalKeys;
-
-      return response.text;
-    } catch (error) {
-      lastError = error;
-
-      if (!isRateLimitError(error) || attempt === 2) {
-        throw error;
-      }
-
-      logger?.warn?.(`Gemini key ${keyIndex + 1} hit 429. Rotating to the next key.`);
-      await sleep(BACKOFF_BASE_MS * 2 ** attempt);
-    }
-  }
-
-  throw lastError;
 }
 
 export async function analyzeResumeWithGemini({
@@ -217,9 +146,14 @@ export async function analyzeResumeWithGemini({
 
   const geminiResponseText = await callGeminiWithRotation({
     prompt,
+    model: env.geminiModel1,
     keys: getGeminiKeys(geminiKeys),
     clientFactory,
-    logger
+    logger,
+    config: {
+      responseMimeType: 'application/json',
+      responseJsonSchema
+    }
   });
 
   let parsedAnalysis;
