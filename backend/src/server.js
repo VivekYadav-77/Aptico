@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import Fastify from 'fastify';
 import { Pool } from 'pg';
 import { neon } from '@neondatabase/serverless';
-import { drizzle } from 'drizzle-orm/neon-http';
+import { drizzle as drizzleNeon } from 'drizzle-orm/neon-http';
+import { drizzle as drizzleNodePg } from 'drizzle-orm/node-postgres';
 import { env, hasDatabaseConfig, hasRedisConfig } from './config/env.js';
 import * as dbSchema from './db/schema.js';
 import analyzeRoutes from './routes/analyzeRoutes.js';
@@ -32,22 +33,20 @@ export function buildServer() {
   });
 
   const db = hasDatabaseConfig()
-  ? process.env.NODE_ENV === "production"
-    ? drizzle({
-        client: neon(env.databaseUrl),
-        schema: dbSchema
-      })
-    : (() => {
+    ? process.env.NODE_ENV === "production"
+      ?drizzleNeon(neon(env.databaseUrl), { 
+          schema: dbSchema 
+        })
+      : (() => {
         const pool = new Pool({
           connectionString: env.databaseUrl,
         });
 
-        return drizzle({
-          client: pool,
-          schema: dbSchema
-        });
+       return drizzleNodePg(pool, { 
+            schema: dbSchema 
+          });
       })()
-  : null;
+    : null;
 
   const redisService = createRedisService({
     url: env.upstashRedisRestUrl,
@@ -95,9 +94,16 @@ export function buildServer() {
     }
   });
 
-  // app.get('/ping', async () => ({
+  // app.get('/api/health', async () => ({
   //   status: 'ok',
-  //   timestamp: new Date().toISOString()
+  //   timestamp: new Date().toISOString(),
+  //   keysConfigured: {
+  //     GEMINI_PRECHECK_API_KEY: Boolean(env.geminiPrecheckKey),
+  //     GEMINI_KEY_1: Boolean(env.geminiKey1),
+  //     GEMINI_KEY_2: Boolean(env.geminiKey2),
+  //     GEMINI_KEY_3: Boolean(env.geminiKey3),
+  //     GEMINI_KEY_FALLBACK: Boolean(env.geminiKeyFallback)
+  //   }
   // }));
 
   app.register(authRoutes, { prefix: '/api/auth' });

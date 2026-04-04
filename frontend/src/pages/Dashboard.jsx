@@ -1,95 +1,501 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import api from '../api/axios.js';
+import { streamAnalysis } from '../api/analyzeApi.js';
 import Gauge from '../components/Gauge.jsx';
 import DiffViewer from '../components/DiffViewer.jsx';
 import { selectAuth } from '../store/authSlice.js';
 import { setCurrentAnalysis } from '../store/historySlice.js';
 
-function bufferToBase64(arrayBuffer) {
-  let binary = '';
-  const bytes = new Uint8Array(arrayBuffer);
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
+const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
-  return btoa(binary);
+const SOURCE_LABELS = {
+  youtube: '▶ YouTube',
+  course: '📚 Course',
+  docs: '📄 Docs',
+  site: '🌐 Site',
+  bootcamp: '🏕 Bootcamp'
+};
+
+// ─── Skeleton Loader ──────────────────────────────────────────────────────────
+
+function SkeletonBlock({ lines = 3 }) {
+  return (
+    <div className="animate-pulse space-y-3">
+      {Array.from({ length: lines }).map((_, i) => (
+        <div
+          key={i}
+          className="h-4 rounded-lg bg-white/10"
+          style={{ width: `${70 + Math.random() * 30}%` }}
+        />
+      ))}
+    </div>
+  );
 }
+
+// ─── Collapsible Card ────────────────────────────────────────────────────────
+
+function CollapsibleCard({ title, badge, badgeColor = 'cyan', children, defaultExpanded = true, featureNumber }) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+
+  const badgeClasses = {
+    cyan: 'bg-cyan-400/10 text-cyan-300 border-cyan-400/20',
+    amber: 'bg-amber-400/10 text-amber-300 border-amber-400/20',
+    rose: 'bg-rose-400/10 text-rose-300 border-rose-400/20',
+    emerald: 'bg-emerald-400/10 text-emerald-300 border-emerald-400/20',
+    violet: 'bg-violet-400/10 text-violet-300 border-violet-400/20',
+    sky: 'bg-sky-400/10 text-sky-300 border-sky-400/20',
+    pink: 'bg-pink-400/10 text-pink-300 border-pink-400/20',
+    indigo: 'bg-indigo-400/10 text-indigo-300 border-indigo-400/20'
+  };
+
+  return (
+    <section className="rounded-[2rem] border border-white/10 bg-slate-900/70 backdrop-blur overflow-hidden transition-all duration-300">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center justify-between gap-4 p-6 text-left transition hover:bg-white/[0.03]"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          {featureNumber != null && (
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-bold text-slate-300">
+              {featureNumber}
+            </span>
+          )}
+          <h2 className="text-lg font-semibold text-white truncate">{title}</h2>
+          {badge && (
+            <span className={`shrink-0 rounded-full border px-3 py-0.5 text-[10px] uppercase tracking-[0.2em] ${badgeClasses[badgeColor] || badgeClasses.cyan}`}>
+              {badge}
+            </span>
+          )}
+        </div>
+        <span className="shrink-0 text-xs text-slate-400 transition-transform duration-200" style={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0)' }}>
+          ▼
+        </span>
+      </button>
+      <div
+        className="transition-[max-height,opacity] duration-300 ease-in-out overflow-hidden"
+        style={{ maxHeight: expanded ? '5000px' : '0', opacity: expanded ? 1 : 0 }}
+      >
+        <div className="px-6 pb-6">
+          {children}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ─── Error Card ──────────────────────────────────────────────────────────────
+
+function StageErrorCard({ message }) {
+  return (
+    <div className="rounded-3xl border border-rose-500/30 bg-rose-500/10 px-5 py-6 text-sm text-rose-200">
+      {message}
+    </div>
+  );
+}
+
+// ─── Precheck Failed Card ────────────────────────────────────────────────────
+
+function PrecheckFailedCard({ score, reason }) {
+  return (
+    <section className="rounded-[2rem] border border-rose-500/30 bg-gradient-to-br from-rose-500/10 to-transparent p-8 text-center">
+      <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-rose-500/20 mb-6">
+        <span className="text-4xl font-bold text-rose-400">{score}</span>
+      </div>
+      <h2 className="text-2xl font-semibold text-white mb-3">Low Compatibility Detected</h2>
+      <p className="mx-auto max-w-lg text-sm leading-7 text-slate-300">{reason}</p>
+      <p className="mt-4 text-xs text-slate-500 uppercase tracking-[0.2em]">Analysis halted — background and job description are not aligned</p>
+    </section>
+  );
+}
+
+// ─── Progress Bar ─────────────────────────────────────────────────────────────
+
+function ProgressBar({ ready, total = 8 }) {
+  const pct = Math.round((ready / total) * 100);
+  return (
+    <div className="sticky top-0 z-30 rounded-2xl border border-white/10 bg-slate-900/90 px-5 py-3 backdrop-blur">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs uppercase tracking-[0.25em] text-slate-400">Insights progress</span>
+        <span className="text-xs font-medium text-cyan-300">{ready} of {total} ready</span>
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+        <div
+          className="h-full rounded-full bg-gradient-to-r from-cyan-400 to-violet-400 transition-all duration-500"
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ─── Feature Renderers ───────────────────────────────────────────────────────
+
+function InterviewQuestionsView({ questions }) {
+  return (
+    <ol className="grid gap-3">
+      {questions.map((q, i) => (
+        <li key={`iq-${i}`} className="rounded-3xl border border-white/10 bg-white/5 p-4 text-sm leading-6 text-slate-200">
+          <span className="mr-2 text-xs font-bold text-cyan-300">{i + 1}.</span>{q}
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function parseRejectionReasons(text) {
+  const sections = { ats: '', recruiter: '', verdict: '' };
+  const raw = String(text || '');
+  const atsMatch = raw.match(/ATS SCAN\s*\n([\s\S]*?)(?=RECRUITER SCAN|$)/i);
+  const recruiterMatch = raw.match(/RECRUITER SCAN[^\n]*\n([\s\S]*?)(?=VERDICT|$)/i);
+  const verdictMatch = raw.match(/VERDICT\s*\n([\s\S]*?)$/i);
+  if (atsMatch) sections.ats = atsMatch[1].trim();
+  if (recruiterMatch) sections.recruiter = recruiterMatch[1].trim();
+  if (verdictMatch) sections.verdict = verdictMatch[1].trim();
+  return sections;
+}
+
+function RejectionPredictorView({ content }) {
+  const sections = parseRejectionReasons(content);
+  return (
+    <div className="grid gap-5">
+      <div className="rounded-3xl border border-rose-500/30 bg-rose-500/10 p-5">
+        <h3 className="mb-3 text-sm font-bold uppercase tracking-[0.25em] text-rose-300">ATS Scan</h3>
+        <pre className="whitespace-pre-wrap text-sm leading-7 text-rose-200">{sections.ats}</pre>
+      </div>
+      <div className="rounded-3xl border border-rose-500/30 bg-rose-500/10 p-5">
+        <h3 className="mb-3 text-sm font-bold uppercase tracking-[0.25em] text-rose-300">Recruiter Scan (first 10 seconds)</h3>
+        <pre className="whitespace-pre-wrap text-sm leading-7 text-rose-200">{sections.recruiter}</pre>
+      </div>
+      <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+        <h3 className="mb-3 text-sm font-bold uppercase tracking-[0.25em] text-slate-300">Verdict</h3>
+        <p className="text-sm leading-7 text-slate-200">{sections.verdict}</p>
+      </div>
+    </div>
+  );
+}
+
+function parseSalaryCoach(text) {
+  const sections = { range: '', why: '', position: '', phrases: '', notToSay: '' };
+  const raw = String(text || '');
+  const rangeMatch = raw.match(/ESTIMATED RANGE\s*\n([\s\S]*?)(?=WHY THIS RANGE|$)/i);
+  const whyMatch = raw.match(/WHY THIS RANGE\s*\n([\s\S]*?)(?=YOUR NEGOTIATION POSITION|$)/i);
+  const positionMatch = raw.match(/YOUR NEGOTIATION POSITION\s*\n([\s\S]*?)(?=EXACT PHRASES TO USE|$)/i);
+  const phrasesMatch = raw.match(/EXACT PHRASES TO USE\s*\n([\s\S]*?)(?=WHAT NOT TO SAY|$)/i);
+  const notToSayMatch = raw.match(/WHAT NOT TO SAY\s*\n([\s\S]*?)$/i);
+  if (rangeMatch) sections.range = rangeMatch[1].trim();
+  if (whyMatch) sections.why = whyMatch[1].trim();
+  if (positionMatch) sections.position = positionMatch[1].trim();
+  if (phrasesMatch) sections.phrases = phrasesMatch[1].trim();
+  if (notToSayMatch) sections.notToSay = notToSayMatch[1].trim();
+  return sections;
+}
+
+function getPositionColor(positionText) {
+  const lower = positionText.toLowerCase();
+  if (lower.startsWith('strong')) return { border: 'border-emerald-500/30', bg: 'bg-emerald-500/10', text: 'text-emerald-300' };
+  if (lower.startsWith('weak')) return { border: 'border-rose-500/30', bg: 'bg-rose-500/10', text: 'text-rose-300' };
+  return { border: 'border-amber-500/30', bg: 'bg-amber-500/10', text: 'text-amber-300' };
+}
+
+function extractPhrases(phrasesText) {
+  return phrasesText.split('\n').map((line) => line.replace(/^\d+\.\s*/, '').trim()).filter(Boolean);
+}
+
+function CopyButton({ text, label = 'Copy' }) {
+  const [copied, setCopied] = useState(false);
+  async function handleCopy() {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (e) { /* clipboard may be unavailable */ }
+  }
+  return (
+    <button type="button" onClick={handleCopy} className="rounded-full border border-slate-700 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-slate-300 transition hover:border-slate-500">
+      {copied ? 'Copied!' : label}
+    </button>
+  );
+}
+
+function SalaryCoachView({ content }) {
+  const sections = parseSalaryCoach(content);
+  const positionColors = getPositionColor(sections.position);
+  const phrases = extractPhrases(sections.phrases);
+  const badPhrases = extractPhrases(sections.notToSay);
+
+  return (
+    <div className="grid gap-5">
+      <div className="rounded-3xl border border-emerald-500/30 bg-emerald-500/10 p-5">
+        <h3 className="mb-2 text-sm font-bold uppercase tracking-[0.25em] text-emerald-300">Estimated Range</h3>
+        <p className="text-lg font-semibold text-emerald-200">{sections.range}</p>
+      </div>
+      <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+        <h3 className="mb-3 text-sm font-bold uppercase tracking-[0.25em] text-slate-300">Why This Range</h3>
+        <p className="text-sm leading-7 text-slate-200">{sections.why}</p>
+      </div>
+      <div className={`rounded-3xl border ${positionColors.border} ${positionColors.bg} p-5`}>
+        <h3 className={`mb-3 text-sm font-bold uppercase tracking-[0.25em] ${positionColors.text}`}>Your Negotiation Position</h3>
+        <p className={`text-sm leading-7 ${positionColors.text}`}>{sections.position}</p>
+      </div>
+      <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
+        <h3 className="mb-4 text-sm font-bold uppercase tracking-[0.25em] text-slate-300">Exact Phrases to Use</h3>
+        <div className="grid gap-3">
+          {phrases.map((phrase, i) => (
+            <div key={`phrase-${i}`} className="flex items-start justify-between gap-3 rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+              <p className="text-sm leading-6 text-slate-200">
+                <span className="mr-2 text-xs font-bold text-cyan-300">{i + 1}.</span>{phrase}
+              </p>
+              <CopyButton text={phrase} />
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="rounded-3xl border border-rose-500/30 bg-rose-500/10 p-5">
+        <h3 className="mb-3 text-sm font-bold uppercase tracking-[0.25em] text-rose-300">What Not to Say</h3>
+        <div className="grid gap-2">
+          {badPhrases.map((phrase, i) => (
+            <p key={`bad-${i}`} className="text-sm leading-6 text-rose-200">
+              <span className="mr-2 text-xs font-bold text-rose-400">{i + 1}.</span>{phrase}
+            </p>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LearningPathView({ content }) {
+  const [expandedIndex, setExpandedIndex] = useState(null);
+  function toggleCard(index) { setExpandedIndex(expandedIndex === index ? null : index); }
+
+  return (
+    <div className="grid gap-4">
+      {content.map((item, index) => {
+        const isExpanded = expandedIndex === index;
+        return (
+          <article key={`${item.skill}-${index}`} className="rounded-3xl border border-white/10 bg-white/5 overflow-hidden">
+            <button type="button" onClick={() => toggleCard(index)} className="flex w-full items-center justify-between gap-4 p-5 text-left transition hover:bg-white/5">
+              <div className="flex items-center gap-3">
+                <p className="text-sm font-medium text-cyan-200">{item.skill}</p>
+                <span className="rounded-full bg-cyan-400/10 px-3 py-0.5 text-[10px] uppercase tracking-[0.2em] text-cyan-300">{item.total_honest_hours} hours total</span>
+              </div>
+              <span className="text-xs text-slate-400">{isExpanded ? '▲' : '▼'}</span>
+            </button>
+            {isExpanded && (
+              <div className="border-t border-white/10 p-5 pt-4">
+                <div className="mb-5">
+                  <h4 className="mb-3 text-xs font-bold uppercase tracking-[0.25em] text-slate-400">Resources</h4>
+                  <div className="grid gap-2">
+                    {item.sources.map((source, sIndex) => (
+                      <div key={`source-${sIndex}`} className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="shrink-0 text-xs text-slate-400">{SOURCE_LABELS[source.type] || source.type}</span>
+                          <a href={source.url} target="_blank" rel="noreferrer" className="truncate text-sm text-cyan-300 underline underline-offset-4">{source.title}</a>
+                        </div>
+                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.15em] ${source.free ? 'bg-emerald-500/10 text-emerald-300' : 'bg-amber-500/10 text-amber-300'}`}>
+                          {source.free ? 'Free' : 'Paid'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="mb-5">
+                  <h4 className="mb-3 text-xs font-bold uppercase tracking-[0.25em] text-slate-400">Day Plan</h4>
+                  <div className="grid gap-2">
+                    {item.day_plan.map((day, dIndex) => (
+                      <div key={`day-${dIndex}`} className="flex items-start gap-3 rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3">
+                        <span className="shrink-0 rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-bold text-cyan-300">Day {day.day}</span>
+                        <p className="flex-1 text-sm leading-6 text-slate-200">{day.goal}</p>
+                        <span className="shrink-0 text-xs text-slate-400">{day.duration_minutes} min</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="mb-2 text-xs text-slate-400">Paste this into Claude, ChatGPT, or Gemini to get a personal tutor</p>
+                  <div className="relative rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+                    <pre className="whitespace-pre-wrap text-xs leading-6 text-slate-300">{item.self_study_prompt}</pre>
+                    <div className="mt-3 flex justify-end"><CopyButton text={item.self_study_prompt} label="Copy prompt" /></div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function ColdEmailView({ content }) {
+  return (
+    <div className="relative rounded-3xl border border-white/10 bg-white/5 p-5">
+      <pre className="whitespace-pre-wrap text-sm leading-7 text-slate-200">{content}</pre>
+      <div className="mt-4 flex justify-end"><CopyButton text={content} label="Copy email" /></div>
+    </div>
+  );
+}
+
+// ─── Fade-in wrapper ─────────────────────────────────────────────────────────
+
+function FadeIn({ children, visible }) {
+  return (
+    <div
+      className="transition-opacity duration-300 ease-in"
+      style={{ opacity: visible ? 1 : 0, display: visible ? 'block' : 'none' }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// ─── Main Dashboard ──────────────────────────────────────────────────────────
 
 export default function Dashboard() {
   const auth = useSelector(selectAuth);
   const dispatch = useDispatch();
+  const abortRef = useRef(null);
+
+  // Form state
   const [selectedFile, setSelectedFile] = useState(null);
   const [jobDescription, setJobDescription] = useState('');
-  const [result, setResult] = useState(null);
-  const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [globalError, setGlobalError] = useState('');
+
+  // SSE result state
+  const [precheck, setPrecheck] = useState(null);
+  const [stage1, setStage1] = useState(null);
+  const [stage2, setStage2] = useState(null);
+  const [stage3, setStage3] = useState(null);
+  const [stageErrors, setStageErrors] = useState({});
+  const [analysisId, setAnalysisId] = useState(null);
+  const [isDone, setIsDone] = useState(false);
+
+  // Loading states per stage
+  const [loadingStages, setLoadingStages] = useState({ precheck: false, stage1: false, stage2: false, stage3: false });
 
   const modeLabel = useMemo(() => {
-    if (auth.isAuthenticated) {
-      return auth.user?.email || 'Authenticated session';
-    }
-
-    if (auth.guestMode) {
-      return 'Guest mode';
-    }
-
+    if (auth.isAuthenticated) return auth.user?.email || 'Authenticated session';
+    if (auth.guestMode) return 'Guest mode';
     return 'Anonymous session';
   }, [auth.guestMode, auth.isAuthenticated, auth.user]);
 
-  async function handleAnalyze(event) {
+  // Count ready features
+  const readyFeatures = useMemo(() => {
+    let count = 0;
+    if (stage1) count += 3;
+    if (stage2) count += 3;
+    if (stage3) count += 2;
+    return count;
+  }, [stage1, stage2, stage3]);
+
+  const hasStarted = precheck !== null || loadingStages.precheck;
+
+  const handleAnalyze = useCallback((event) => {
     event.preventDefault();
-    setError('');
-    setIsSubmitting(true);
+    setGlobalError('');
 
-    try {
-      if (!selectedFile) {
-        throw new Error('Please choose a PDF resume first.');
-      }
-
-      if (selectedFile.size > 1 * 1024 * 1024) {
-        throw new Error('PDF must be under 1 MB.');
-      }
-
-      const arrayBuffer = await selectedFile.arrayBuffer();
-      const contentBase64 = bufferToBase64(arrayBuffer);
-      const response = await api.post('/api/analyze', {
-        file: {
-          name: selectedFile.name,
-          type: selectedFile.type || 'application/pdf',
-          size: selectedFile.size,
-          contentBase64
-        },
-        jobDescription
-      });
-
-      setResult(response.data.data);
-      dispatch(
-        setCurrentAnalysis({
-          id: response.data.data.id,
-          companyName: response.data.data.companyName,
-          confidenceScore: response.data.data.confidenceScore,
-          summary: response.data.data.summary
-        })
-      );
-    } catch (requestError) {
-      setResult(null);
-      setError(requestError.response?.data?.error || requestError.message || 'Analysis failed.');
-    } finally {
-      setIsSubmitting(false);
+    if (!selectedFile) {
+      setGlobalError('Please choose a PDF or DOCX resume first.');
+      return;
     }
-  }
+
+    if (selectedFile.size > MAX_FILE_BYTES) {
+      setGlobalError('File must be under 5 MB.');
+      return;
+    }
+
+    // Reset all state
+    setPrecheck(null);
+    setStage1(null);
+    setStage2(null);
+    setStage3(null);
+    setStageErrors({});
+    setAnalysisId(null);
+    setIsDone(false);
+    setIsSubmitting(true);
+    setLoadingStages({ precheck: true, stage1: false, stage2: false, stage3: false });
+
+    if (abortRef.current) {
+      abortRef.current.abort();
+    }
+
+    const controller = streamAnalysis(
+      { file: selectedFile, jobDescription },
+      {
+        onPrecheck(data) {
+          setPrecheck(data);
+          setLoadingStages((prev) => ({
+            ...prev,
+            precheck: false,
+            stage1: data.canProceed ? true : false
+          }));
+        },
+        onStage1(data) {
+          setStage1(data);
+          setLoadingStages((prev) => ({
+            ...prev,
+            stage1: false,
+            stage2: true,
+            stage3: true
+          }));
+          // Dispatch to Redux for history
+          dispatch(setCurrentAnalysis({
+            id: null,
+            companyName: data.companyName,
+            confidenceScore: data.confidenceScore,
+            summary: data.summary
+          }));
+        },
+        onStage2(data) {
+          setStage2(data);
+          setLoadingStages((prev) => ({ ...prev, stage2: false }));
+        },
+        onStage3(data) {
+          setStage3(data);
+          setLoadingStages((prev) => ({ ...prev, stage3: false }));
+        },
+        onAnalysisId(data) {
+          setAnalysisId(data.id);
+          dispatch(setCurrentAnalysis({
+            id: data.id,
+            companyName: stage1?.companyName || null,
+            confidenceScore: stage1?.confidenceScore || 0,
+            summary: stage1?.summary || ''
+          }));
+        },
+        onError(errorMsg, stageName) {
+          if (stageName) {
+            setStageErrors((prev) => ({ ...prev, [stageName]: errorMsg }));
+            setLoadingStages((prev) => ({ ...prev, [stageName]: false }));
+          } else {
+            setGlobalError(errorMsg);
+          }
+        },
+        onDone() {
+          setIsDone(true);
+          setIsSubmitting(false);
+          setLoadingStages({ precheck: false, stage1: false, stage2: false, stage3: false });
+        }
+      }
+    );
+
+    abortRef.current = controller;
+  }, [selectedFile, jobDescription, dispatch, stage1]);
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(34,211,238,0.18),_transparent_38%),linear-gradient(180deg,_#020617_0%,_#020617_35%,_#0f172a_100%)] px-6 py-10 text-slate-100">
       <div className="mx-auto max-w-7xl space-y-8">
+        {/* ── Header ─────────────────────────────────────────────────────── */}
         <header className="flex flex-col gap-4 rounded-[2rem] border border-white/10 bg-slate-900/70 p-6 backdrop-blur lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-2">
             <p className="text-xs uppercase tracking-[0.35em] text-cyan-300">Aptico Analysis Lab</p>
             <h1 className="text-3xl font-semibold tracking-tight text-white">Resume confidence analysis</h1>
-            <p className="text-sm text-slate-300">Upload a PDF resume, paste a job description, and inspect the structured gap analysis.</p>
+            <p className="text-sm text-slate-300">Upload a PDF resume, paste a job description, and inspect all 8 AI-driven insights in real time.</p>
           </div>
           <div className="flex flex-col items-start gap-3 rounded-3xl border border-white/10 bg-white/5 px-5 py-4 text-sm text-slate-300">
             <span className="text-xs uppercase tracking-[0.25em] text-slate-400">Current mode</span>
@@ -103,37 +509,35 @@ export default function Dashboard() {
           </div>
         </header>
 
+        {/* ── Form + Gauge ───────────────────────────────────────────────── */}
         <div className="grid gap-8 xl:grid-cols-[1.05fr_0.95fr]">
           <section className="rounded-[2rem] border border-white/10 bg-slate-900/70 p-6 backdrop-blur">
             <form className="space-y-6" onSubmit={handleAnalyze}>
               <div className="grid gap-6 md:grid-cols-2">
                 <label className="block rounded-3xl border border-dashed border-slate-700 bg-slate-950/50 p-6 transition hover:border-cyan-400">
-                  <span className="text-xs uppercase tracking-[0.25em] text-slate-400">Resume PDF</span>
+                  <span className="text-xs uppercase tracking-[0.25em] text-slate-400">Resume (PDF / DOCX)</span>
                   <input
                     type="file"
-                    accept=".pdf,application/pdf"
+                    accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                     className="mt-4 block w-full text-sm text-slate-300 file:mr-4 file:rounded-full file:border-0 file:bg-cyan-400 file:px-4 file:py-2 file:text-sm file:font-medium file:text-slate-950"
-                    onChange={(event) => {
-                      setSelectedFile(event.target.files?.[0] || null);
-                    }}
+                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
                   />
                   <p className="mt-4 text-sm text-slate-400">
-                    {selectedFile ? `${selectedFile.name} · ${(selectedFile.size / 1024).toFixed(1)} KB` : 'Choose a PDF under 1 MB.'}
+                    {selectedFile ? `${selectedFile.name} · ${(selectedFile.size / 1024).toFixed(1)} KB` : 'Choose a file under 5 MB.'}
                   </p>
                 </label>
-
                 <label className="block rounded-3xl border border-white/10 bg-slate-950/50 p-6">
                   <span className="text-xs uppercase tracking-[0.25em] text-slate-400">Job description</span>
                   <textarea
                     value={jobDescription}
-                    onChange={(event) => setJobDescription(event.target.value)}
+                    onChange={(e) => setJobDescription(e.target.value)}
                     className="mt-4 h-48 w-full rounded-2xl border border-slate-700 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400"
                     placeholder="Paste the target job description here..."
+                    maxLength={10000}
                     required
                   />
                 </label>
               </div>
-
               <button
                 type="submit"
                 disabled={isSubmitting}
@@ -142,98 +546,166 @@ export default function Dashboard() {
                 {isSubmitting ? 'Analyzing...' : 'Analyze resume'}
               </button>
             </form>
-
-            {error ? (
-              <div className="mt-6 rounded-3xl border border-rose-500/30 bg-rose-500/10 px-5 py-4 text-sm text-rose-200">
-                {error}
-              </div>
+            {globalError ? (
+              <div className="mt-6 rounded-3xl border border-rose-500/30 bg-rose-500/10 px-5 py-4 text-sm text-rose-200">{globalError}</div>
             ) : null}
           </section>
 
           <section className="rounded-[2rem] border border-white/10 bg-slate-900/70 p-6 backdrop-blur">
             <div className="flex h-full flex-col items-center justify-center gap-6 rounded-3xl border border-white/10 bg-slate-950/50 p-6 text-center">
-              <Gauge value={result?.confidenceScore || 0} />
+              <Gauge value={stage1?.confidenceScore || 0} />
               <div className="space-y-3">
                 <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Analysis summary</p>
-                <h2 className="text-2xl font-semibold text-white">{result?.companyName || 'Awaiting analysis result'}</h2>
+                <h2 className="text-2xl font-semibold text-white">{stage1?.companyName || 'Awaiting analysis result'}</h2>
                 <p className="max-w-md text-sm leading-6 text-slate-300">
-                  {result?.summary || 'Your structured Gemini analysis will appear here once the PDF and job description are submitted.'}
+                  {stage1?.summary || 'Your structured analysis will appear here once the resume and job description are submitted.'}
                 </p>
               </div>
             </div>
           </section>
         </div>
 
-        <div className="grid gap-8 xl:grid-cols-[0.9fr_1.1fr]">
-          <section className="rounded-[2rem] border border-white/10 bg-slate-900/70 p-6 backdrop-blur">
-            <div className="space-y-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Keyword mismatches</p>
-                <h2 className="mt-2 text-2xl font-semibold text-white">Missing signal areas</h2>
-              </div>
-              <div className="grid gap-4">
-                {(result?.keywordMismatches || []).length ? (
-                  result.keywordMismatches.map((item, index) => (
-                    <article key={`${item.keyword}-${index}`} className="rounded-3xl border border-white/10 bg-slate-950/60 p-5">
-                      <p className="text-sm font-medium text-cyan-300">{item.keyword}</p>
-                      <p className="mt-2 text-sm leading-6 text-slate-200">{item.jobRequirement}</p>
-                      <p className="mt-3 text-xs uppercase tracking-[0.2em] text-slate-500">Resume evidence</p>
-                      <p className="mt-1 text-sm leading-6 text-slate-300">{item.resumeEvidence}</p>
-                      <p className="mt-3 text-xs text-slate-500">{item.importance}</p>
-                    </article>
-                  ))
-                ) : (
-                  <div className="rounded-3xl border border-dashed border-slate-700 px-5 py-6 text-sm text-slate-400">
-                    Keyword mismatches will render here once analysis completes.
-                  </div>
-                )}
-              </div>
-            </div>
-          </section>
+        {/* ── Results Area ────────────────────────────────────────────────── */}
+        {hasStarted && (
+          <div className="space-y-6">
+            {/* Progress bar */}
+            {!isDone && precheck?.canProceed && (
+              <ProgressBar ready={readyFeatures} />
+            )}
 
-          <section className="rounded-[2rem] border border-white/10 bg-slate-900/70 p-6 backdrop-blur">
-            <div className="space-y-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Seniority alignment</p>
-                <h2 className="mt-2 text-2xl font-semibold text-white">Level gaps and rewrites</h2>
-              </div>
-              <div className="grid gap-4">
-                {(result?.seniorityMismatches || []).length ? (
-                  result.seniorityMismatches.map((item, index) => (
-                    <article key={`${item.topic}-${index}`} className="rounded-3xl border border-white/10 bg-slate-950/60 p-5">
-                      <p className="text-sm font-medium text-amber-300">{item.topic}</p>
-                      <div className="mt-3 grid gap-3 md:grid-cols-2">
-                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Resume level</p>
-                          <p className="mt-2 text-sm text-slate-200">{item.resumeLevel}</p>
-                        </div>
-                        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                          <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Target level</p>
-                          <p className="mt-2 text-sm text-slate-200">{item.targetLevel}</p>
-                        </div>
+            {/* Precheck card (failed) */}
+            {precheck && !precheck.canProceed && (
+              <FadeIn visible={true}>
+                <PrecheckFailedCard score={precheck.score} reason={precheck.reason} />
+              </FadeIn>
+            )}
+
+            {/* Precheck card (passed) */}
+            {precheck?.canProceed && (
+              <FadeIn visible={true}>
+                <div className="rounded-[2rem] border border-emerald-500/20 bg-emerald-500/5 px-6 py-4 flex items-center gap-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/20">
+                    <span className="text-lg font-bold text-emerald-400">✓</span>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-emerald-300">Compatibility check passed — score: {precheck.score}/100</p>
+                    <p className="text-xs text-slate-400">{precheck.reason}</p>
+                  </div>
+                </div>
+              </FadeIn>
+            )}
+
+            {/* ── Stage 1 — Features 1, 2, 3 ─────────────────────────────── */}
+            {(stage1 || loadingStages.stage1) && (
+              <FadeIn visible={true}>
+                <div className="space-y-6">
+                  {/* Feature 1: Gap Analysis */}
+                  <CollapsibleCard title="Resume & JD Gap Analysis" badge="Feature 1" badgeColor="cyan" featureNumber={1}>
+                    {stage1 ? (
+                      <div className="grid gap-4">
+                        {(stage1.keywordMismatches || []).length ? (
+                          stage1.keywordMismatches.map((item, i) => (
+                            <article key={`kw-${i}`} className="rounded-3xl border border-white/10 bg-slate-950/60 p-5">
+                              <p className="text-sm font-medium text-cyan-300">{item.keyword}</p>
+                              <p className="mt-2 text-sm leading-6 text-slate-200">{item.jobRequirement}</p>
+                              <p className="mt-3 text-xs uppercase tracking-[0.2em] text-slate-500">Resume evidence</p>
+                              <p className="mt-1 text-sm leading-6 text-slate-300">{item.resumeEvidence}</p>
+                              <p className="mt-3 text-xs text-slate-500">{item.importance}</p>
+                            </article>
+                          ))
+                        ) : (
+                          <div className="rounded-3xl border border-dashed border-slate-700 px-5 py-6 text-sm text-slate-400">
+                            No significant keyword mismatches found.
+                          </div>
+                        )}
                       </div>
-                      <p className="mt-4 text-sm leading-6 text-slate-300">{item.explanation}</p>
-                    </article>
-                  ))
-                ) : (
-                  <div className="rounded-3xl border border-dashed border-slate-700 px-5 py-6 text-sm text-slate-400">
-                    Seniority mismatch insights will render here after the Gemini response.
-                  </div>
-                )}
-              </div>
-            </div>
-          </section>
-        </div>
+                    ) : <SkeletonBlock lines={5} />}
+                  </CollapsibleCard>
 
-        <section className="rounded-[2rem] border border-white/10 bg-slate-900/70 p-6 backdrop-blur">
-          <div className="space-y-4">
-            <div>
-              <p className="text-xs uppercase tracking-[0.25em] text-slate-400">Bullet rewrite diff</p>
-              <h2 className="mt-2 text-2xl font-semibold text-white">Before and after suggestions</h2>
-            </div>
-            <DiffViewer items={result?.rewriteSuggestions || []} />
+                  {/* Feature 2: Bullet Rewriter */}
+                  <CollapsibleCard title="Resume Bullet Rewriter" badge="Feature 2" badgeColor="emerald" featureNumber={2}>
+                    {stage1 ? <DiffViewer items={stage1.rewriteSuggestions || []} /> : <SkeletonBlock lines={4} />}
+                  </CollapsibleCard>
+
+                  {/* Feature 3: Seniority Alignment */}
+                  <CollapsibleCard title="Seniority Alignment" badge="Feature 3" badgeColor="amber" featureNumber={3}>
+                    {stage1 ? (
+                      <div className="grid gap-4">
+                        {(stage1.seniorityMismatches || []).length ? (
+                          stage1.seniorityMismatches.map((item, i) => (
+                            <article key={`sm-${i}`} className="rounded-3xl border border-white/10 bg-slate-950/60 p-5">
+                              <p className="text-sm font-medium text-amber-300">{item.topic}</p>
+                              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Resume level</p>
+                                  <p className="mt-2 text-sm text-slate-200">{item.resumeLevel}</p>
+                                </div>
+                                <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">Target level</p>
+                                  <p className="mt-2 text-sm text-slate-200">{item.targetLevel}</p>
+                                </div>
+                              </div>
+                              <p className="mt-4 text-sm leading-6 text-slate-300">{item.explanation}</p>
+                            </article>
+                          ))
+                        ) : (
+                          <div className="rounded-3xl border border-dashed border-slate-700 px-5 py-6 text-sm text-slate-400">
+                            No seniority gaps detected.
+                          </div>
+                        )}
+                      </div>
+                    ) : <SkeletonBlock lines={4} />}
+                  </CollapsibleCard>
+                </div>
+              </FadeIn>
+            )}
+
+            {stageErrors.stage1 && <StageErrorCard message={stageErrors.stage1} />}
+
+            {/* ── Stage 2 — Features 4, 5, 6 ─────────────────────────────── */}
+            {(stage2 || loadingStages.stage2) && (
+              <FadeIn visible={true}>
+                <div className="space-y-6">
+                  {/* Feature 4: Interview Questions */}
+                  <CollapsibleCard title="Interview Question Predictor" badge="Feature 4" badgeColor="violet" featureNumber={4}>
+                    {stage2 ? <InterviewQuestionsView questions={stage2.interviewQuestions} /> : <SkeletonBlock lines={5} />}
+                  </CollapsibleCard>
+
+                  {/* Feature 5: Rejection Predictor */}
+                  <CollapsibleCard title="Rejection Reason Predictor" badge="Feature 5" badgeColor="rose" featureNumber={5}>
+                    {stage2 ? <RejectionPredictorView content={stage2.rejectionReasons} /> : <SkeletonBlock lines={5} />}
+                  </CollapsibleCard>
+
+                  {/* Feature 6: Salary Coach */}
+                  <CollapsibleCard title="Salary Negotiation Coach" badge="Feature 6" badgeColor="emerald" featureNumber={6}>
+                    {stage2 ? <SalaryCoachView content={stage2.salaryCoach} /> : <SkeletonBlock lines={5} />}
+                  </CollapsibleCard>
+                </div>
+              </FadeIn>
+            )}
+
+            {stageErrors.stage2 && <StageErrorCard message={stageErrors.stage2} />}
+
+            {/* ── Stage 3 — Features 7, 8 ─────────────────────────────────── */}
+            {(stage3 || loadingStages.stage3) && (
+              <FadeIn visible={true}>
+                <div className="space-y-6">
+                  {/* Feature 7: Skill Gap Learning Path */}
+                  <CollapsibleCard title="Skill Gap Learning Path" badge="Feature 7" badgeColor="sky" featureNumber={7}>
+                    {stage3 ? <LearningPathView content={stage3.learningPath} /> : <SkeletonBlock lines={5} />}
+                  </CollapsibleCard>
+
+                  {/* Feature 8: Cold Email Generator */}
+                  <CollapsibleCard title="Cold Email & DM Generator" badge="Feature 8" badgeColor="indigo" featureNumber={8}>
+                    {stage3 ? <ColdEmailView content={stage3.coldEmail} /> : <SkeletonBlock lines={4} />}
+                  </CollapsibleCard>
+                </div>
+              </FadeIn>
+            )}
+
+            {stageErrors.stage3 && <StageErrorCard message={stageErrors.stage3} />}
           </div>
-        </section>
+        )}
       </div>
     </main>
   );

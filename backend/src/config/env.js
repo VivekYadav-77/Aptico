@@ -27,6 +27,7 @@ const envSchema = z.object({
   GEMINI_MODEL_2: z.string().trim().min(1).default('gemini-3.1-flash-lite'),
   GEMINI_MODEL_3: z.string().trim().min(1).default('gemini-3.1-flash-lite'),
   GEMINI_MODEL_FALLBACK: z.string().trim().min(1).default('gemini-3.1-flash-lite'),
+  GEMINI_PRECHECK_API_KEY: z.string().trim().min(1).optional(),
   GEMINI_KEY_1: z.string().trim().min(1).optional(),
   GEMINI_KEY_2: z.string().trim().min(1).optional(),
   GEMINI_KEY_3: z.string().trim().min(1).optional(),
@@ -50,6 +51,14 @@ if (!parsedEnv.success) {
   throw new Error(`Invalid environment configuration: ${parsedEnv.error.message}`);
 }
 
+// Startup key-presence warnings
+const KEY_NAMES = ['GEMINI_PRECHECK_API_KEY', 'GEMINI_KEY_1', 'GEMINI_KEY_2', 'GEMINI_KEY_3', 'GEMINI_KEY_FALLBACK'];
+for (const keyName of KEY_NAMES) {
+  if (!parsedEnv.data[keyName]) {
+    console.warn(`[env] WARNING: ${keyName} is not set. Features relying on it will be unavailable.`);
+  }
+}
+
 export const env = {
   nodeEnv: parsedEnv.data.NODE_ENV,
   host: parsedEnv.data.HOST,
@@ -65,6 +74,11 @@ export const env = {
   geminiModel2: parsedEnv.data.GEMINI_MODEL_2,
   geminiModel3: parsedEnv.data.GEMINI_MODEL_3,
   geminiModelFallback: parsedEnv.data.GEMINI_MODEL_FALLBACK,
+  geminiPrecheckKey: parsedEnv.data.GEMINI_PRECHECK_API_KEY || null,
+  geminiKey1: parsedEnv.data.GEMINI_KEY_1 || null,
+  geminiKey2: parsedEnv.data.GEMINI_KEY_2 || null,
+  geminiKey3: parsedEnv.data.GEMINI_KEY_3 || null,
+  geminiKeyFallback: parsedEnv.data.GEMINI_KEY_FALLBACK || null,
   geminiKeys: [parsedEnv.data.GEMINI_KEY_1, parsedEnv.data.GEMINI_KEY_2, parsedEnv.data.GEMINI_KEY_3, parsedEnv.data.GEMINI_KEY_FALLBACK].filter(Boolean),
   googleClientId: parsedEnv.data.GOOGLE_CLIENT_ID || null,
   googleTokenInfoUrl: parsedEnv.data.GOOGLE_TOKENINFO_URL,

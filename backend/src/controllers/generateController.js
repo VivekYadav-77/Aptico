@@ -11,7 +11,9 @@ const requestSchema = z.object({
   url: z.string().trim().url().optional()
 });
 
+
 export async function generateController(request, reply) {
+  console.log("in the generate controller")
   try {
     const body = requestSchema.parse(request.body || {});
     const generated = await generateApplyKitContent({

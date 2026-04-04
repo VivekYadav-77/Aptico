@@ -28,6 +28,9 @@ export function getGeminiKeys(keys) {
 
 export function createGeminiClient(apiKey, clientFactory) {
   if (clientFactory) {
+    if (typeof clientFactory !== "function") {
+      throw new Error("clientFactory must be a function");
+    }
     return clientFactory(apiKey);
   }
 
@@ -51,7 +54,9 @@ export async function callGeminiWithRotation({ prompt, model, keys, clientFactor
       });
 
       nextKeyIndex = (nextKeyIndex + 1) % totalKeys;
-      return response.text;
+      return typeof response.text === "function"
+        ? response.text()
+        : response.text;
     } catch (error) {
       lastError = error;
 
