@@ -59,14 +59,26 @@ const stage3Schema = z.object({
     z.object({
       skill: z.string().trim().min(1),
       total_honest_hours: z.number().int().positive(),
+      why_learn_first: z.string().trim().min(1).optional(),
+      difficulty: z.enum(['Beginner', 'Intermediate', 'Advanced']).optional(),
       sources: z.array(
         z.object({
-          type: z.enum(['youtube', 'course', 'docs', 'site', 'bootcamp']),
+          type: z.enum(['youtube', 'course', 'docs', 'site', 'bootcamp', 'github']),
           title: z.string().trim().min(1),
           url: z.string().trim().min(1),
-          free: z.boolean()
+          free: z.boolean(),
+          why: z.string().trim().min(1).optional()
         })
       ).min(1),
+      resources: z.array(
+        z.object({
+          type: z.enum(['youtube', 'course', 'docs', 'site', 'bootcamp', 'github']),
+          title: z.string().trim().min(1),
+          url: z.string().trim().min(1),
+          free: z.boolean(),
+          why: z.string().trim().min(1).optional()
+        })
+      ).optional(),
       day_plan: z.array(
         z.object({
           day: z.number().int().positive(),
@@ -74,7 +86,23 @@ const stage3Schema = z.object({
           duration_minutes: z.number().int().positive()
         })
       ).min(1),
-      self_study_prompt: z.string().trim().min(1)
+      day_bootcamp: z.array(
+        z.object({
+          day: z.number().int().positive(),
+          focus: z.string().trim().min(1),
+          tasks: z.array(z.string().trim().min(1)),
+          practice_question: z.string().trim().min(1).optional()
+        })
+      ).optional(),
+      self_study_prompt: z.string().trim().min(1),
+      ai_tutor_prompt: z.string().trim().min(1).optional(),
+      projects: z.array(
+        z.object({
+          title: z.string().trim().min(1),
+          description: z.string().trim().min(1),
+          github_search: z.string().trim().min(1)
+        })
+      ).optional()
     })
   ),
   coldEmail: z.string().trim().min(1)
@@ -170,16 +198,33 @@ const stage3JsonSchema = {
         properties: {
           skill: { type: 'string' },
           total_honest_hours: { type: 'integer' },
+          why_learn_first: { type: 'string' },
+          difficulty: { type: 'string', enum: ['Beginner', 'Intermediate', 'Advanced'] },
           sources: {
             type: 'array',
             items: {
               type: 'object',
               required: ['type', 'title', 'url', 'free'],
               properties: {
-                type: { type: 'string', enum: ['youtube', 'course', 'docs', 'site', 'bootcamp'] },
+                type: { type: 'string', enum: ['youtube', 'course', 'docs', 'site', 'bootcamp', 'github'] },
                 title: { type: 'string' },
                 url: { type: 'string' },
-                free: { type: 'boolean' }
+                free: { type: 'boolean' },
+                why: { type: 'string' }
+              }
+            }
+          },
+          resources: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['type', 'title', 'url', 'free'],
+              properties: {
+                type: { type: 'string', enum: ['youtube', 'course', 'docs', 'site', 'bootcamp', 'github'] },
+                title: { type: 'string' },
+                url: { type: 'string' },
+                free: { type: 'boolean' },
+                why: { type: 'string' }
               }
             }
           },
@@ -195,7 +240,33 @@ const stage3JsonSchema = {
               }
             }
           },
-          self_study_prompt: { type: 'string' }
+          day_bootcamp: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['day', 'focus', 'tasks'],
+              properties: {
+                day: { type: 'integer' },
+                focus: { type: 'string' },
+                tasks: { type: 'array', items: { type: 'string' } },
+                practice_question: { type: 'string' }
+              }
+            }
+          },
+          self_study_prompt: { type: 'string' },
+          ai_tutor_prompt: { type: 'string' },
+          projects: {
+            type: 'array',
+            items: {
+              type: 'object',
+              required: ['title', 'description', 'github_search'],
+              properties: {
+                title: { type: 'string' },
+                description: { type: 'string' },
+                github_search: { type: 'string' }
+              }
+            }
+          }
         }
       }
     },
@@ -207,28 +278,49 @@ const stage3JsonSchema = {
 
 function buildStage1Prompt(resumeText, jobDescription) {
   return [
-    'You are Aptico, an AI career analysis engine.',
-    'Analyze the resume against the job description and return only valid JSON matching the provided schema.',
+    'You are Aptico, a senior technical career analyst.You have reviewed thousands of resumes and hiring decisions. You think like a hiring manager at a top tech company and a career coach simultaneously.',
+    'Analyze this resume against this job description with brutal honesty and surgical precision. You are not here to encourage. You are here to give the candidate the exact truth they need to either fix their resume or understand where they truly stand.',
     '',
-    'You MUST do ALL of the following in a single response:',
+    'Return only valid JSON matching the provided schema. Every field is mandatory. Do not leave any array empty if evidence exists.',
     '',
-    '1. Extract a "sharedContext" object with these fields:',
-    '   - skillsPresent: array of skills found in the resume',
-    '   - skillsMissing: array of skills required by the JD but absent from the resume',
-    '   - toneAssessment: brief assessment of resume tone and writing quality',
-    '   - seniorityLevel: detected seniority level (e.g. "Junior", "Mid-Level", "Senior")',
-    '   - jobDomain: job domain and role type (e.g. "Backend Engineering")',
-    '   - companyName: company name if found in JD, otherwise "Unknown"',
-    '   - strongestMatch: the single strongest skill match between resume and JD',
-    '   - estimatedYoe: estimated years of experience as a number',
+    'SHARED CONTEXT — extract with precision:',
     '',
-    '2. Produce "confidenceScore" (integer 0-100) and "summary" (paragraph).',
+    'skillsPresent: List every technical skill, tool, framework, language, methodology, and domain explicitly demonstrated or clearly implied by work experience in the resume. Be specific. Not "programming" — write "Python", "React", "REST APIs".',
+    'skillsMissing: List every skill, tool, framework, or domain the JD requires or strongly implies that is completely absent from the resume. Be specific and exhaustive.',
+    'toneAssessment: Assess the resume writing quality in 4 sentences. Is it passive or active voice? Vague or quantified? Generic or tailored? Example: "Resume uses passive constructions and lacks quantified impact. Bullet points read as task lists rather than achievement statements."',
+    'seniorityLevel: One of — Intern, Fresher, Junior, Mid-Level, Senior, Lead, Principal. Base this on years of experience, scope of work, and technologies used.',
+    'jobDomain: Specific domain and role type. Example: "Full-Stack Web Development — React + Node.js" or "Data Engineering — Python + Spark".',
+    'companyName: Extract from JD if present. Return "Unknown" if not found.',
+    'strongestMatch: The single skill or experience that most strongly connects this resume to this JD.',
+    'estimatedYoe: Estimate years of experience as an integer. Count from first relevant role or graduation if fresher.',
     '',
-    '3. Produce "keywordMismatches": array of missing keyword objects with keyword, jobRequirement, resumeEvidence, importance.',
+    'CONFIDENCE SCORE — integer 0 to 100 are here: ',
+    'This is the honest probability that this resume passes an initial screening for this exact role.',
+    '90-100: Near-perfect match. Minor gaps only.',
+    '70-89: Strong match with 1-2 meaningful gaps.',
+    '50-69: Moderate match. Several important gaps but core is present.',
+    '30-49: Weak match. Major skill or experience gaps.',
+    '0-29: Very poor match. Fundamental misalignment.',
     '',
-    '4. Produce "seniorityMismatches": array of level gap objects with topic, resumeLevel, targetLevel, explanation.',
+    'SUMMARY — one paragraph:',
+    'Write as if you are a senior hiring manager explaining your decision to a recruiter. Be direct. Name the biggest strengths and the most critical gaps. Do not use bullet points here.',
     '',
-    '5. Produce "rewriteSuggestions": array of bullet rewrite objects with original, rewritten, reason.',
+    'KEYWORD MISMATCHES — for each important skill or term in the JD that is absent or weak in the resume:',
+    'keyword: the exact skill or term from the JD',
+    'jobRequirement: why this matters for the role, one sentence',
+    'resumeEvidence: what the resume does or does not show about this skill — be specific, quote resume language if relevant',
+    'importance: one of — Critical, High, Medium, Low',
+    '',
+    'SENIORITY MISMATCHES — for each area where the candidate demonstrated level does not match what the JD expects:',
+    'topic: the specific area of mismatch (example: "System Design", "Team Leadership", "Production Deployment")',
+    'resumeLevel: what the resume demonstrates, one phrase',
+    'targetLevel: what the JD expects, one phrase',
+    'explanation: why this gap matters for this role, one sentence',
+    '',
+    'REWRITE SUGGESTIONS — identify the 3 to 5 weakest bullet points in the resume and rewrite them:',
+    'original: copy the exact original bullet point from the resume',
+    'rewritten: rewrite it using strong action verbs, quantified impact, and JD-relevant language',
+    'reason: one sentence explaining what was wrong and what the rewrite fixes',
     '',
     'Resume:',
     resumeText,
@@ -241,37 +333,53 @@ function buildStage1Prompt(resumeText, jobDescription) {
 function buildStage2Prompt(sharedContext) {
   const ctx = JSON.stringify(sharedContext);
   return [
-    'You are Aptico, an AI career analysis engine.',
-    'You are given a shared context object extracted from a prior resume + JD analysis. Use ONLY this context — do not request the raw resume or JD.',
-    'Return only valid JSON matching the provided schema.',
+    'You are Aptico, a senior technical career analyst and interview coach.',
+    'You are given a structured analysis context from a resume and job description comparison. Use only this context. Do not ask for the raw resume or JD.',
     '',
-    'Produce exactly three fields:',
+    'Return only valid JSON matching the provided schema. All three fields are mandatory.',
     '',
-    '1. "interviewQuestions": Array of exactly 5 likely interview questions specific to this role and these skill gaps.',
+    'INTERVIEW QUESTIONS — produce exactly 5 questions:',
+    'Each question must be directly derived from the skill gaps and role requirements in this context. Do not produce generic questions. Every question must be something a real interviewer would ask someone with exactly these gaps applying for exactly this role.',
+    'Pattern for each question: mix of technical depth questions on required skills, behavioral questions tied to the seniority level, and at least one question that directly probes the weakest skill gap.',
+    'Format: plain question string, no numbering, no preamble.',
     '',
-    '2. "rejectionReasons": A plain text string (NO markdown, NO JSON) that simulates both an ATS scan and a human recruiter eye scan. The output MUST follow this format:',
+    'REJECTION REASONS — plain text, no markdown, no JSON. Follow EXACTLY this format with no preamble or introduction. Start the response immediately with the header ATS SCAN:',
+    '',
     'ATS SCAN',
-    '- <point>',
-    'RECRUITER SCAN (first 10 seconds)',
-    '- <point>',
-    'VERDICT',
-    '<single paragraph>',
-    'Be specific, blunt, and reference exact issues.',
+    '- [specific reason tied to missing keywords or formatting issues from the context]',
+    '- [specific reason]',
+    '- [specific reason]',
     '',
-    '3. "salaryCoach": A plain text string (NO markdown, NO JSON) that follows this format:',
+    'RECRUITER SCAN (first 10 seconds)',
+    '- [specific reason a human would notice immediately — visual, structural, or content issue]',
+    '- [specific reason]',
+    '- [specific reason]',
+    '',
+    'VERDICT',
+    '[Maximum 3 sentences. Name ONLY the single most damaging issue from the above and the one specific thing that must change before reapplying. Be blunt and surgical. Do not list multiple issues.]',
+    '',
+    'Every bullet MUST start with a hyphen (-). Do not use asterisks, numbers, or other bullet characters.',
+    '',
+    'SALARY COACH — plain text, no markdown, no JSON. Follow EXACTLY this format. Every section header below is MANDATORY and must appear exactly as written:',
+    '',
     'ESTIMATED RANGE',
-    '₹<min>–₹<max>',
+    '₹[min]–₹[max] per month (or [X]–[Y] LPA if full-time role)',
+    'If the JD contains no salary signals, use current Indian market rates for the role domain and seniority level from the context. Never return an empty range.',
+    '',
     'WHY THIS RANGE',
-    '<2-3 sentences>',
+    '[2 to 3 sentences. Reference the role domain, seniority level, and skills from the context. Tie the range to signals in this specific context, not generic industry averages.]',
+    '',
     'YOUR NEGOTIATION POSITION',
-    '<STRONG | NEUTRAL | WEAK>: <explanation>',
+    '[STRONG | NEUTRAL | WEAK]: [One sentence explaining why, referencing the candidate strongest matching skill or their skill gaps]',
+    '',
     'EXACT PHRASES TO USE',
-    '1. <phrase>',
-    '2. <phrase>',
-    '3. <phrase>',
+    '1. [A specific email sentence to open salary discussion]',
+    '2. [A specific spoken sentence for a call or interview]',
+    '3. [A specific counter-offer sentence if they offer below range]',
+    '',
     'WHAT NOT TO SAY',
-    '1. <bad phrase>',
-    '2. <bad phrase>',
+    '1. [A phrase that signals desperation or inexperience]',
+    '2. [A phrase that undermines negotiating position]',
     '',
     'Shared Context:',
     ctx
@@ -281,20 +389,66 @@ function buildStage2Prompt(sharedContext) {
 function buildStage3Prompt(sharedContext) {
   const ctx = JSON.stringify(sharedContext);
   return [
-    'You are Aptico, an AI career analysis engine.',
-    'You are given a shared context object extracted from a prior resume + JD analysis. Use ONLY this context — do not request the raw resume or JD.',
-    'Return only valid JSON matching the provided schema.',
+    'You are Aptico, a senior learning architect and career strategist. You are given a structured analysis context. Use only this context. Do not ask for the raw resume or JD.',
     '',
-    'Produce exactly two fields:',
+    'Return only valid JSON matching the provided schema. Both fields are mandatory.',
     '',
-    '1. "learningPath": For EACH missing skill in the context, produce an object with:',
-    '   - skill: the missing skill name',
-    '   - total_honest_hours: realistic hours needed (50-120 for deep skills)',
-    '   - sources: array of resources with at least 1 YouTube, 1 docs, 1 free course, 1 bootcamp. Each has type, title, url, free.',
-    '   - day_plan: array of daily tasks (concrete, not vague). Each has day, goal, duration_minutes (30-90).',
-    '   - self_study_prompt: a prompt the user can paste into an AI tutor. Include skill name, current level, target level.',
+    'LEARNING PATH — for every skill in skillsMissing from the context: Produce a realistic, actionable learning plan. Do not produce vague or motivational content. Every item must be immediately usable by the candidate.',
     '',
-    '2. "coldEmail": A plain text personalized cold email to the hiring manager. Use the company name, role domain, and strongest matching skill from the context. No markdown. No placeholders.',
+    'Order skills by urgency — the skill that most blocks this candidate from getting this job comes first.',
+    '',
+    'skill: exact skill name from the missing skills list',
+    '',
+    'why_learn_first: one sentence explaining why this skill is at this position in the priority list relative to the others',
+    '',
+    'difficulty: one of "Beginner", "Intermediate", "Advanced" — based on how hard it is for someone at this candidate seniority level',
+    '',
+    'total_honest_hours: Be genuinely honest. Do not underestimate to encourage the user.',
+    '- A new programming language or framework: 40 to 80 hours',
+    '- A deep concept like system design or ML: 80 to 150 hours',
+    '- A tool or platform with docs: 10 to 30 hours',
+    '- A soft or process skill: 5 to 20 hours',
+    '',
+    'sources: Provide real, specific resources. Only provide URLs that actually exist today.',
+    '- At least 1 YouTube resource: link to a specific playlist or video, not a channel homepage',
+    '- At least 1 official documentation link: the actual technology docs page (e.g. https://react.dev/learn not https://react.dev)',
+    '- At least 1 free course: from freeCodeCamp, The Odin Project, Coursera audit, CS50, or equivalent',
+    '- At least 1 bootcamp-style resource: a structured multi-week resource',
+    '- At least 1 GitHub repository: a popular open-source repo for learning or reference. Use type "github".',
+    '- Set free: true only if the resource requires no payment',
+    '- For each resource add a "why" string explaining why this specific resource is the best choice for this skill',
+    '',
+    'day_plan: Provide as backward-compatible fallback. Concrete daily tasks not topics. Each day entry must describe what the person will build, watch, or practice.',
+    'duration_minutes must be between 30 and 90',
+    '',
+    'day_bootcamp: Array of exactly 7 objects for a 7-day intensive bootcamp on this skill.',
+    'Each object has:',
+    '  day: integer 1 through 7',
+    '  focus: string, max 4 words summarizing the day theme (e.g. "Core hooks deep dive")',
+    '  tasks: array of short, concrete action strings. Write as actions not topics. GOOD: "build a weather app using useState and useEffect", "watch Codevolution useEffect tutorial (45 min)". BAD: "learn React hooks", "study useState".',
+    '  practice_question: a single interview-style or conceptual question for that day topic that tests understanding',
+    '',
+    'projects: Array of exactly 2 project objects for this skill.',
+    'Each project has:',
+    '  title: short project name',
+    '  description: 1 to 2 sentences describing what to build and why it demonstrates the skill',
+    '  github_search: a GitHub search query string that would find reference implementations (e.g. "react todo app typescript")',
+    '',
+    'self_study_prompt: Write a prompt the user can paste directly into any AI tutor. Include the skill name, the candidate current level, the target level, and instructions for step-by-step teaching.',
+    '',
+    'ai_tutor_prompt: Write a complete, paste-ready prompt for an AI agent to run the 7-day bootcamp interactively. The prompt must instruct the AI to:',
+    '  - Teach one day at a time',
+    '  - Assign the practice question for that day',
+    '  - Wait for the user answer before proceeding',
+    '  - Evaluate the answer, explain if wrong, and only move to the next day when the answer is correct',
+    '  - At the end of all 7 days, give a final assessment and recommend next steps',
+    '  - Reference the specific projects as capstone assignments',
+    '',
+    'COLD EMAIL — plain text, no markdown, no JSON:',
+    'Write one complete, ready-to-send personalized cold email to the hiring manager. Use the company name, job domain, and strongest matching skill from the context.',
+    'Do not use placeholders like [Your Name] or [Company]. Use "I" for the sender and the actual company name and role domain from the context.',
+    'Structure: opening hook that shows you know the company or role specifically, one sentence on your strongest relevant skill with a concrete example, one sentence acknowledging you are still building one key skill and what you are doing about it, a direct ask for a call or interview, professional sign-off.',
+    'Tone: confident, direct, not desperate. Under 150 words.',
     '',
     'Shared Context:',
     ctx

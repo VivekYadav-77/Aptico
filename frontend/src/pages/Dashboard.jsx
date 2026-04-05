@@ -16,7 +16,8 @@ const SOURCE_LABELS = {
   course: '📚 Course',
   docs: '📄 Docs',
   site: '🌐 Site',
-  bootcamp: '🏕 Bootcamp'
+  bootcamp: '🏕 Bootcamp',
+  github: '🐙 GitHub'
 };
 
 // ─── Skeleton Loader ──────────────────────────────────────────────────────────
@@ -147,14 +148,32 @@ function InterviewQuestionsView({ questions }) {
 }
 
 function parseRejectionReasons(text) {
-  const sections = { ats: '', recruiter: '', verdict: '' };
-  const raw = String(text || '');
-  const atsMatch = raw.match(/ATS SCAN\s*\n([\s\S]*?)(?=RECRUITER SCAN|$)/i);
-  const recruiterMatch = raw.match(/RECRUITER SCAN[^\n]*\n([\s\S]*?)(?=VERDICT|$)/i);
-  const verdictMatch = raw.match(/VERDICT\s*\n([\s\S]*?)$/i);
-  if (atsMatch) sections.ats = atsMatch[1].trim();
-  if (recruiterMatch) sections.recruiter = recruiterMatch[1].trim();
-  if (verdictMatch) sections.verdict = verdictMatch[1].trim();
+  const sections = { ats: [], recruiter: [], verdict: '' };
+  const raw = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  const splitBullets = (block) =>
+    block.trim().split('\n')
+      .map(l => l.replace(/^\s*[-•*]\s*/, '').replace(/^\d+\.\s*/, '').trim())
+      .filter(Boolean);
+
+  const atsMatch = raw.match(/ATS\s+SCAN[:\s-]*\n?([\s\S]*?)(?=RECRUITER\s+SCAN|VERDICT|$)/i);
+  const recruiterMatch = raw.match(/RECRUITER\s+SCAN[^\n]*[:\s-]*\n?([\s\S]*?)(?=VERDICT|ATS\s+SCAN|$)/i);
+  const verdictMatch = raw.match(/VERDICT[:\s-]*\n?([\s\S]*?)$/i);
+
+  if (atsMatch) {
+    sections.ats = splitBullets(atsMatch[1]);
+  }
+  if (recruiterMatch) {
+    sections.recruiter = splitBullets(recruiterMatch[1]);
+  }
+  if (verdictMatch) {
+    sections.verdict = verdictMatch[1].trim();
+  }
+
+  if (!sections.ats.length && !sections.recruiter.length && !sections.verdict) {
+    sections.verdict = raw.split('\n').map(l => l.trim()).filter(Boolean).join(' ');
+  }
+
   return sections;
 }
 
@@ -163,34 +182,66 @@ function RejectionPredictorView({ content }) {
   return (
     <div className="grid gap-5">
       <div className="rounded-3xl border border-rose-500/30 bg-rose-500/10 p-5">
-        <h3 className="mb-3 text-sm font-bold uppercase tracking-[0.25em] text-rose-300">ATS Scan</h3>
-        <pre className="whitespace-pre-wrap text-sm leading-7 text-rose-200">{sections.ats}</pre>
+        <h3 className="mb-4 text-xs font-bold uppercase tracking-[0.25em] text-rose-300">ATS Scan</h3>
+        {sections.ats.length ? (
+          <div className="grid gap-2">
+            {sections.ats.map((point, i) => (
+              <div key={i} className="flex items-start gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/5 px-4 py-3">
+                <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-rose-500/30 text-[9px] font-bold text-rose-300">{i + 1}</span>
+                <p className="text-sm leading-6 text-rose-200">{point}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-rose-300/60">No ATS issues detected.</p>
+        )}
       </div>
-      <div className="rounded-3xl border border-rose-500/30 bg-rose-500/10 p-5">
-        <h3 className="mb-3 text-sm font-bold uppercase tracking-[0.25em] text-rose-300">Recruiter Scan (first 10 seconds)</h3>
-        <pre className="whitespace-pre-wrap text-sm leading-7 text-rose-200">{sections.recruiter}</pre>
+
+      <div className="rounded-3xl border border-orange-500/30 bg-orange-500/10 p-5">
+        <h3 className="mb-4 text-xs font-bold uppercase tracking-[0.25em] text-orange-300">Recruiter Scan (first 10 seconds)</h3>
+        {sections.recruiter.length ? (
+          <div className="grid gap-2">
+            {sections.recruiter.map((point, i) => (
+              <div key={i} className="flex items-start gap-3 rounded-2xl border border-orange-500/20 bg-orange-500/5 px-4 py-3">
+                <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-orange-500/30 text-[9px] font-bold text-orange-300">{i + 1}</span>
+                <p className="text-sm leading-6 text-orange-200">{point}</p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-orange-300/60">No immediate visual issues detected.</p>
+        )}
       </div>
-      <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
-        <h3 className="mb-3 text-sm font-bold uppercase tracking-[0.25em] text-slate-300">Verdict</h3>
-        <p className="text-sm leading-7 text-slate-200">{sections.verdict}</p>
+
+      <div className="rounded-3xl border border-white/10 bg-slate-950/60 p-5">
+        <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.25em] text-slate-300">Verdict</h3>
+        <p className="text-sm leading-7 text-slate-200">{sections.verdict || 'No verdict available.'}</p>
       </div>
     </div>
   );
 }
 
 function parseSalaryCoach(text) {
-  const sections = { range: '', why: '', position: '', phrases: '', notToSay: '' };
-  const raw = String(text || '');
-  const rangeMatch = raw.match(/ESTIMATED RANGE\s*\n([\s\S]*?)(?=WHY THIS RANGE|$)/i);
-  const whyMatch = raw.match(/WHY THIS RANGE\s*\n([\s\S]*?)(?=YOUR NEGOTIATION POSITION|$)/i);
-  const positionMatch = raw.match(/YOUR NEGOTIATION POSITION\s*\n([\s\S]*?)(?=EXACT PHRASES TO USE|$)/i);
-  const phrasesMatch = raw.match(/EXACT PHRASES TO USE\s*\n([\s\S]*?)(?=WHAT NOT TO SAY|$)/i);
-  const notToSayMatch = raw.match(/WHAT NOT TO SAY\s*\n([\s\S]*?)$/i);
-  if (rangeMatch) sections.range = rangeMatch[1].trim();
+  const sections = { range: '', why: '', position: '', phrases: [], notToSay: [] };
+  const raw = String(text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
+  const splitList = (block) =>
+    block.trim().split('\n')
+      .map(l => l.replace(/^\s*[-•*]\s*/, '').replace(/^\d+\.\s*/, '').trim())
+      .filter(Boolean);
+
+  const rangeMatch = raw.match(/ESTIMATED\s+RANGE[:\s-]*\n?([\s\S]*?)(?=WHY\s+THIS\s+RANGE|$)/i);
+  const whyMatch = raw.match(/WHY\s+THIS\s+RANGE[:\s-]*\n?([\s\S]*?)(?=YOUR\s+NEGOTIATION\s+POSITION|$)/i);
+  const positionMatch = raw.match(/YOUR\s+NEGOTIATION\s+POSITION[:\s-]*\n?([\s\S]*?)(?=EXACT\s+PHRASES\s+TO\s+USE|$)/i);
+  const phrasesMatch = raw.match(/EXACT\s+PHRASES\s+TO\s+USE[:\s-]*\n?([\s\S]*?)(?=WHAT\s+NOT\s+TO\s+SAY|$)/i);
+  const notToSayMatch = raw.match(/WHAT\s+NOT\s+TO\s+SAY[:\s-]*\n?([\s\S]*?)$/i);
+
+  if (rangeMatch) sections.range = rangeMatch[1].trim().split('\n').filter(Boolean).join(' ');
   if (whyMatch) sections.why = whyMatch[1].trim();
-  if (positionMatch) sections.position = positionMatch[1].trim();
-  if (phrasesMatch) sections.phrases = phrasesMatch[1].trim();
-  if (notToSayMatch) sections.notToSay = notToSayMatch[1].trim();
+  if (positionMatch) sections.position = positionMatch[1].trim().split('\n').filter(Boolean).join(' ');
+  if (phrasesMatch) sections.phrases = splitList(phrasesMatch[1]);
+  if (notToSayMatch) sections.notToSay = splitList(notToSayMatch[1]);
+
   return sections;
 }
 
@@ -224,102 +275,233 @@ function CopyButton({ text, label = 'Copy' }) {
 function SalaryCoachView({ content }) {
   const sections = parseSalaryCoach(content);
   const positionColors = getPositionColor(sections.position);
-  const phrases = extractPhrases(sections.phrases);
-  const badPhrases = extractPhrases(sections.notToSay);
 
   return (
     <div className="grid gap-5">
-      <div className="rounded-3xl border border-emerald-500/30 bg-emerald-500/10 p-5">
-        <h3 className="mb-2 text-sm font-bold uppercase tracking-[0.25em] text-emerald-300">Estimated Range</h3>
-        <p className="text-lg font-semibold text-emerald-200">{sections.range}</p>
+      <div className="rounded-3xl border border-emerald-500/30 bg-emerald-500/10 p-6 text-center">
+        <p className="mb-1 text-xs uppercase tracking-[0.25em] text-emerald-400">Estimated Range</p>
+        <p className="text-2xl font-bold text-emerald-200">{sections.range || '—'}</p>
       </div>
+
       <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
-        <h3 className="mb-3 text-sm font-bold uppercase tracking-[0.25em] text-slate-300">Why This Range</h3>
-        <p className="text-sm leading-7 text-slate-200">{sections.why}</p>
+        <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.25em] text-slate-300">Why This Range</h3>
+        <p className="text-sm leading-7 text-slate-200">{sections.why || '—'}</p>
       </div>
+
       <div className={`rounded-3xl border ${positionColors.border} ${positionColors.bg} p-5`}>
-        <h3 className={`mb-3 text-sm font-bold uppercase tracking-[0.25em] ${positionColors.text}`}>Your Negotiation Position</h3>
-        <p className={`text-sm leading-7 ${positionColors.text}`}>{sections.position}</p>
+        <h3 className={`mb-3 text-xs font-bold uppercase tracking-[0.25em] ${positionColors.text}`}>Your Negotiation Position</h3>
+        <p className={`text-sm leading-7 font-medium ${positionColors.text}`}>{sections.position || '—'}</p>
       </div>
+
       <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
-        <h3 className="mb-4 text-sm font-bold uppercase tracking-[0.25em] text-slate-300">Exact Phrases to Use</h3>
+        <h3 className="mb-4 text-xs font-bold uppercase tracking-[0.25em] text-slate-300">Exact Phrases to Use</h3>
         <div className="grid gap-3">
-          {phrases.map((phrase, i) => (
-            <div key={`phrase-${i}`} className="flex items-start justify-between gap-3 rounded-2xl border border-white/10 bg-slate-950/50 p-4">
+          {sections.phrases.length ? sections.phrases.map((phrase, i) => (
+            <div key={i} className="flex items-start justify-between gap-3 rounded-2xl border border-white/10 bg-slate-950/50 p-4">
               <p className="text-sm leading-6 text-slate-200">
                 <span className="mr-2 text-xs font-bold text-cyan-300">{i + 1}.</span>{phrase}
               </p>
               <CopyButton text={phrase} />
             </div>
-          ))}
+          )) : <p className="text-sm text-slate-500">No phrases available.</p>}
         </div>
       </div>
+
       <div className="rounded-3xl border border-rose-500/30 bg-rose-500/10 p-5">
-        <h3 className="mb-3 text-sm font-bold uppercase tracking-[0.25em] text-rose-300">What Not to Say</h3>
+        <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.25em] text-rose-300">What Not to Say</h3>
         <div className="grid gap-2">
-          {badPhrases.map((phrase, i) => (
-            <p key={`bad-${i}`} className="text-sm leading-6 text-rose-200">
-              <span className="mr-2 text-xs font-bold text-rose-400">{i + 1}.</span>{phrase}
-            </p>
-          ))}
+          {sections.notToSay.length ? sections.notToSay.map((phrase, i) => (
+            <div key={i} className="flex items-start gap-3 rounded-2xl border border-rose-500/20 bg-rose-500/5 px-4 py-3">
+              <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-rose-500/30 text-[9px] font-bold text-rose-400">✕</span>
+              <p className="text-sm leading-6 text-rose-200">{phrase}</p>
+            </div>
+          )) : <p className="text-sm text-rose-400/60">No bad phrases listed.</p>}
         </div>
       </div>
     </div>
   );
 }
 
+
 function LearningPathView({ content }) {
   const [expandedIndex, setExpandedIndex] = useState(null);
-  function toggleCard(index) { setExpandedIndex(expandedIndex === index ? null : index); }
+  const [copiedPrompt, setCopiedPrompt] = useState(null);
+
+  function toggleCard(index) {
+    setExpandedIndex(expandedIndex === index ? null : index);
+  }
+
+  function getHourColor(hours) {
+    if (hours <= 20) return { bar: 'bg-emerald-400', label: 'text-emerald-300', badge: 'bg-emerald-400/10 text-emerald-300 border-emerald-400/20' };
+    if (hours <= 50) return { bar: 'bg-amber-400', label: 'text-amber-300', badge: 'bg-amber-400/10 text-amber-300 border-amber-400/20' };
+    return { bar: 'bg-rose-400', label: 'text-rose-300', badge: 'bg-rose-400/10 text-rose-300 border-rose-400/20' };
+  }
+
+  const DIFFICULTY_COLORS = {
+    Beginner: 'border-emerald-400/30 bg-emerald-400/10 text-emerald-300',
+    Intermediate: 'border-amber-400/30 bg-amber-400/10 text-amber-300',
+    Advanced: 'border-rose-400/30 bg-rose-400/10 text-rose-300'
+  };
+
+  async function handleCopyPrompt(text, index) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedPrompt(index);
+      setTimeout(() => setCopiedPrompt(null), 1500);
+    } catch (e) {}
+  }
 
   return (
     <div className="grid gap-4">
       {content.map((item, index) => {
         const isExpanded = expandedIndex === index;
+        const hourColors = getHourColor(item.total_honest_hours);
+        const maxHours = Math.max(...content.map(c => c.total_honest_hours), 1);
+        const barWidth = Math.round((item.total_honest_hours / maxHours) * 100);
+        const resources = item.resources || item.sources;
+        const dayPlan = item.day_bootcamp || item.day_plan;
+        const tutorPrompt = item.ai_tutor_prompt || item.self_study_prompt;
+
         return (
-          <article key={`${item.skill}-${index}`} className="rounded-3xl border border-white/10 bg-white/5 overflow-hidden">
-            <button type="button" onClick={() => toggleCard(index)} className="flex w-full items-center justify-between gap-4 p-5 text-left transition hover:bg-white/5">
-              <div className="flex items-center gap-3">
-                <p className="text-sm font-medium text-cyan-200">{item.skill}</p>
-                <span className="rounded-full bg-cyan-400/10 px-3 py-0.5 text-[10px] uppercase tracking-[0.2em] text-cyan-300">{item.total_honest_hours} hours total</span>
+          <article key={`${item.skill}-${index}`} className="overflow-hidden rounded-3xl border border-white/10 bg-slate-950/60">
+            <button
+              type="button"
+              onClick={() => toggleCard(index)}
+              className="flex w-full flex-col gap-3 p-5 text-left transition hover:bg-white/[0.03]"
+            >
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-400/10">
+                    <span className="text-xs font-bold text-sky-300">{index + 1}</span>
+                  </div>
+                  <p className="text-sm font-semibold text-white truncate">{item.skill}</p>
+                  {item.difficulty && (
+                    <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-[0.15em] ${DIFFICULTY_COLORS[item.difficulty] || DIFFICULTY_COLORS.Intermediate}`}>
+                      {item.difficulty}
+                    </span>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  <span className={`rounded-full border px-3 py-0.5 text-[10px] uppercase tracking-[0.15em] ${hourColors.badge}`}>
+                    {item.total_honest_hours}h
+                  </span>
+                  <span className="text-xs text-slate-500">{isExpanded ? '▲' : '▼'}</span>
+                </div>
               </div>
-              <span className="text-xs text-slate-400">{isExpanded ? '▲' : '▼'}</span>
+              {item.why_learn_first && (
+                <p className="text-xs leading-5 text-slate-400 pl-11">{item.why_learn_first}</p>
+              )}
+              <div className="w-full">
+                <div className="flex justify-between mb-1">
+                  <span className="text-[10px] uppercase tracking-[0.2em] text-slate-500">Time investment</span>
+                  <span className={`text-[10px] font-medium ${hourColors.label}`}>{item.total_honest_hours} hours</span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                  <div className={`h-full rounded-full ${hourColors.bar} transition-all duration-500`} style={{ width: `${barWidth}%` }} />
+                </div>
+              </div>
             </button>
+
             {isExpanded && (
-              <div className="border-t border-white/10 p-5 pt-4">
-                <div className="mb-5">
-                  <h4 className="mb-3 text-xs font-bold uppercase tracking-[0.25em] text-slate-400">Resources</h4>
-                  <div className="grid gap-2">
-                    {item.sources.map((source, sIndex) => (
-                      <div key={`source-${sIndex}`} className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <span className="shrink-0 text-xs text-slate-400">{SOURCE_LABELS[source.type] || source.type}</span>
-                          <a href={source.url} target="_blank" rel="noreferrer" className="truncate text-sm text-cyan-300 underline underline-offset-4">{source.title}</a>
-                        </div>
-                        <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.15em] ${source.free ? 'bg-emerald-500/10 text-emerald-300' : 'bg-amber-500/10 text-amber-300'}`}>
-                          {source.free ? 'Free' : 'Paid'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="mb-5">
-                  <h4 className="mb-3 text-xs font-bold uppercase tracking-[0.25em] text-slate-400">Day Plan</h4>
-                  <div className="grid gap-2">
-                    {item.day_plan.map((day, dIndex) => (
-                      <div key={`day-${dIndex}`} className="flex items-start gap-3 rounded-2xl border border-white/10 bg-slate-950/50 px-4 py-3">
-                        <span className="shrink-0 rounded-full bg-cyan-400/10 px-2 py-0.5 text-[10px] font-bold text-cyan-300">Day {day.day}</span>
-                        <p className="flex-1 text-sm leading-6 text-slate-200">{day.goal}</p>
-                        <span className="shrink-0 text-xs text-slate-400">{day.duration_minutes} min</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              <div className="border-t border-white/10 space-y-5 p-5">
                 <div>
-                  <p className="mb-2 text-xs text-slate-400">Paste this into Claude, ChatGPT, or Gemini to get a personal tutor</p>
-                  <div className="relative rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-                    <pre className="whitespace-pre-wrap text-xs leading-6 text-slate-300">{item.self_study_prompt}</pre>
-                    <div className="mt-3 flex justify-end"><CopyButton text={item.self_study_prompt} label="Copy prompt" /></div>
+                  <h4 className="mb-3 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400">Resources</h4>
+                  <div className="grid gap-2">
+                    {resources.map((source, sIndex) => (
+                      <a
+                        key={sIndex}
+                        href={source.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex flex-col gap-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 transition hover:border-cyan-400/30 hover:bg-cyan-400/5"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <span className="shrink-0 text-xs text-slate-400">{SOURCE_LABELS[source.type] || source.type}</span>
+                            <span className="truncate text-sm text-cyan-300">{source.title}</span>
+                          </div>
+                          <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-[0.15em] ${source.free ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300' : 'border-amber-500/30 bg-amber-500/10 text-amber-300'}`}>
+                            {source.free ? 'Free' : 'Paid'}
+                          </span>
+                        </div>
+                        {source.why && (
+                          <p className="text-[11px] leading-4 text-slate-500 pl-0">{source.why}</p>
+                        )}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="mb-3 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400">Day-by-day bootcamp</h4>
+                  <div className="grid gap-2">
+                    {dayPlan.map((day, dIndex) => (
+                      <div key={dIndex} className="rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
+                        <div className="flex items-start gap-3">
+                          <div className="flex h-6 w-10 shrink-0 items-center justify-center rounded-full bg-sky-400/10">
+                            <span className="text-[10px] font-bold text-sky-300">D{day.day}</span>
+                          </div>
+                          <p className="flex-1 text-sm leading-6 text-slate-200">{day.focus || day.goal}</p>
+                          {day.duration_minutes && (
+                            <span className="shrink-0 rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-slate-400">{day.duration_minutes}m</span>
+                          )}
+                        </div>
+                        {day.tasks && day.tasks.length > 0 && (
+                          <ul className="mt-2 ml-[3.25rem] space-y-1">
+                            {day.tasks.map((task, tIdx) => (
+                              <li key={tIdx} className="text-xs leading-5 text-slate-300 before:content-['→_'] before:text-sky-400">{task}</li>
+                            ))}
+                          </ul>
+                        )}
+                        {day.practice_question && (
+                          <div className="mt-2 ml-[3.25rem] rounded-xl border border-violet-500/20 bg-violet-500/5 px-3 py-2">
+                            <p className="text-[10px] uppercase tracking-[0.15em] text-violet-400 mb-1">Practice question</p>
+                            <p className="text-xs leading-5 text-violet-200">{day.practice_question}</p>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {item.projects && item.projects.length > 0 && (
+                  <div>
+                    <h4 className="mb-3 text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400">Projects</h4>
+                    <div className="grid gap-2">
+                      {item.projects.map((proj, pIdx) => (
+                        <div key={pIdx} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                          <p className="text-sm font-medium text-white">{proj.title}</p>
+                          <p className="mt-1 text-xs leading-5 text-slate-300">{proj.description}</p>
+                          {proj.github_search && (
+                            <a
+                              href={`https://github.com/search?q=${encodeURIComponent(proj.github_search)}&type=repositories`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-2 inline-flex items-center gap-1 rounded-full border border-slate-700 px-3 py-1 text-[10px] uppercase tracking-[0.15em] text-slate-300 transition hover:border-cyan-400 hover:text-cyan-300"
+                            >
+                              🐙 Search GitHub
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <div className="mb-3 flex items-center justify-between">
+                    <h4 className="text-[10px] font-bold uppercase tracking-[0.25em] text-slate-400">AI tutor prompt</h4>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyPrompt(tutorPrompt, index)}
+                      className="rounded-full border border-slate-700 px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-slate-300 transition hover:border-cyan-400 hover:text-cyan-300"
+                    >
+                      {copiedPrompt === index ? 'Copied!' : 'Copy prompt'}
+                    </button>
+                  </div>
+                  <div className="rounded-2xl border border-sky-400/20 bg-sky-400/5 p-4">
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-sky-400 mb-2">Paste into ChatGPT · Claude · Gemini</p>
+                    <pre className="whitespace-pre-wrap text-xs leading-6 text-slate-300">{tutorPrompt}</pre>
                   </div>
                 </div>
               </div>
@@ -330,15 +512,93 @@ function LearningPathView({ content }) {
     </div>
   );
 }
-
 function ColdEmailView({ content }) {
+  const [copied, setCopied] = useState(false);
+  const [activeTab, setActiveTab] = useState('email');
+
+  const lines = String(content || '').trim().split('\n');
+  const subjectLine = lines.find(l => /^subject:/i.test(l.trim()));
+  const bodyLines = subjectLine
+    ? lines.filter(l => l !== subjectLine)
+    : lines;
+  const subject = subjectLine ? subjectLine.replace(/^subject:\s*/i, '').trim() : null;
+  const body = bodyLines.join('\n').trim();
+
+  const dmVersion = body
+    .split('\n')
+    .filter(Boolean)
+    .slice(0, 4)
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 300) + (body.length > 300 ? '...' : '');
+
+  async function handleCopy(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (e) {}
+  }
+
   return (
-    <div className="relative rounded-3xl border border-white/10 bg-white/5 p-5">
-      <pre className="whitespace-pre-wrap text-sm leading-7 text-slate-200">{content}</pre>
-      <div className="mt-4 flex justify-end"><CopyButton text={content} label="Copy email" /></div>
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        {['email', 'dm'].map(tab => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => setActiveTab(tab)}
+            className={`rounded-full border px-4 py-1.5 text-xs uppercase tracking-[0.2em] transition ${activeTab === tab ? 'border-indigo-400/40 bg-indigo-400/10 text-indigo-300' : 'border-slate-700 text-slate-400 hover:border-slate-500'}`}
+          >
+            {tab === 'email' ? '✉ Full Email' : '💬 DM Version'}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === 'email' && (
+        <div className="rounded-3xl border border-indigo-400/20 bg-indigo-400/5 p-5 space-y-4">
+          {subject && (
+            <div className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-1">Subject line</p>
+              <p className="text-sm font-medium text-white">{subject}</p>
+            </div>
+          )}
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.2em] text-slate-400 mb-2">Email body</p>
+            <pre className="whitespace-pre-wrap text-sm leading-7 text-slate-200">{body}</pre>
+          </div>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => handleCopy(subject ? `Subject: ${subject}\n\n${body}` : body)}
+              className="rounded-full border border-slate-700 px-4 py-1.5 text-xs uppercase tracking-[0.2em] text-slate-300 transition hover:border-indigo-400 hover:text-indigo-300"
+            >
+              {copied ? 'Copied!' : 'Copy email'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'dm' && (
+        <div className="rounded-3xl border border-violet-400/20 bg-violet-400/5 p-5 space-y-3">
+          <p className="text-[10px] uppercase tracking-[0.2em] text-violet-400">Shortened for LinkedIn · Twitter DM · WhatsApp</p>
+          <p className="text-sm leading-7 text-slate-200">{dmVersion}</p>
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={() => handleCopy(dmVersion)}
+              className="rounded-full border border-slate-700 px-4 py-1.5 text-xs uppercase tracking-[0.2em] text-slate-300 transition hover:border-violet-400 hover:text-violet-300"
+            >
+              {copied ? 'Copied!' : 'Copy DM'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
 
 // ─── Fade-in wrapper ─────────────────────────────────────────────────────────
 
