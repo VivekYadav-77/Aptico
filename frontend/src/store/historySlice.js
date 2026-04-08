@@ -43,7 +43,13 @@ const historySlice = createSlice({
   initialState: loadHistoryState(),
   reducers: {
     setCurrentAnalysis(state, action) {
-      state.currentAnalysis = action.payload;
+      state.currentAnalysis = {
+        ...action.payload,
+        matchedSkills: Array.isArray(action.payload?.matchedSkills) ? action.payload.matchedSkills : []
+      };
+    },
+    clearCurrentAnalysis(state) {
+      state.currentAnalysis = null;
     },
     addGeneratedItem(state, action) {
       const incomingItem = action.payload;
@@ -62,7 +68,7 @@ const historySlice = createSlice({
   }
 });
 
-export const { addGeneratedItem, setCurrentAnalysis } = historySlice.actions;
+export const { addGeneratedItem, clearCurrentAnalysis, setCurrentAnalysis } = historySlice.actions;
 export const selectHistory = (state) => state.history;
 export const selectCurrentAnalysis = (state) => state.history.currentAnalysis;
 export default historySlice.reducer;

@@ -1,5 +1,5 @@
 import api from './axios.js';
-import { clearAuthSession, setAuthSession, updateAccessToken } from '../store/authSlice.js';
+import { clearAuthSession, setAuthReady, setAuthSession, updateAccessToken } from '../store/authSlice.js';
 
 let interceptorsReady = false;
 let activeStore = null;
@@ -16,9 +16,11 @@ async function runRefreshFlow() {
 
 function isAuthenticationEndpoint(requestUrl) {
   return (
+    requestUrl.includes('/api/auth/register') ||
+    requestUrl.includes('/api/auth/login') ||
     requestUrl.includes('/api/auth/google') ||
-    requestUrl.includes('/api/auth/magic-link') ||
-    requestUrl.includes('/api/auth/verify') ||
+    requestUrl.includes('/api/auth/verify-email/') ||
+    requestUrl.includes('/api/auth/password/') ||
     requestUrl.includes('/api/auth/refresh')
   );
 }
@@ -89,48 +91,85 @@ export function setupAuthInterceptors(store) {
 }
 
 export async function sendMagicLinkRequest(email) {
-  const response = await api.post('/api/auth/magic-link', { email });
+  const response = await api.post('/api/auth/verify-email/request', { email });
   return response.data.data;
 }
 
-export async function verifyMagicLinkRequest(token, store) {
-  const response = await api.post('/api/auth/verify', { token });
-  const session = response.data.data;
-
+function applySessionToStore(store, session) {
   store.dispatch(
     setAuthSession({
       user: session.user,
       accessToken: session.accessToken
     })
   );
+}
 
+export async function registerRequest(payload) {
+  const response = await api.post('/api/auth/register', payload);
+  return response.data.data;
+}
+
+export async function loginRequest(payload, store) {
+  const response = await api.post('/api/auth/login', payload);
+  const session = response.data.data;
+  applySessionToStore(store, session);
   return session;
 }
 
 export async function loginWithGoogleRequest(credential, store) {
   const response = await api.post('/api/auth/google', { credential });
   const session = response.data.data;
-
-  store.dispatch(
-    setAuthSession({
-      user: session.user,
-      accessToken: session.accessToken
-    })
-  );
-
+  applySessionToStore(store, session);
   return session;
+}
+
+export async function verifyEmailRequest(token, store) {
+  const response = await api.post('/api/auth/verify-email/confirm', { token });
+  const session = response.data.data;
+  applySessionToStore(store, session);
+  return session;
+}
+
+export const verifyMagicLinkRequest = verifyEmailRequest;
+
+export async function forgotPasswordRequest(email) {
+  const response = await api.post('/api/auth/password/forgot', { email });
+  return response.data.data;
+}
+
+export async function resetPasswordRequest(payload) {
+  const response = await api.post('/api/auth/password/reset', payload);
+  return response.data.data;
+}
+
+export async function requestEmailVerification(email) {
+  const response = await api.post('/api/auth/verify-email/request', { email });
+  return response.data.data;
 }
 
 export async function refreshSessionRequest(store) {
   const session = await runRefreshFlow();
 
   store.dispatch(updateAccessToken(session.accessToken));
-  store.dispatch(
-    setAuthSession({
-      user: session.user,
-      accessToken: session.accessToken
-    })
-  );
+  applySessionToStore(store, session);
 
   return session;
+}
+
+export async function bootstrapAuthSession(store) {
+  try {
+    await refreshSessionRequest(store);
+  } catch (error) {
+    store.dispatch(clearAuthSession());
+  } finally {
+    store.dispatch(setAuthReady(true));
+  }
+}
+
+export async function logoutRequest(store) {
+  try {
+    await api.post('/api/auth/logout');
+  } finally {
+    store.dispatch(clearAuthSession());
+  }
 }

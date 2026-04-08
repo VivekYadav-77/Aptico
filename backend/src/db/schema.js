@@ -17,7 +17,10 @@ export const users = pgTable('users', {
   name: text('name'),
   avatarUrl: text('avatar_url'),
   authProvider: text('auth_provider').notNull(),
+  passwordHash: text('password_hash'),
+  googleSubject: text('google_subject'),
   role: text('role').notNull().default('user'),
+  emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   lastLogin: timestamp('last_login', { withTimezone: true })
 });
@@ -29,7 +32,8 @@ export const refreshTokens = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    jti: text('jti').notNull(),
+    accessTokenJti: text('access_token_jti').notNull(),
+    refreshTokenJti: text('refresh_token_jti').notNull(),
     tokenHash: text('token_hash').notNull(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
     revokedAt: timestamp('revoked_at', { withTimezone: true }),
@@ -38,7 +42,28 @@ export const refreshTokens = pgTable(
   },
   (table) => ({
     userIdIdx: index('refresh_tokens_user_id_idx').on(table.userId),
-    tokenHashIdx: uniqueIndex('refresh_tokens_token_hash_idx').on(table.tokenHash)
+    tokenHashIdx: uniqueIndex('refresh_tokens_token_hash_idx').on(table.tokenHash),
+    accessTokenJtiIdx: uniqueIndex('refresh_tokens_access_token_jti_idx').on(table.accessTokenJti),
+    refreshTokenJtiIdx: uniqueIndex('refresh_tokens_refresh_token_jti_idx').on(table.refreshTokenJti)
+  })
+);
+
+export const authTokens = pgTable(
+  'auth_tokens',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    tokenType: text('token_type').notNull(),
+    tokenHash: text('token_hash').notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    consumedAt: timestamp('consumed_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    userIdTypeIdx: index('auth_tokens_user_id_token_type_idx').on(table.userId, table.tokenType),
+    tokenHashIdx: uniqueIndex('auth_tokens_token_hash_idx').on(table.tokenHash)
   })
 );
 
@@ -96,6 +121,22 @@ export const savedJobs = pgTable(
   })
 );
 
+export const profileSettings = pgTable(
+  'profile_settings',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    settingsJson: jsonb('settings_json').notNull().default({}),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    userIdIdx: uniqueIndex('profile_settings_user_id_idx').on(table.userId)
+  })
+);
+
 export const apiUsage = pgTable(
   'api_usage',
   {
@@ -112,13 +153,22 @@ export const apiUsage = pgTable(
 
 export const usersRelations = relations(users, ({ many }) => ({
   refreshTokens: many(refreshTokens),
+  authTokens: many(authTokens),
   analyses: many(analyses),
-  savedJobs: many(savedJobs)
+  savedJobs: many(savedJobs),
+  profileSettings: many(profileSettings)
 }));
 
 export const refreshTokensRelations = relations(refreshTokens, ({ one }) => ({
   user: one(users, {
     fields: [refreshTokens.userId],
+    references: [users.id]
+  })
+}));
+
+export const authTokensRelations = relations(authTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [authTokens.userId],
     references: [users.id]
   })
 }));
@@ -141,6 +191,13 @@ export const generatedContentRelations = relations(generatedContent, ({ one }) =
 export const savedJobsRelations = relations(savedJobs, ({ one }) => ({
   user: one(users, {
     fields: [savedJobs.userId],
+    references: [users.id]
+  })
+}));
+
+export const profileSettingsRelations = relations(profileSettings, ({ one }) => ({
+  user: one(users, {
+    fields: [profileSettings.userId],
     references: [users.id]
   })
 }));

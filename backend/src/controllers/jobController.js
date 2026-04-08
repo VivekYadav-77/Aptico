@@ -1,9 +1,14 @@
+import { desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { saveJob, searchJobs } from '../services/jobScraperService.js';
+import { analyses } from '../db/schema.js';
+import { searchJobs } from '../services/jobSearchService.js';
+import { saveJob } from '../services/jobScraperService.js';
 
 const searchQuerySchema = z.object({
-  q: z.string().trim().min(1).default('software engineer'),
-  location: z.string().trim().min(1).default('remote')
+  query: z.string().trim().min(1),
+  location: z.string().trim().min(1).default('India'),
+  jobType: z.enum(['remote', 'hybrid', 'full-time', 'internship-remote', 'internship-onsite']),
+  useAnalysis: z.coerce.boolean().default(false)
 });
 
 const saveJobSchema = z.object({
@@ -18,16 +23,43 @@ const saveJobSchema = z.object({
 export async function getJobsController(request, reply) {
   try {
     const query = searchQuerySchema.parse({
-      q: request.query?.q || 'software engineer',
-      location: request.query?.location || 'remote'
+      query: request.query?.query,
+      location: request.query?.location || 'India',
+      jobType: request.query?.jobType,
+      useAnalysis: request.query?.useAnalysis ?? false
     });
 
+    let analysisData = null;
+
+    if (query.useAnalysis && request.auth?.userId && request.server.db) {
+      const rows = await request.server.db
+        .select({
+          id: analyses.id,
+          companyName: analyses.companyName,
+          gapAnalysisJson: analyses.gapAnalysisJson
+        })
+        .from(analyses)
+        .where(eq(analyses.userId, request.auth.userId))
+        .orderBy(desc(analyses.createdAt))
+        .limit(1);
+
+      if (rows[0]) {
+        analysisData = {
+          analysisId: rows[0].id,
+          companyName: rows[0].companyName,
+          ...(rows[0].gapAnalysisJson || {})
+        };
+      }
+    }
+
     const result = await searchJobs({
-      query: query.q,
+      query: query.query,
       location: query.location,
-      userId: request.auth?.userId || null,
+      jobType: query.jobType,
+      role: query.query,
+      analysisData,
       redisService: request.server.services?.redis,
-      db: request.server.db,
+      env: request.server.env || null,
       logger: request.log
     });
 

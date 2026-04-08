@@ -1,14 +1,13 @@
+import { store } from '../store/authSlice.js';
+
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
 function getAuthHeaders() {
-  try {
-    const token = window.localStorage.getItem('aptico-access-token');
-    if (token) {
-      return { Authorization: `Bearer ${token}` };
-    }
-  } catch (error) {
-    // No token available
+  const token = store.getState()?.auth?.accessToken;
+  if (token) {
+    return { Authorization: `Bearer ${token}` };
   }
+
   return {};
 }
 

@@ -41,14 +41,16 @@ export default async function adminRoutes(app) {
       const activeSessions = await db
         .select({
           id: refreshTokens.id,
-          jti: refreshTokens.jti
+          accessTokenJti: refreshTokens.accessTokenJti
         })
         .from(refreshTokens)
         .where(and(eq(refreshTokens.userId, userId), isNull(refreshTokens.revokedAt)));
 
       if (activeSessions.length) {
         const blacklistWrites = Promise.allSettled(
-          activeSessions.map((session) => redis.set(`revoked_jwt:${session.jti}`, userId, ACCESS_TOKEN_BLACKLIST_TTL_SECONDS))
+          activeSessions.map((session) =>
+            redis.set(`revoked_jwt:${session.accessTokenJti}`, userId, ACCESS_TOKEN_BLACKLIST_TTL_SECONDS)
+          )
         );
 
         await Promise.race([blacklistWrites, wait(REDIS_DISPATCH_WINDOW_MS)]);

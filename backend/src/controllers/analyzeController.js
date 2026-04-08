@@ -115,6 +115,7 @@ export async function analyzeController(request, reply) {
 
     writeSSE(raw, 'stage1', {
       companyName: sharedContext.companyName,
+      skillsPresent: sharedContext.skillsPresent,
       confidenceScore: stage1.confidenceScore,
       summary: stage1.summary,
       keywordMismatches: stage1.keywordMismatches,
@@ -137,6 +138,7 @@ export async function analyzeController(request, reply) {
               confidenceScore: stage1.confidenceScore,
               summary: stage1.summary,
               companyName: sharedContext.companyName,
+              skillsPresent: sharedContext.skillsPresent,
               keywordMismatches: stage1.keywordMismatches,
               seniorityMismatches: stage1.seniorityMismatches,
               rewriteSuggestions: stage1.rewriteSuggestions

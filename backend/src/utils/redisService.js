@@ -75,6 +75,14 @@ export class RedisService {
     return this.request(['SET', key, serializedValue], { query });
   }
 
+  async incr(key) {
+    return this.request(['INCR', key]);
+  }
+
+  async expire(key, ttlSeconds) {
+    return this.request(['EXPIRE', key, ttlSeconds]);
+  }
+
   async del(key) {
     return this.request(['DEL', key]);
   }

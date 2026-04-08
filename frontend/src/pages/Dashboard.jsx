@@ -707,6 +707,7 @@ export default function Dashboard() {
           dispatch(setCurrentAnalysis({
             id: null,
             companyName: data.companyName,
+            matchedSkills: data.skillsPresent || [],
             confidenceScore: data.confidenceScore,
             summary: data.summary
           }));
@@ -724,6 +725,7 @@ export default function Dashboard() {
           dispatch(setCurrentAnalysis({
             id: data.id,
             companyName: stage1?.companyName || null,
+            matchedSkills: stage1?.skillsPresent || [],
             confidenceScore: stage1?.confidenceScore || 0,
             summary: stage1?.summary || ''
           }));

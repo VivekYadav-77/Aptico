@@ -5,7 +5,8 @@ const initialState = {
   user: null,
   accessToken: null,
   isAuthenticated: false,
-  guestMode: false
+  guestMode: false,
+  authReady: false
 };
 
 const authSlice = createSlice({
@@ -17,30 +18,37 @@ const authSlice = createSlice({
       state.accessToken = action.payload.accessToken;
       state.isAuthenticated = true;
       state.guestMode = false;
+      state.authReady = true;
     },
     updateAccessToken(state, action) {
       state.accessToken = action.payload;
       state.isAuthenticated = Boolean(action.payload && state.user);
+      state.authReady = true;
     },
     clearAuthSession(state) {
       state.user = null;
       state.accessToken = null;
       state.isAuthenticated = false;
       state.guestMode = false;
+      state.authReady = true;
     },
     enterGuestMode(state) {
       state.user = null;
       state.accessToken = null;
       state.isAuthenticated = false;
       state.guestMode = true;
+      state.authReady = true;
     },
     exitGuestMode(state) {
       state.guestMode = false;
+    },
+    setAuthReady(state, action) {
+      state.authReady = Boolean(action.payload);
     }
   }
 });
 
-export const { clearAuthSession, enterGuestMode, exitGuestMode, setAuthSession, updateAccessToken } =
+export const { clearAuthSession, enterGuestMode, exitGuestMode, setAuthReady, setAuthSession, updateAccessToken } =
   authSlice.actions;
 
 export const store = configureStore({

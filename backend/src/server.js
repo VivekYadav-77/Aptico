@@ -15,6 +15,7 @@ import authRoutes from './routes/authRoutes.js';
 import generateRoutes from './routes/generateRoutes.js';
 import jobRoutes from './routes/jobRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
+import profileRoutes from './routes/profileRoutes.js';
 import { authenticateAdminRequest } from './middlewares/authMiddleware.js';
 import { createRedisService } from './utils/redisService.js';
 
@@ -24,7 +25,7 @@ const helmet = require('@fastify/helmet');
 const rateLimit = require('@fastify/rate-limit');
 
 const CORS_HEADERS = 'authorization, content-type';
-const CORS_METHODS = 'GET, POST, OPTIONS';
+const CORS_METHODS = 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
 
 export function buildServer() {
   const app = Fastify({
@@ -55,6 +56,7 @@ export function buildServer() {
   });
 
   app.decorate('db', db);
+  app.decorate('env', env);
   app.decorate('services', {
     redis: redisService
   });
@@ -110,6 +112,7 @@ export function buildServer() {
   app.register(analyzeRoutes, { prefix: '/api/analyze' });
   app.register(generateRoutes, { prefix: '/api/generate' });
   app.register(jobRoutes, { prefix: '/api/jobs' });
+  app.register(profileRoutes, { prefix: '/api' });
   app.register(async function adminScope(adminApp) {
     adminApp.addHook('onRequest', authenticateAdminRequest);
     adminApp.register(adminRoutes, { prefix: '/api/admin' });

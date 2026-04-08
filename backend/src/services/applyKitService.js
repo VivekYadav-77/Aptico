@@ -341,7 +341,7 @@ function buildPrompt({ analysis, contentType, jobContext }) {
       '1. [Phrase that signals desperation]',
       '2. [Phrase that weakens negotiating position]',
       '',
-      `Resume text: ${resumeText}`,
+      `Resume text: ${analysis.resumeText}`,
       `Target company: ${companyName}`,
       `Target role: ${roleTitle}`,
       `Job description: ${jobDescription}`,
