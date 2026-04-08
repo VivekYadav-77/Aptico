@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle.jsx';
 
@@ -70,25 +71,80 @@ const mainFeatures = [
 ];
 
 export default function LandingPage() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
     <div className="app-page">
-      <header className="fixed top-0 z-50 flex h-14 w-full items-center justify-between border-b border-[var(--border)] bg-[var(--shell)] px-6">
-        <Link to="/" className="flex items-center gap-3">
-          <span className="text-xl font-bold tracking-[-0.05em] text-[var(--text)]">Aptico</span>
-        </Link>
+      <header className="fixed top-0 z-50 w-full border-b border-[var(--border)] bg-[var(--shell)]">
+        <div className="flex h-14 items-center justify-between px-6">
+          <Link to="/" className="flex items-center gap-3">
+            <span className="text-xl font-bold tracking-[-0.05em] text-[var(--text)]">Aptico</span>
+          </Link>
 
-        <nav className="hidden items-center gap-6 md:flex">
-          <a className="border-b-2 border-[var(--accent)] pb-1 text-sm font-semibold text-[var(--accent-strong)]">Product</a>
-          <a className="text-sm font-semibold text-[var(--muted)]">Pricing</a>
-          <a className="text-sm font-semibold text-[var(--muted)]">Docs</a>
-          <a className="text-sm font-semibold text-[var(--muted)]">Blog</a>
-        </nav>
+          {/* Desktop nav */}
+          <nav className="hidden items-center gap-6 md:flex">
+            <a className="border-b-2 border-[var(--accent)] pb-1 text-sm font-semibold text-[var(--accent-strong)]">Product</a>
+            <a className="text-sm font-semibold text-[var(--muted)] transition hover:text-[var(--text)]">Pricing</a>
+            <a className="text-sm font-semibold text-[var(--muted)] transition hover:text-[var(--text)]">Docs</a>
+            <a className="text-sm font-semibold text-[var(--muted)] transition hover:text-[var(--text)]">Blog</a>
+          </nav>
 
-        <div className="flex items-center gap-4">
-          <ThemeToggle compact />
-          <Link to="/auth" className="hidden text-sm font-semibold text-[var(--muted)] sm:inline-flex">Log in</Link>
-          <Link to="/auth" className="app-button px-4 py-2">Start free</Link>
+          <div className="flex items-center gap-3">
+            <ThemeToggle compact />
+            <Link to="/auth" className="hidden text-sm font-semibold text-[var(--muted)] transition hover:text-[var(--text)] sm:inline-flex">Log in</Link>
+            <Link to="/auth" className="app-button hidden px-4 py-2 md:inline-flex">Start free</Link>
+            {/* Hamburger — mobile only */}
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+              className="app-icon-button md:hidden"
+              aria-label="Toggle menu"
+            >
+              <span className="material-symbols-outlined text-[22px]">
+                {mobileMenuOpen ? 'close' : 'menu'}
+              </span>
+            </button>
+          </div>
         </div>
+
+        {/* Mobile dropdown */}
+        {mobileMenuOpen ? (
+          <div className="border-t border-[var(--border)] bg-[var(--shell)] px-6 py-5 md:hidden">
+            <nav className="flex flex-col gap-1">
+              {[
+                ['Product', '#'],
+                ['Pricing', '#'],
+                ['Docs', '#'],
+                ['Blog', '#']
+              ].map(([label, href]) => (
+                <a
+                  key={label}
+                  href={href}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="rounded-xl px-4 py-3 text-sm font-semibold text-[var(--muted-strong)] transition hover:bg-[var(--panel-soft)] hover:text-[var(--text)]"
+                >
+                  {label}
+                </a>
+              ))}
+            </nav>
+            <div className="mt-4 flex flex-col gap-3 border-t border-[var(--border)] pt-4">
+              <Link
+                to="/auth"
+                onClick={() => setMobileMenuOpen(false)}
+                className="app-button-secondary w-full justify-center"
+              >
+                Log in
+              </Link>
+              <Link
+                to="/auth"
+                onClick={() => setMobileMenuOpen(false)}
+                className="app-button w-full justify-center"
+              >
+                Start free
+              </Link>
+            </div>
+          </div>
+        ) : null}
       </header>
 
       <main className="px-6 pt-[120px]">
@@ -101,12 +157,12 @@ export default function LandingPage() {
             Aptico transforms your resume, target role, and job search into a structured intelligence system built for action.
           </p>
           <div className="flex flex-wrap justify-center gap-4">
-            <Link to="/auth" className="app-button px-8 py-3">Start Free</Link>
-            <Link to="/analysis" className="app-button-secondary px-8 py-3">View Demo</Link>
+            <Link to="/auth" className="app-button px-8 py-3 transition hover:brightness-105">Start Free</Link>
+            <Link to="/analysis" className="app-button-secondary px-8 py-3 transition hover:bg-[var(--panel-soft)]">View Demo</Link>
           </div>
         </section>
 
-        <section className="mx-auto mb-24 max-w-6xl overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--panel)] shadow-2xl">
+        <section className="mx-auto mb-24 max-w-6xl overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--panel)] pb-2 shadow-2xl">
           <div className="flex h-8 items-center gap-2 border-b border-[var(--border)] bg-[var(--panel-strong)] px-4">
             <div className="h-2.5 w-2.5 rounded-full bg-[var(--muted)]" />
             <div className="h-2.5 w-2.5 rounded-full bg-[var(--muted)]" />
@@ -197,7 +253,7 @@ export default function LandingPage() {
             The methodology
           </span>
 
-          <div className="relative flex flex-col items-start justify-between gap-10 md:flex-row md:items-center md:gap-4">
+          <div className="relative flex flex-col items-center justify-between gap-10 md:flex-row md:items-start md:gap-4">
             <div className="absolute left-0 top-5 -z-10 hidden h-px w-full border-t border-dashed border-[var(--border)] md:block" />
 
             {methodologySteps.map((step) => (

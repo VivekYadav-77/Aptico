@@ -297,14 +297,14 @@ export default function ModernJobSearchPage() {
                 </p>
               </div>
 
-              <div className="grid min-w-full gap-3 sm:grid-cols-3 lg:min-w-[24rem]">
+              <div className="flex shrink-0 gap-3">
                 {[
                   ['Live sources', String(sourceCount || 0)],
                   ['Visible roles', String(filteredJobs.length || 0)],
                   ['Avg. fit', averageMatch ? `${averageMatch}%` : '--']
                 ].map(([label, value]) => (
-                  <div key={label} className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-4">
-                    <p className="app-field-label">{label}</p>
+                  <div key={label} className="min-w-[6.5rem] rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-4">
+                    <p className="app-field-label whitespace-nowrap">{label}</p>
                     <p className="mt-3 text-2xl font-black tracking-[-0.04em] text-[var(--text)]">{value}</p>
                   </div>
                 ))}
@@ -381,7 +381,8 @@ export default function ModernJobSearchPage() {
                 <input
                   value={formState.query}
                   onChange={(event) => updateField('query', event.target.value)}
-                  className="app-input pl-11"
+                  className="app-input"
+                  style={{ paddingLeft: '3rem' }}
                   placeholder="React developer, product designer, data analyst"
                   required
                 />
@@ -401,7 +402,8 @@ export default function ModernJobSearchPage() {
                 <input
                   value={formState.location}
                   onChange={(event) => updateField('location', event.target.value)}
-                  className="app-input pl-11"
+                  className="app-input"
+                  style={{ paddingLeft: '3rem' }}
                   placeholder="Bangalore, Mumbai, Pune"
                 />
               </div>
@@ -420,7 +422,7 @@ export default function ModernJobSearchPage() {
                   key={option.value}
                   type="button"
                   onClick={() => updateField('jobType', option.value)}
-                  className={`flex items-center gap-3 rounded-[1rem] border px-4 py-3 text-left text-sm transition ${
+                  className={`flex items-center gap-3 rounded-[1rem] border px-4 py-3 text-left text-xs sm:text-sm transition ${
                     formState.jobType === option.value
                       ? 'border-transparent bg-[var(--accent)] text-slate-950'
                       : 'border-[var(--border)] bg-[var(--panel-soft)] text-[var(--text)] hover:border-[var(--accent)]/40'
@@ -435,10 +437,10 @@ export default function ModernJobSearchPage() {
 
           <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] p-4">
             <p className="app-field-label">Quick notes</p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+            <div className="mt-3 grid gap-3 sm:grid-cols-[1.4fr_1fr_1fr]">
               <div>
                 <p className="text-sm font-semibold text-[var(--text)]">Search query</p>
-                <p className="mt-1 text-sm text-[var(--muted-strong)]">
+                <p className="mt-1 flex-1 text-sm text-[var(--muted-strong)] pr-2">
                   {formState.useAnalysis ? analysisSearchText || 'Waiting for analysis context' : formState.query || 'Add a role or skill set'}
                 </p>
               </div>
@@ -482,7 +484,8 @@ export default function ModernJobSearchPage() {
                 <input
                   value={localSearch}
                   onChange={(event) => setLocalSearch(event.target.value)}
-                  className="app-input pl-11"
+                  className="app-input"
+                  style={{ paddingLeft: '3rem' }}
                   placeholder="Refine visible results"
                 />
               </div>
@@ -586,7 +589,7 @@ export default function ModernJobSearchPage() {
                               <div>
                                 <h4 className="text-lg font-bold tracking-[-0.03em] text-[var(--text)]">{job.title}</h4>
                                 <p className="mt-1 text-sm text-[var(--muted-strong)]">
-                                  {job.company} · {job.location}
+                                  {job.company} Â· {job.location}
                                 </p>
                               </div>
                             </div>
@@ -628,7 +631,7 @@ export default function ModernJobSearchPage() {
                           <p className="app-kicker">Selected role</p>
                           <h3 className="text-2xl font-black tracking-[-0.04em] text-[var(--text)]">{selectedJob.title}</h3>
                           <p className="text-sm text-[var(--muted-strong)]">
-                            {selectedJob.company} · {selectedJob.location}
+                            {selectedJob.company} Â· {selectedJob.location}
                           </p>
                         </div>
 

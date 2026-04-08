@@ -136,7 +136,7 @@ export default function SettingsWorkspace() {
                 }`}
               >
                 <span>{section}</span>
-                {activeSection === section ? <span>&bull;</span> : null}
+                {activeSection === section ? <span className="h-2 w-2 rounded-full bg-[var(--accent)]" /> : null}
               </button>
             ))}
           </nav>
@@ -464,9 +464,7 @@ export default function SettingsWorkspace() {
                   <ThemeToggle />
                 </div>
 
-                <div className="rounded-3xl border border-[var(--border)] bg-[var(--panel-soft)] p-4 text-sm leading-7 text-[var(--muted-strong)]">
-                  The redesigned Aptico UI preserves hierarchy, card depth, and readability across both themes and screen sizes while staying close to your Settings reference.
-                </div>
+
               </div>
             ) : null}
 
