@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector, useStore } from 'react-redux';
 import {
@@ -287,9 +287,10 @@ export default function AuthPermanent() {
     }
   }
 
-  async function handleGoogleLogin(credential) {
+  const handleGoogleLogin = useCallback(async (credential) => {
     setIsSubmitting(true);
-    resetMessages();
+    setErrorMessage('');
+    setStatusMessage('');
     dispatch(exitGuestMode());
 
     try {
@@ -300,7 +301,7 @@ export default function AuthPermanent() {
     } finally {
       setIsSubmitting(false);
     }
-  }
+  }, [dispatch, navigate, store]);
 
   async function handleResendVerification() {
     const email = pendingVerificationEmail || formState.email.trim();
@@ -501,7 +502,7 @@ export default function AuthPermanent() {
                   <div className="h-px flex-1 bg-[var(--border)]" />
                 </div>
 
-                <GoogleButton onError={setErrorMessage} onSuccess={(credential) => void handleGoogleLogin(credential)} />
+                <GoogleButton onError={setErrorMessage} onSuccess={handleGoogleLogin} />
               </>
             ) : null}
 

@@ -246,18 +246,18 @@ export default function AppShell({ title, description, actions, children, banner
     <div className="app-page">
       <header className="fixed left-0 right-0 top-0 z-50 border-b border-[var(--border)] bg-[var(--shell)]" style={{ backdropFilter: 'blur(16px)' }}>
         {banner}
-        <div className="flex h-14 items-center justify-between gap-3 px-4 sm:px-6 md:pl-[18.5rem]">
+        <div className="flex h-14 items-center justify-between gap-3 px-4 sm:px-6">
           {/* Left: hamburger + mobile logo OR desktop search */}
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <button
               type="button"
-              className="app-icon-button shrink-0 md:hidden"
+              className="app-icon-button shrink-0"
               onClick={() => setMobileMenuOpen((current) => !current)}
               aria-label="Toggle navigation"
             >
               <span className="material-symbols-outlined text-[20px]">{mobileMenuOpen ? 'close' : 'menu'}</span>
             </button>
-            <div className="min-w-0 md:hidden">
+            <div className="min-w-0">
               <AppLogo />
             </div>
             {/* Search — desktop: inline, mobile: also shown inline after logo */}
@@ -306,7 +306,7 @@ export default function AppShell({ title, description, actions, children, banner
       {/* Mobile backdrop overlay */}
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 md:hidden"
+          className="fixed inset-0 z-40 bg-black/40"
           style={{ backdropFilter: 'blur(4px)' }}
           onClick={() => setMobileMenuOpen(false)}
           aria-hidden="true"
@@ -315,7 +315,7 @@ export default function AppShell({ title, description, actions, children, banner
 
       {/* Mobile slide-in drawer */}
       <div
-        className={`fixed left-0 top-0 z-[45] flex h-full w-72 flex-col border-r border-[var(--border)] bg-[var(--shell)] transition-transform duration-300 ease-out md:hidden ${
+        className={`fixed left-0 top-0 z-[45] flex h-full w-72 flex-col border-r border-[var(--border)] bg-[var(--shell)] transition-transform duration-300 ease-out ${
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{ backdropFilter: 'blur(20px)' }}
@@ -425,23 +425,7 @@ export default function AppShell({ title, description, actions, children, banner
         </div>
       </div>
 
-      {/* Desktop sidebar */}
-      <aside className="fixed left-0 top-0 hidden h-full w-64 border-r border-[var(--border)] bg-[var(--shell)] md:flex md:flex-col" style={{ backdropFilter: 'blur(16px)' }}>
-        <div className="mt-14 px-6 py-6">
-          <AppLogo />
-          <div className="mt-10">
-            <p className="mb-3 px-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Workspace</p>
-            <Navigation showAdmin={auth.user?.role === 'admin'} />
-          </div>
-        </div>
-        <div className="mt-auto px-4 pb-6">
-          <button type="button" className="w-full rounded-xl bg-[var(--accent)] px-4 py-3 text-[10px] font-bold uppercase tracking-[0.24em] text-[#003824] transition hover:brightness-105">
-            Upgrade Plan
-          </button>
-        </div>
-      </aside>
-
-      <main className="px-4 pb-8 pt-20 sm:px-6 md:ml-64 lg:pb-10">
+      <main className="px-4 pb-8 pt-20 sm:px-6 lg:pb-10">
         <section className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl space-y-3">
             <p className="app-kicker">Aptico workspace</p>
