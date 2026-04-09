@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { analyses } from '../db/schema.js';
 import { searchJobs } from '../services/jobSearchService.js';
 import { saveJob } from '../services/jobScraperService.js';
+import { generateFollowUpScripts } from '../utils/followUpScripts.js';
 
 const searchQuerySchema = z.object({
   query: z.string().trim().min(1),
@@ -18,6 +19,13 @@ const saveJobSchema = z.object({
   url: z.string().trim().url(),
   stipend: z.string().trim().nullable().optional(),
   matchPercent: z.number().int().min(0).max(100).optional()
+});
+
+const followUpScriptsSchema = z.object({
+  jobTitle: z.string().trim().min(1),
+  companyName: z.string().trim().min(1),
+  appliedDate: z.string().datetime(),
+  userName: z.string().trim().optional()
 });
 
 export async function getJobsController(request, reply) {
@@ -94,6 +102,32 @@ export async function saveJobController(request, reply) {
     return reply.code(statusCode).send({
       success: false,
       error: error.message || 'Could not save job.'
+    });
+  }
+}
+
+export async function getFollowUpScriptsController(request, reply) {
+  try {
+    const body = followUpScriptsSchema.parse(request.body || {});
+    const appliedDate = new Date(body.appliedDate);
+    const scripts = generateFollowUpScripts({
+      jobTitle: body.jobTitle,
+      companyName: body.companyName,
+      userName: body.userName,
+      appliedDate
+    });
+
+    return reply.send({
+      success: true,
+      data: {
+        scripts
+      }
+    });
+  } catch (error) {
+    const statusCode = error.name === 'ZodError' ? 400 : error.statusCode || 500;
+    return reply.code(statusCode).send({
+      success: false,
+      error: error.message || 'Could not generate follow-up scripts.'
     });
   }
 }

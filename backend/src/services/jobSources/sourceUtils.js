@@ -8,7 +8,6 @@ export const SOURCE_META = Symbol('job-source-meta');
 
 export const SOURCE_CACHE_TTLS = {
   remotive: 7200,
-  himalayas: 86400,
   muse: 7200,
   reed: 7200,
   adzuna: 7200,

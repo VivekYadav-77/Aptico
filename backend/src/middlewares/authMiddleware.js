@@ -21,6 +21,7 @@ function sendAuthError(reply, message, statusCode) {
 async function resolveAuth(request, reply, { optional, adminOnly = false }) {
   const failureStatusCode = adminOnly ? 403 : 401;
   const bearerToken = getBearerToken(request.headers.authorization);
+  const allowGuestFallback = optional && !adminOnly;
 
   if (!bearerToken) {
     if (optional) {
@@ -36,10 +37,20 @@ async function resolveAuth(request, reply, { optional, adminOnly = false }) {
   try {
     payload = jwt.verify(bearerToken, env.jwtSecret);
   } catch (error) {
+    if (allowGuestFallback) {
+      request.auth = null;
+      return;
+    }
+
     return sendAuthError(reply, 'Authorization token is invalid or expired.', failureStatusCode);
   }
 
   if (payload.type !== 'access' || !payload.jti) {
+    if (allowGuestFallback) {
+      request.auth = null;
+      return;
+    }
+
     return sendAuthError(reply, 'Authorization token is invalid.', failureStatusCode);
   }
 
@@ -56,6 +67,11 @@ async function resolveAuth(request, reply, { optional, adminOnly = false }) {
     if (revocationResult === REDIS_TIMEOUT_SYMBOL) {
       request.log.warn(`Redis revocation check timed out for JWT ${payload.jti}. Allowing request.`);
     } else if (revocationResult) {
+      if (allowGuestFallback) {
+        request.auth = null;
+        return;
+      }
+
       return sendAuthError(reply, 'Authorization token has been revoked.', failureStatusCode);
     }
   }

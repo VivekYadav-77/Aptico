@@ -1,9 +1,12 @@
-import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+﻿import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
+import api from '../api/axios.js';
 import { fetchJobs } from '../api/jobsApi.js';
 import AppShell from '../components/AppShell.jsx';
+import ApplyKitModal from '../components/ApplyKitModal.jsx';
+import { selectAuth } from '../store/authSlice.js';
 import { selectCurrentAnalysis } from '../store/historySlice.js';
 
 const JOB_TYPE_OPTIONS = [
@@ -19,6 +22,19 @@ const FOCUS_TAGS = [
   { label: 'Remote ready', value: 'remote' },
   { label: 'High pay', value: 'salary' },
   { label: 'Verified first', value: 'verified' }
+];
+
+const STIPEND_BENCHMARK_ROWS = [
+  ['Tech Dev', 'Tier 1 (Bengaluru, Mumbai etc.)', '₹10,000-₹15,000+'],
+  ['Tech Dev', 'Tier 2 cities', '₹6,000-₹10,000'],
+  ['Tech Dev', 'Remote', '₹8,000-₹12,000'],
+  ['Design', 'Tier 1', '₹8,000-₹12,000'],
+  ['Design', 'Tier 2', '₹5,000-₹8,000'],
+  ['Marketing', 'Tier 1', '₹5,000-₹8,000'],
+  ['Marketing', 'Tier 2', '₹3,000-₹5,000'],
+  ['Finance', 'Tier 1', '₹8,000-₹12,000'],
+  ['General', 'Tier 1', '₹4,000-₹6,000'],
+  ['General', 'Tier 2', '₹3,000-₹5,000']
 ];
 
 function isRemoteType(jobType) {
@@ -72,15 +88,15 @@ function getMatchScore(job, analysisTerms) {
   return Math.max(42, Math.min(98, base + remoteBoost + verifiedBoost));
 }
 
-function getMatchTone(score) {
-  if (score >= 85) {
+function getMatchTone(score, color) {
+  if (color === 'green' || score >= 85) {
     return {
       label: 'High match',
       className: 'border-emerald-500/25 bg-emerald-500/12 text-emerald-200'
     };
   }
 
-  if (score >= 70) {
+  if (color === 'amber' || score >= 70) {
     return {
       label: 'Good match',
       className: 'border-cyan-500/25 bg-cyan-500/12 text-cyan-200'
@@ -97,8 +113,46 @@ function renderSourceTone(source) {
   return source ? source.replace(/[-_]/g, ' ') : 'Unknown source';
 }
 
+function getSignalClasses(color) {
+  if (color === 'green') {
+    return 'border-emerald-500/25 bg-emerald-500/10 text-emerald-300';
+  }
+
+  if (color === 'amber') {
+    return 'border-amber-500/25 bg-amber-500/10 text-amber-300';
+  }
+
+  if (color === 'red') {
+    return 'border-rose-500/30 bg-rose-500/10 text-rose-300';
+  }
+
+  if (color === 'purple') {
+    return 'border-fuchsia-500/25 bg-fuchsia-500/10 text-fuchsia-200';
+  }
+
+  return 'border-[var(--border)] bg-[var(--panel-soft)] text-[var(--muted-strong)]';
+}
+
+function getStatCardClasses(color) {
+  return `rounded-[1.35rem] border px-4 py-4 ${getSignalClasses(color)}`;
+}
+
+function getProgressBarClasses(color) {
+  if (color === 'green') {
+    return 'bg-emerald-400';
+  }
+
+  if (color === 'amber') {
+    return 'bg-amber-400';
+  }
+
+  return 'bg-rose-400';
+}
+
 export default function ModernJobSearchPage() {
+  const auth = useSelector(selectAuth);
   const currentAnalysis = useSelector(selectCurrentAnalysis);
+  const navigate = useNavigate();
   const [formState, setFormState] = useState({
     query: '',
     jobType: 'full-time',
@@ -109,6 +163,11 @@ export default function ModernJobSearchPage() {
   const [activeFocus, setActiveFocus] = useState('best-match');
   const [localSearch, setLocalSearch] = useState('');
   const [selectedJobId, setSelectedJobId] = useState(null);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [actionError, setActionError] = useState('');
+  const [savingJobId, setSavingJobId] = useState(null);
+  const [activeJob, setActiveJob] = useState(null);
+  const [showBenchmarks, setShowBenchmarks] = useState(false);
   const deferredLocalSearch = useDeferredValue(localSearch);
 
   const matchedSkills = useMemo(
@@ -164,7 +223,8 @@ export default function ModernJobSearchPage() {
     exhausted: false,
     sourcesUsed: [],
     cachedSources: [],
-    matchedSkills: []
+    matchedSkills: [],
+    dashboardStats: null
   };
 
   const enrichedJobs = useMemo(() => {
@@ -172,11 +232,12 @@ export default function ModernJobSearchPage() {
 
     return (result.jobs || []).map((job, index) => ({
       ...job,
-      matchScore: getMatchScore(job, analysisTerms),
+      matchScore: job.match?.matchScore ?? getMatchScore(job, analysisTerms),
       normalizedType: normalizeInternshipType(job.jobType),
       compensation: getCompensationLabel(job),
       postedLabel: formatPostedDate(job.postedAt),
-      priorityIndex: index
+      priorityIndex: index,
+      tone: getMatchTone(job.match?.matchScore ?? getMatchScore(job, analysisTerms), job.match?.matchColor)
     }));
   }, [matchedSkills, result.jobs, result.matchedSkills]);
 
@@ -243,6 +304,15 @@ export default function ModernJobSearchPage() {
   const averageMatch = filteredJobs.length
     ? Math.round(filteredJobs.reduce((sum, job) => sum + job.matchScore, 0) / filteredJobs.length)
     : 0;
+  const dashboardStats = result.dashboardStats || {
+    freshJobs: enrichedJobs.filter((job) => job.applyWindow?.daysLive !== null && job.applyWindow?.daysLive <= 7).length,
+    ghostAlertCount: enrichedJobs.filter((job) => (job.ghost?.ghostScore || 0) > 50).length,
+    averageGhostRisk: Math.round(enrichedJobs.reduce((sum, job) => sum + (job.ghost?.ghostScore || 0), 0) / (enrichedJobs.length || 1)),
+    strongMatchCount: enrichedJobs.filter((job) => (job.match?.matchScore || 0) >= 70).length,
+    exploitationCount: enrichedJobs.filter((job) => job.stipendFairness?.fairnessLabel === 'Exploitation Risk').length
+  };
+  const isInternshipSearch = submittedSearch?.jobType?.includes('internship');
+  const sourceSummary = (result.sourcesUsed || []).join(', ');
 
   function updateField(field, value) {
     setFormState((current) => ({ ...current, [field]: value }));
@@ -251,6 +321,8 @@ export default function ModernJobSearchPage() {
   function handleSubmit(event) {
     event.preventDefault();
     setSelectedJobId(null);
+    setStatusMessage('');
+    setActionError('');
     setSubmittedSearch({
       query: formState.useAnalysis ? analysisSearchText.trim() : formState.query.trim(),
       jobType: formState.jobType,
@@ -269,6 +341,53 @@ export default function ModernJobSearchPage() {
       ...current,
       submittedAt: Date.now()
     }));
+  }
+
+  async function handleSaveToPipeline(job) {
+    if (!auth.isAuthenticated) {
+      setActionError('Sign in to save jobs to your pipeline.');
+      return;
+    }
+
+    setSavingJobId(job.id);
+    setActionError('');
+    setStatusMessage('');
+
+    try {
+      await api.post('/api/jobs/save', {
+        title: job.title,
+        company: job.company,
+        source: job.source,
+        url: job.applyUrl,
+        stipend: job.stipend || null,
+        matchPercent: job.match?.matchScore ?? job.matchScore
+      });
+
+      setStatusMessage(`${job.title} was saved to your pipeline.`);
+    } catch (requestError) {
+      setActionError(requestError.response?.data?.error || 'Could not save job.');
+    } finally {
+      setSavingJobId(null);
+    }
+  }
+
+  function handleGenerateApplyKit(job) {
+    setActiveJob({
+      ...job,
+      url: job.applyUrl
+    });
+    setActionError('');
+    setStatusMessage('');
+  }
+
+  function handleSkillClick(skill) {
+    navigate('/analysis', {
+      state: {
+        prompt: `Show me the learning path for ${skill}`,
+        focus: 'learning-path',
+        skill
+      }
+    });
   }
 
   return (
@@ -464,6 +583,18 @@ export default function ModernJobSearchPage() {
         </form>
 
         <div className="space-y-5">
+          {statusMessage ? (
+            <div className="rounded-[1.5rem] border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+              {statusMessage}
+            </div>
+          ) : null}
+
+          {actionError ? (
+            <div className="rounded-[1.5rem] border border-[var(--danger-border)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-rose-300">
+              {actionError}
+            </div>
+          ) : null}
+
           {jobsQuery.error ? (
             <div className="rounded-[1.5rem] border border-[var(--danger-border)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-rose-300">
               {jobsQuery.error.response?.data?.error || 'Could not load jobs.'}
@@ -549,7 +680,47 @@ export default function ModernJobSearchPage() {
           </section>
           {submittedSearch ? (
             filteredJobs.length ? (
-              <section className="grid gap-5 2xl:grid-cols-[0.88fr_1.12fr]">
+              <>
+                {result.jobs.length ? (
+                  <section className="app-panel space-y-4">
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                      <div className={getStatCardClasses('green')}>
+                        <p className="app-field-label">Fresh Listings</p>
+                        <p className="mt-3 text-2xl font-black tracking-[-0.04em]">{dashboardStats.freshJobs}</p>
+                        <p className="mt-2 text-sm">Posted in last 7 days</p>
+                      </div>
+
+                      <div className={getStatCardClasses(dashboardStats.averageGhostRisk >= 50 ? 'red' : 'amber')}>
+                        <p className="app-field-label">Ghost Risk</p>
+                        <p className="mt-3 text-2xl font-black tracking-[-0.04em]">{dashboardStats.averageGhostRisk}%</p>
+                        <p className="mt-2 text-sm">{dashboardStats.ghostAlertCount} listings flagged as high risk</p>
+                      </div>
+
+                      {submittedSearch.useAnalysis ? (
+                        <div className={getStatCardClasses('purple')}>
+                          <p className="app-field-label">Strong Matches</p>
+                          <p className="mt-3 text-2xl font-black tracking-[-0.04em]">{dashboardStats.strongMatchCount}</p>
+                          <p className="mt-2 text-sm">Jobs matching your profile 70%+</p>
+                        </div>
+                      ) : null}
+
+                      {isInternshipSearch ? (
+                        <div className={getStatCardClasses('red')}>
+                          <p className="app-field-label">Exploitation Alerts</p>
+                          <p className="mt-3 text-2xl font-black tracking-[-0.04em]">{dashboardStats.exploitationCount}</p>
+                          <p className="mt-2 text-sm">Internships with unfair stipends</p>
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <p className="text-sm text-[var(--muted-strong)]">
+                      Searched across {sourceSummary || 'no sources'}
+                      {cachedSourceCount ? ` · ${cachedSourceCount} source(s) from cache` : ''}
+                    </p>
+                  </section>
+                ) : null}
+
+                <section className="grid gap-5 2xl:grid-cols-[0.88fr_1.12fr]">
                 <div className="space-y-4">
                   {result.exhausted ? (
                     <div className="rounded-[1.5rem] border border-[var(--warning-border)] bg-[var(--warning-soft)] px-4 py-3 text-sm text-[var(--warning-text)]">
@@ -557,9 +728,8 @@ export default function ModernJobSearchPage() {
                     </div>
                   ) : null}
 
-                  <div className="space-y-3">
-                    {filteredJobs.map((job) => {
-                      const tone = getMatchTone(job.matchScore);
+                    <div className="space-y-3">
+                      {filteredJobs.map((job) => {
                       const isSelected = selectedJob?.id === job.id;
 
                       return (
@@ -573,11 +743,20 @@ export default function ModernJobSearchPage() {
                               : 'border-[var(--border)] bg-[var(--panel)] hover:bg-[var(--panel-soft)]'
                           }`}
                         >
+                          {job.isScam ? (
+                            <div
+                              title="Shows patterns common in fraudulent job postings"
+                              className="mb-4 rounded-[1rem] border border-rose-500/30 bg-rose-500/15 px-4 py-3 text-sm font-medium text-rose-200"
+                            >
+                              ⚠ Unverified listing - verify before applying
+                            </div>
+                          ) : null}
+
                           <div className="flex items-start justify-between gap-4">
                             <div className="space-y-2">
                               <div className="flex flex-wrap gap-2">
-                                <span className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${tone.className}`}>
-                                  {tone.label}
+                                <span className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${job.tone.className}`}>
+                                  {job.tone.label}
                                 </span>
                                 <span className="rounded-full border border-[var(--border)] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-[var(--muted-strong)]">
                                   {renderSourceTone(job.source)}
@@ -586,7 +765,7 @@ export default function ModernJobSearchPage() {
                               <div>
                                 <h4 className="text-lg font-bold tracking-[-0.03em] text-[var(--text)]">{job.title}</h4>
                                 <p className="mt-1 text-sm text-[var(--muted-strong)]">
-                                  {job.company} � {job.location}
+                                  {job.company} · {job.location}
                                 </p>
                               </div>
                             </div>
@@ -594,12 +773,31 @@ export default function ModernJobSearchPage() {
                             <div className="min-w-[74px] rounded-[1rem] border border-[var(--border)] bg-[var(--panel-soft)] px-3 py-3 text-center">
                               <p className="text-2xl font-black tracking-[-0.04em] text-[var(--text)]">{job.matchScore}</p>
                               <p className="app-field-label mt-1">Fit</p>
+                              </div>
                             </div>
-                          </div>
 
-                          <p className="mt-4 line-clamp-2 text-sm leading-7 text-[var(--muted-strong)]">
-                            {job.description || 'No description was provided by this source.'}
-                          </p>
+                            <div className="mt-4 flex flex-wrap gap-2">
+                              <span title={job.applyWindow?.windowMessage} className={`rounded-full border px-3 py-1 text-xs ${getSignalClasses(job.applyWindow?.windowColor)}`}>
+                                {job.applyWindow?.windowLabel}
+                              </span>
+                              {job.ghost?.ghostScore > 25 ? (
+                                <span title={`Ghost Score: ${job.ghost.ghostScore}/100`} className={`rounded-full border px-3 py-1 text-xs ${getSignalClasses(job.ghost.ghostColor)}`}>
+                                  {job.ghost.ghostLabel}
+                                </span>
+                              ) : null}
+                              <span title={job.responseLikelihood?.likelihoodTip} className={`rounded-full border px-3 py-1 text-xs ${getSignalClasses(job.responseLikelihood?.likelihoodColor)}`}>
+                                {job.responseLikelihood?.likelihoodLabel}
+                              </span>
+                              {job.stipendFairness ? (
+                                <span title={job.stipendFairness.fairnessMessage} className={`rounded-full border px-3 py-1 text-xs ${getSignalClasses(job.stipendFairness.fairnessColor)}`}>
+                                  {job.stipendFairness.fairnessLabel}
+                                </span>
+                              ) : null}
+                            </div>
+
+                            <p className="mt-4 line-clamp-2 text-sm leading-7 text-[var(--muted-strong)]">
+                              {job.description || 'No description was provided by this source.'}
+                            </p>
 
                           <div className="mt-4 flex flex-wrap gap-2">
                             <span className="rounded-full border border-[var(--border)] px-3 py-1 text-xs text-[var(--muted-strong)]">{job.compensation}</span>
@@ -623,17 +821,25 @@ export default function ModernJobSearchPage() {
                 <aside className="app-panel h-fit 2xl:sticky 2xl:top-24">
                   {selectedJob ? (
                     <div className="space-y-6">
+                      {selectedJob.isScam ? (
+                        <div title="Shows patterns common in fraudulent job postings" className="rounded-[1.2rem] border border-rose-500/30 bg-rose-500/15 px-4 py-3 text-sm font-medium text-rose-200">
+                          ⚠ Unverified listing - verify before applying
+                        </div>
+                      ) : null}
+
                       <div className="flex items-start justify-between gap-4">
                         <div className="space-y-2">
                           <p className="app-kicker">Selected role</p>
                           <h3 className="text-2xl font-black tracking-[-0.04em] text-[var(--text)]">{selectedJob.title}</h3>
                           <p className="text-sm text-[var(--muted-strong)]">
-                            {selectedJob.company} � {selectedJob.location}
+                            {selectedJob.company} · {selectedJob.location}
                           </p>
                         </div>
 
                         <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-4 text-center">
-                          <p className="text-3xl font-black tracking-[-0.05em] text-[var(--text)]">{selectedJob.matchScore}</p>
+                          <p className={`text-3xl font-black tracking-[-0.05em] ${selectedJob.match?.matchColor === 'green' ? 'text-emerald-300' : selectedJob.match?.matchColor === 'amber' ? 'text-amber-300' : 'text-rose-300'}`}>
+                            {selectedJob.matchScore}%
+                          </p>
                           <p className="app-field-label mt-1">Match</p>
                         </div>
                       </div>
@@ -642,28 +848,73 @@ export default function ModernJobSearchPage() {
                         <span className="app-chip">{renderSourceTone(selectedJob.source)}</span>
                         <span className="app-chip">{selectedJob.compensation}</span>
                         <span className="app-chip">{selectedJob.postedLabel}</span>
+                        <span title={selectedJob.applyWindow?.windowMessage} className={`rounded-full border px-3 py-1 text-xs ${getSignalClasses(selectedJob.applyWindow?.windowColor)}`}>
+                          {selectedJob.applyWindow?.windowLabel}
+                        </span>
+                        {selectedJob.ghost?.ghostScore > 25 ? (
+                          <span title={`Ghost Score: ${selectedJob.ghost.ghostScore}/100`} className={`rounded-full border px-3 py-1 text-xs ${getSignalClasses(selectedJob.ghost.ghostColor)}`}>
+                            {selectedJob.ghost.ghostLabel}
+                          </span>
+                        ) : null}
+                        <span title={selectedJob.responseLikelihood?.likelihoodTip} className={`rounded-full border px-3 py-1 text-xs ${getSignalClasses(selectedJob.responseLikelihood?.likelihoodColor)}`}>
+                          {selectedJob.responseLikelihood?.likelihoodLabel}
+                        </span>
+                        {selectedJob.stipendFairness ? (
+                          <span title={selectedJob.stipendFairness.fairnessMessage} className={`rounded-full border px-3 py-1 text-xs ${getSignalClasses(selectedJob.stipendFairness.fairnessColor)}`}>
+                            {selectedJob.stipendFairness.fairnessLabel}
+                          </span>
+                        ) : null}
                       </div>
+
+                      {selectedJob.match ? (
+                        <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] p-5">
+                          <div className="flex items-center gap-4">
+                            <span className="text-sm font-semibold text-[var(--text)]">Your Match</span>
+                            <div className="h-3 flex-1 overflow-hidden rounded-full bg-[var(--panel-strong)]">
+                              <div className={`h-full rounded-full ${getProgressBarClasses(selectedJob.match.matchColor)}`} style={{ width: `${selectedJob.match.matchScore}%` }} />
+                            </div>
+                            <span className={`text-sm font-bold ${selectedJob.match.matchColor === 'green' ? 'text-emerald-300' : selectedJob.match.matchColor === 'amber' ? 'text-amber-300' : 'text-rose-300'}`}>
+                              {selectedJob.match.matchScore}%
+                            </span>
+                          </div>
+
+                          {selectedJob.match.missingFromThisJob?.length ? (
+                            <div className="mt-4 space-y-3">
+                              <p className="text-sm text-[var(--muted-strong)]">Missing:</p>
+                              <div className="flex flex-wrap gap-2">
+                                {selectedJob.match.missingFromThisJob.map((skill) => (
+                                  <button
+                                    key={skill}
+                                    type="button"
+                                    onClick={() => handleSkillClick(skill)}
+                                    className="rounded-full border border-cyan-500/25 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-200 transition hover:border-cyan-400/40"
+                                  >
+                                    {skill}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
 
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-soft)] p-4">
-                          <p className="app-field-label">Fit signal</p>
-                          <p className="mt-3 text-sm leading-7 text-[var(--muted-strong)]">
-                            {selectedJob.matchScore >= 85
-                              ? 'Strong alignment with your current direction and analysis context.'
-                              : selectedJob.matchScore >= 70
-                                ? 'Worth reviewing closely. The role overlaps with part of your target profile.'
-                                : 'More of a stretch role. Review expectations before applying.'}
-                          </p>
+                          <p className="app-field-label">Apply window</p>
+                          <p className="mt-3 text-sm leading-7 text-[var(--muted-strong)]">{selectedJob.applyWindow?.windowMessage}</p>
                         </div>
                         <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-soft)] p-4">
-                          <p className="app-field-label">Risk check</p>
-                          <p className="mt-3 text-sm leading-7 text-[var(--muted-strong)]">
-                            {selectedJob.isScam
-                              ? 'This posting shows patterns common in low-trust listings. Verify the employer and application URL.'
-                              : 'No immediate scam flag was surfaced by the source metadata for this listing.'}
-                          </p>
+                          <p className="app-field-label">Response signal</p>
+                          <p className="mt-3 text-sm leading-7 text-[var(--muted-strong)]">{selectedJob.responseLikelihood?.likelihoodTip}</p>
                         </div>
                       </div>
+
+                      {selectedJob.stipendFairness ? (
+                        <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-soft)] p-4">
+                          <p className="app-field-label">Stipend fairness</p>
+                          <p className="mt-3 text-sm leading-7 text-[var(--muted-strong)]">{selectedJob.stipendFairness.fairnessMessage}</p>
+                        </div>
+                      ) : null}
 
                       <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] p-5">
                         <p className="app-field-label">Role summary</p>
@@ -686,11 +937,22 @@ export default function ModernJobSearchPage() {
                       <div className="flex flex-wrap gap-3">
                         <a href={selectedJob.applyUrl} target="_blank" rel="noreferrer" className="app-button">
                           <span className="material-symbols-outlined text-[18px]">open_in_new</span>
-                          View &amp; apply
+                          View &amp; Apply
                         </a>
-                        <button type="button" onClick={() => setLocalSearch(selectedJob.company || '')} className="app-button-secondary">
-                          <span className="material-symbols-outlined text-[18px]">filter_alt</span>
-                          More from this company
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void handleSaveToPipeline(selectedJob);
+                          }}
+                          disabled={!auth.isAuthenticated || savingJobId === selectedJob.id}
+                          className="app-button-secondary"
+                        >
+                          <span className="material-symbols-outlined text-[18px]">bookmark</span>
+                          {savingJobId === selectedJob.id ? 'Saving...' : 'Save to Pipeline'}
+                        </button>
+                        <button type="button" onClick={() => handleGenerateApplyKit(selectedJob)} className="app-button-secondary">
+                          <span className="material-symbols-outlined text-[18px]">assignment</span>
+                          Generate Apply Kit
                         </button>
                       </div>
                     </div>
@@ -700,7 +962,46 @@ export default function ModernJobSearchPage() {
                     </div>
                   )}
                 </aside>
-              </section>
+                </section>
+
+                {isInternshipSearch ? (
+                  <section className="app-panel space-y-4">
+                    <button type="button" onClick={() => setShowBenchmarks((current) => !current)} className="flex items-center gap-3 text-left text-sm font-semibold text-[var(--text)]">
+                      <span className="material-symbols-outlined text-[18px]">{showBenchmarks ? 'expand_less' : 'expand_more'}</span>
+                      Show Stipend Benchmarks
+                    </button>
+
+                    {showBenchmarks ? (
+                      <div className="space-y-4 rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] p-5">
+                        <h3 className="text-lg font-bold text-[var(--text)]">Internship Stipend Benchmarks - India 2025</h3>
+
+                        <div className="overflow-x-auto">
+                          <table className="min-w-full divide-y divide-[var(--border)] text-sm text-[var(--muted-strong)]">
+                            <thead>
+                              <tr className="text-left text-[var(--text)]">
+                                <th className="pb-3 pr-4 font-semibold">Role Category</th>
+                                <th className="pb-3 pr-4 font-semibold">City Tier</th>
+                                <th className="pb-3 font-semibold">Fair Range (₹/month)</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[var(--border)]">
+                              {STIPEND_BENCHMARK_ROWS.map(([role, tier, range]) => (
+                                <tr key={`${role}-${tier}`}>
+                                  <td className="py-3 pr-4">{role}</td>
+                                  <td className="py-3 pr-4">{tier}</td>
+                                  <td className="py-3">{range}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        <p className="text-xs text-[var(--muted-strong)]">Listings below minimum are flagged as Exploitation Risk in the search results.</p>
+                      </div>
+                    ) : null}
+                  </section>
+                ) : null}
+              </>
             ) : (
               <div className="rounded-[2rem] border border-dashed border-[var(--border)] px-6 py-12 text-center text-sm text-[var(--muted-strong)]">
                 {result.exhausted ? (
@@ -730,6 +1031,8 @@ export default function ModernJobSearchPage() {
           ) : null}
         </div>
       </section>
+      <ApplyKitModal isOpen={Boolean(activeJob)} onClose={() => setActiveJob(null)} job={activeJob} analysisId={currentAnalysis?.id || null} />
     </AppShell>
   );
 }
+

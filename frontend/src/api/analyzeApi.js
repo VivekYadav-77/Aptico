@@ -1,4 +1,5 @@
-import { store } from '../store/authSlice.js';
+import api from './axios.js';
+import { clearAuthSession, setAuthSession, store } from '../store/authSlice.js';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
 
@@ -9,6 +10,27 @@ function getAuthHeaders() {
   }
 
   return {};
+}
+
+async function refreshAnalysisSession() {
+  try {
+    const response = await api.post('/api/auth/refresh');
+    const session = response.data?.data;
+
+    if (session?.accessToken && session?.user) {
+      store.dispatch(
+        setAuthSession({
+          user: session.user,
+          accessToken: session.accessToken
+        })
+      );
+    }
+
+    return session;
+  } catch (error) {
+    store.dispatch(clearAuthSession());
+    throw error;
+  }
 }
 
 /**
@@ -31,31 +53,41 @@ export function streamAnalysis(payload, callbacks) {
       }
       const contentBase64 = btoa(binary);
 
-      const response = await fetch(`${API_BASE}api/analyze`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'text/event-stream',
-          ...getAuthHeaders()
+      const requestBody = JSON.stringify({
+        file: {
+          name: payload.file.name,
+          type: payload.file.type || 'application/pdf',
+          size: payload.file.size,
+          contentBase64
         },
-        credentials: 'include',
-        signal: controller.signal,
-        body: JSON.stringify({
-          file: {
-            name: payload.file.name,
-            type: payload.file.type || 'application/pdf',
-            size: payload.file.size,
-            contentBase64
-          },
-          jobDescription: payload.jobDescription
-        })
+        jobDescription: payload.jobDescription
       });
+
+      const sendAnalysisRequest = () =>
+        fetch(`${API_BASE}api/analyze`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'text/event-stream',
+            ...getAuthHeaders()
+          },
+          credentials: 'include',
+          signal: controller.signal,
+          body: requestBody
+        });
+
+      let response = await sendAnalysisRequest();
+
+      if (response.status === 401 && store.getState()?.auth?.isAuthenticated) {
+        await refreshAnalysisSession();
+        response = await sendAnalysisRequest();
+      }
 
       if (!response.ok) {
         let errorMsg = 'Analysis failed.';
         try {
           const errorJson = await response.json();
-          errorMsg = errorJson.error || errorMsg;
+          errorMsg = errorJson.error || errorJson.message || errorMsg;
         } catch (e) {
           // couldn't parse error response
         }

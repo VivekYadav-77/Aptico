@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useQuery } from '@tanstack/react-query';
+import api from '../api/axios.js';
 import { fetchDashboardSummary } from '../api/profileApi.js';
 import AppShell from '../components/AppShell.jsx';
 import { selectAuth } from '../store/authSlice.js';
@@ -95,9 +96,32 @@ function formatRelativeTime(value) {
   return `${diffDays}d ago`;
 }
 
+function formatScriptDate(value) {
+  if (!value) {
+    return 'a later date';
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return 'a later date';
+  }
+
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  });
+}
+
 export default function MainDashboard() {
   const auth = useSelector(selectAuth);
   const currentAnalysis = useSelector(selectCurrentAnalysis);
+  const [expandedJobId, setExpandedJobId] = useState(null);
+  const [followUpScriptsByJob, setFollowUpScriptsByJob] = useState({});
+  const [loadingJobId, setLoadingJobId] = useState(null);
+  const [followUpError, setFollowUpError] = useState('');
+  const [copiedKey, setCopiedKey] = useState('');
   const name = auth.user?.name?.split(' ')[0] || (auth.guestMode ? 'Explorer' : 'there');
   const matchedSkills = currentAnalysis?.matchedSkills?.slice(0, 6) || [];
   const score = currentAnalysis?.confidenceScore || 82;
@@ -113,6 +137,46 @@ export default function MainDashboard() {
     enabled: auth.isAuthenticated,
     retry: false
   });
+
+  async function handleCopy(text, key) {
+    try {
+      await navigator.clipboard.writeText(String(text || ''));
+      setCopiedKey(key);
+      setTimeout(() => setCopiedKey(''), 1500);
+    } catch (error) {
+      setFollowUpError('Could not copy to clipboard.');
+    }
+  }
+
+  async function handleToggleFollowUp(job) {
+    const nextExpanded = expandedJobId === job.id ? null : job.id;
+    setExpandedJobId(nextExpanded);
+    setFollowUpError('');
+
+    if (nextExpanded !== job.id || followUpScriptsByJob[job.id]) {
+      return;
+    }
+
+    setLoadingJobId(job.id);
+
+    try {
+      const response = await api.post('/api/jobs/follow-up-scripts', {
+        jobTitle: job.title,
+        companyName: job.company,
+        appliedDate: job.savedAt || new Date().toISOString(),
+        userName: auth.user?.name || undefined
+      });
+
+      setFollowUpScriptsByJob((current) => ({
+        ...current,
+        [job.id]: response.data?.data?.scripts || []
+      }));
+    } catch (error) {
+      setFollowUpError(error.response?.data?.error || 'Could not load follow-up scripts.');
+    } finally {
+      setLoadingJobId(null);
+    }
+  }
 
   const recentAnalyses = useMemo(() => {
     const apiAnalyses = (dashboardQuery.data?.recentAnalyses || []).map((item) => ({
@@ -145,13 +209,22 @@ export default function MainDashboard() {
 
   const savedJobs = useMemo(() => {
     const apiSavedJobs = (dashboardQuery.data?.savedJobs || []).map((job) => ({
+      id: `saved-${job.id}`,
       title: job.title,
       company: job.company,
       location: job.location,
-      icon: 'bookmark'
+      icon: 'bookmark',
+      url: job.url,
+      source: job.source,
+      savedAt: job.savedAt
     }));
 
-    return apiSavedJobs.length ? apiSavedJobs : savedJobsFallback;
+    return apiSavedJobs.length
+      ? apiSavedJobs
+      : savedJobsFallback.map((job) => ({
+          ...job,
+          id: `fallback-${job.title}-${job.company}`
+        }));
   }, [dashboardQuery.data?.savedJobs]);
 
   const recommendations = dashboardQuery.data?.recommendations?.length
@@ -266,22 +339,83 @@ export default function MainDashboard() {
             <span className="material-symbols-outlined text-[18px] text-[var(--muted)]">arrow_forward</span>
           </div>
           <div className="space-y-3">
+            {followUpError ? (
+              <div className="rounded-2xl border border-[var(--warning-border)] bg-[var(--warning-soft)] px-4 py-3 text-sm text-[var(--warning-text)]">
+                {followUpError}
+              </div>
+            ) : null}
             {savedJobs.map((job) => (
-              <Link
-                key={`${job.title}-${job.company}`}
-                to="/jobs"
-                className="flex items-center gap-4 rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4 transition hover:border-[var(--accent)]/30 hover:bg-[var(--panel-soft)]"
+              <article
+                key={`${job.id || job.title}-${job.company}`}
+                className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4 transition hover:border-[var(--accent)]/30 hover:bg-[var(--panel-soft)]"
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--panel-soft)]">
-                  <span className="material-symbols-outlined text-[var(--muted)]">{job.icon}</span>
+                <div className="flex items-start justify-between gap-4">
+                  <Link to="/jobs" className="flex min-w-0 flex-1 items-center gap-4">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--panel-soft)]">
+                      <span className="material-symbols-outlined text-[var(--muted)]">{job.icon}</span>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-bold text-[var(--text)]">{job.title}</p>
+                      <p className="mt-1 text-[11px] text-[var(--muted-strong)]">
+                        {job.company} - {job.location}
+                      </p>
+                    </div>
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleToggleFollowUp(job);
+                    }}
+                    className="rounded-full border border-[var(--border)] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text)] transition hover:border-[var(--accent)]/30"
+                  >
+                    Follow-up Scripts
+                  </button>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-[13px] font-bold text-[var(--text)]">{job.title}</p>
-                  <p className="mt-1 text-[11px] text-[var(--muted-strong)]">
-                    {job.company} - {job.location}
-                  </p>
-                </div>
-              </Link>
+
+                {expandedJobId === job.id ? (
+                  <div className="mt-4 space-y-3 border-t border-[var(--border)] pt-4">
+                    {loadingJobId === job.id ? (
+                      <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-4 text-sm text-[var(--muted-strong)]">
+                        Loading follow-up scripts...
+                      </div>
+                    ) : (
+                      (followUpScriptsByJob[job.id] || []).map((script) => (
+                        <div key={`${job.id}-${script.day}`} className="rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] p-4">
+                          <p className="text-[12px] font-bold uppercase tracking-[0.18em] text-[var(--text)]">
+                            Day {script.day} - Send on {formatScriptDate(script.sendOn)}
+                          </p>
+                          <p className="mt-3 text-sm font-semibold text-[var(--text)]">{script.subject}</p>
+                          <textarea
+                            readOnly
+                            value={script.body}
+                            className="mt-3 h-36 w-full rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-xs leading-6 text-[var(--muted-strong)] outline-none"
+                          />
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void handleCopy(script.body, `${job.id}-${script.day}-body`);
+                              }}
+                              className="rounded-full border border-[var(--border)] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text)] transition hover:border-[var(--accent)]/30"
+                            >
+                              {copiedKey === `${job.id}-${script.day}-body` ? 'Copied!' : 'Copy'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                void handleCopy(script.subject, `${job.id}-${script.day}-subject`);
+                              }}
+                              className="rounded-full border border-[var(--border)] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text)] transition hover:border-[var(--accent)]/30"
+                            >
+                              {copiedKey === `${job.id}-${script.day}-subject` ? 'Copied!' : 'Copy Subject'}
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                ) : null}
+              </article>
             ))}
           </div>
         </article>

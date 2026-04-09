@@ -15,7 +15,6 @@ function getSourceRules(source) {
 
   return {
     remotive: [],
-    himalayas: [],
     muse: [{ key: `muse:rpm:${minuteKey}`, limit: 58 }],
     reed: [{ key: `reed:rpm:${minuteKey}`, limit: 32 }],
     adzuna: [
@@ -61,4 +60,3 @@ export async function isAllowed(redisService, source) {
     return true;
   }
 }
-

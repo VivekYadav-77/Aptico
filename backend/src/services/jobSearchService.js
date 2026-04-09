@@ -1,13 +1,14 @@
 import { adzunaSource } from './jobSources/adzunaSource.js';
+import { searchDuckDuckGoFallback } from './ddgsFallbackService.js';
 import { ddgsSource } from './jobSources/ddgsSource.js';
-import { himalayasSource } from './jobSources/himalayasSource.js';
 import { jsearchSource } from './jobSources/jsearchSource.js';
 import { museSource } from './jobSources/museSource.js';
 import { reedSource } from './jobSources/reedSource.js';
 import { remotiveSource } from './jobSources/remotiveSource.js';
 import { serperSource } from './jobSources/serperSource.js';
 import { flagScamJobs } from '../utils/scamDetector.js';
-import { getSourceMeta, normalizeText } from './jobSources/sourceUtils.js';
+import { computeDashboardStats, enrichJob } from '../utils/jobIntelligence.js';
+import { buildNormalizedJob, getSourceMeta, normalizeText } from './jobSources/sourceUtils.js';
 
 function extractMatchedSkills(analysisData) {
   const skills = Array.isArray(analysisData?.skillsPresent)
@@ -107,6 +108,35 @@ async function runSource(sourceName, sourceFn, sharedArgs, sourceState) {
   return Array.isArray(jobs) ? jobs : [];
 }
 
+async function runDuckDuckGoFallbackSearch({ query, location, jobType, sourceState, logger = console }) {
+  sourceState.sourcesUsed.push('duckduckgo-fallback');
+
+  try {
+    const fallbackJobs = await searchDuckDuckGoFallback({
+      query,
+      location,
+      limit: 10
+    });
+
+    return fallbackJobs.map((job, index) =>
+      buildNormalizedJob({
+        source: 'ddgs',
+        originalId: job.id || job.url || index,
+        title: job.title,
+        company: job.company,
+        location: job.location || location,
+        jobType,
+        applyUrl: job.url,
+        postedAt: job.postedAt,
+        description: job.description
+      })
+    );
+  } catch (error) {
+    logger.warn?.(`[duckduckgo-fallback] job source failed: ${error.message}`);
+    return [];
+  }
+}
+
 export async function searchJobs({ query, location, jobType, role, analysisData, redisService, env, logger = console }) {
   const { query: enhancedQuery, matchedSkills } = buildSearchQuery({ query, analysisData });
   const indiaSearch = isIndiaSearch(location);
@@ -130,7 +160,7 @@ export async function searchJobs({ query, location, jobType, role, analysisData,
   if (jobType === 'remote') {
     resultBuckets = await Promise.all([
       runSource('remotive', remotiveSource, sharedArgs, sourceState),
-      runSource('himalayas', himalayasSource, sharedArgs, sourceState)
+      runSource('ddgs', ddgsSource, sharedArgs, sourceState)
     ]);
 
     let combinedJobs = resultBuckets.flat();
@@ -154,13 +184,13 @@ export async function searchJobs({ query, location, jobType, role, analysisData,
 
     resultBuckets = [adzunaJobs, jsearchJobs, museJobs, serperJobs];
   } else if (jobType === 'internship-remote') {
-    const [remotiveJobs, himalayasJobs, museJobs] = await Promise.all([
+    const [remotiveJobs, ddgsJobs, museJobs] = await Promise.all([
       runSource('remotive', remotiveSource, sharedArgs, sourceState),
-      runSource('himalayas', himalayasSource, sharedArgs, sourceState),
+      runSource('ddgs', ddgsSource, sharedArgs, sourceState),
       runSource('muse', museSource, sharedArgs, sourceState)
     ]);
 
-    let combinedJobs = [...remotiveJobs, ...himalayasJobs, ...museJobs];
+    let combinedJobs = [...remotiveJobs, ...ddgsJobs, ...museJobs];
 
     if (combinedJobs.length < 5) {
       combinedJobs = combinedJobs.concat(await runSource('jsearch', jsearchSource, sharedArgs, sourceState));
@@ -193,19 +223,21 @@ export async function searchJobs({ query, location, jobType, role, analysisData,
       combinedJobs = combinedJobs.concat(await runSource('adzuna', adzunaSource, sharedArgs, sourceState));
     }
 
-    const [remotiveJobs, himalayasJobs] = await Promise.all([
+    const [remotiveJobs, ddgsJobs] = await Promise.all([
       runSource('remotive', remotiveSource, sharedArgs, sourceState),
-      runSource('himalayas', himalayasSource, sharedArgs, sourceState)
+      runSource('ddgs', ddgsSource, sharedArgs, sourceState)
     ]);
 
-    resultBuckets = [combinedJobs, remotiveJobs, himalayasJobs];
+    resultBuckets = [combinedJobs, remotiveJobs, ddgsJobs];
   } else {
     resultBuckets = await Promise.all([
       runSource('remotive', remotiveSource, sharedArgs, sourceState),
-      runSource('himalayas', himalayasSource, sharedArgs, sourceState),
+      runSource('ddgs', ddgsSource, sharedArgs, sourceState),
       runSource('muse', museSource, sharedArgs, sourceState),
       runSource('reed', reedSource, sharedArgs, sourceState)
     ]);
+
+    const primaryJobs = resultBuckets.flat();
   }
 
   let jobs = sortJobs(flagScamJobs(dedupeJobs(resultBuckets.flat())));
@@ -213,6 +245,18 @@ export async function searchJobs({ query, location, jobType, role, analysisData,
   if (!jobs.length) {
     const ddgsJobs = await runSource('ddgs', ddgsSource, sharedArgs, sourceState);
     jobs = sortJobs(flagScamJobs(dedupeJobs(ddgsJobs)));
+  }
+
+  if (!jobs.length) {
+    const fallbackJobs = await runDuckDuckGoFallbackSearch({
+      query: enhancedQuery,
+      location,
+      jobType,
+      sourceState,
+      logger
+    });
+
+    jobs = sortJobs(flagScamJobs(dedupeJobs(fallbackJobs)));
   }
 
   if (!jobs.length) {
@@ -226,14 +270,18 @@ export async function searchJobs({ query, location, jobType, role, analysisData,
     };
   }
 
+  const enrichedJobs = jobs.map((job) => enrichJob(job, analysisData || null));
+  const dashboardStats = computeDashboardStats(enrichedJobs);
+
   return {
-    jobs,
+    jobs: enrichedJobs,
     exhausted: sourceState.rateLimited,
     message: sourceState.rateLimited
       ? 'Some sources are temporarily limited. Showing available results. Try again in a few minutes.'
       : null,
     sourcesUsed: [...new Set(sourceState.sourcesUsed)],
     cachedSources: [...new Set(sourceState.cachedSources)],
+    dashboardStats,
     matchedSkills
   };
 }
