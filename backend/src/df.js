@@ -1,7 +1,10 @@
-import { Pool } from 'pg';
+import pkg from 'pg';
+const { Pool } = pkg;
 
 async function fixDatabase() {
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  const pool = new Pool({
+    connectionString: "postgresql://postgres:2611@localhost:5432/aptico"
+  });
   
   try {
     console.log('Restoring permissions to the public schema...');

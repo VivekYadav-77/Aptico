@@ -98,11 +98,11 @@ export default function ProfilePage() {
           <article className="app-panel relative overflow-hidden">
             <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-r from-[var(--accent-soft)] via-transparent to-[var(--warning-soft)]" />
             <div className="relative flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-              <div className="flex gap-4">
-                <div className="flex h-20 w-20 items-center justify-center rounded-3xl border border-[var(--border)] bg-[var(--panel-soft)] text-2xl font-black text-[var(--text)]">
+              <div className="flex flex-1 gap-4">
+                <div className="flex shrink-0 h-20 w-20 items-center justify-center rounded-3xl border border-[var(--border)] bg-[var(--panel-soft)] text-2xl font-black text-[var(--text)]">
                   {initials}
                 </div>
-                <div className="space-y-3">
+                <div className="flex-1 space-y-3">
                   <div>
                     <p className="app-kicker">Professional identity</p>
                     <h2 className="mt-2 text-3xl font-black tracking-[-0.04em] text-[var(--text)]">{fullName}</h2>
@@ -243,15 +243,21 @@ export default function ProfilePage() {
 
             <div className="mt-6 rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] p-5">
               <p className="app-field-label">Public links</p>
-              <div className="mt-4 space-y-3 text-sm text-[var(--muted-strong)]">
+              <div className="mt-4 space-y-3 text-sm">
                 {publicLinks.length ? (
                   publicLinks.map((link) => (
-                    <p key={link} className="break-all">
+                    <a
+                      key={link}
+                      href={link.startsWith('http') ? link : `https://${link}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block break-all text-[var(--accent-strong)] underline underline-offset-4 hover:text-[var(--accent)]"
+                    >
                       {link}
-                    </p>
+                    </a>
                   ))
                 ) : (
-                  <p>Add portfolio, LinkedIn, GitHub, or personal website links in settings.</p>
+                  <p className="text-[var(--muted-strong)]">Add portfolio, LinkedIn, GitHub, or personal website links in settings.</p>
                 )}
               </div>
             </div>

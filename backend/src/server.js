@@ -63,8 +63,9 @@ export function buildServer() {
 
   app.register(helmet, {
     global: true,
-    contentSecurityPolicy: true,
-    crossOriginEmbedderPolicy: true
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+    crossOriginOpenerPolicy: { policy: 'same-origin-allow-popups' }
   });
 
   app.register(rateLimit, {

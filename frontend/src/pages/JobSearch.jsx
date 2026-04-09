@@ -82,50 +82,82 @@ export default function JobSearch() {
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(34,211,238,0.16),_transparent_35%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)] px-6 py-10 text-slate-100">
+    <main className="min-h-screen bg-[var(--bg)] px-6 py-10 text-[var(--text)]">
       <div className="mx-auto max-w-7xl space-y-8">
-        <header className="flex flex-col gap-4 rounded-[2rem] border border-white/10 bg-slate-900/70 p-6 backdrop-blur lg:flex-row lg:items-center lg:justify-between">
+        <header className="flex flex-col gap-4 rounded-[2rem] border border-[var(--border)] bg-[var(--panel)] p-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-2">
-            <p className="text-xs uppercase tracking-[0.35em] text-cyan-300">Aptico Job Search</p>
-            <h1 className="text-3xl font-semibold tracking-tight text-white">Multi-source role discovery</h1>
-            <p className="text-sm text-slate-300">Search across the configured sources, see match percentages when analysis exists, and bookmark roles to your account.</p>
+            <p className="text-xs uppercase tracking-[0.35em] text-[var(--accent-strong)]">Aptico Job Search</p>
+            <h1 className="text-3xl font-semibold tracking-tight text-[var(--text)]">Multi-source role discovery</h1>
+            <p className="text-sm text-[var(--muted-strong)]">Search across the configured sources, see match percentages when analysis exists, and bookmark roles to your account.</p>
           </div>
           <div className="flex flex-wrap gap-3">
-            <Link to="/dashboard" className="rounded-full border border-slate-700 px-4 py-2 text-xs uppercase tracking-[0.2em] text-slate-200 transition hover:border-cyan-400 hover:text-cyan-200">
+            <Link to="/dashboard" className="rounded-full border border-[var(--border)] px-4 py-2 text-xs uppercase tracking-[0.2em] text-[var(--text)] transition hover:border-[var(--accent)] hover:text-[var(--accent-strong)]">
               Dashboard
             </Link>
-            <Link to="/auth" className="rounded-full border border-slate-700 px-4 py-2 text-xs uppercase tracking-[0.2em] text-slate-200 transition hover:border-cyan-400 hover:text-cyan-200">
+            <Link to="/auth" className="rounded-full border border-[var(--border)] px-4 py-2 text-xs uppercase tracking-[0.2em] text-[var(--text)] transition hover:border-[var(--accent)] hover:text-[var(--accent-strong)]">
               Auth
             </Link>
           </div>
         </header>
 
-        <section className="rounded-[2rem] border border-white/10 bg-slate-900/70 p-6 backdrop-blur">
+        <section className="rounded-[2rem] border border-[var(--border)] bg-[var(--panel)] p-6">
           <form className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr_auto]" onSubmit={handleSearch}>
             <label className="space-y-2">
-              <span className="text-xs uppercase tracking-[0.22em] text-slate-400">Role or keyword</span>
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400"
-                placeholder="frontend developer"
-                required
-              />
+              <span className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">Role or keyword</span>
+              <div className="relative flex items-center">
+                {/* Search Icon */}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="pointer-events-none absolute left-3.5 h-4 w-4 shrink-0 text-[var(--accent-strong)]"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  aria-hidden="true"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <input
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  className="app-input"
+                  style={{ paddingLeft: '3rem' }}
+                  placeholder="frontend developer"
+                  required
+                />
+              </div>
             </label>
             <label className="space-y-2">
-              <span className="text-xs uppercase tracking-[0.22em] text-slate-400">Location</span>
-              <input
-                value={location}
-                onChange={(event) => setLocation(event.target.value)}
-                className="w-full rounded-2xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-400"
-                placeholder="remote"
-                required
-              />
+              <span className="text-xs uppercase tracking-[0.22em] text-[var(--muted)]">Location</span>
+              <div className="relative flex items-center">
+                {/* Location / Map-pin Icon */}
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  className="pointer-events-none absolute left-3.5 h-4 w-4 shrink-0 text-[var(--accent-strong)]"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  aria-hidden="true"
+                >
+                  <path d="M12 2C8.686 2 6 4.686 6 8c0 5.25 6 13 6 13s6-7.75 6-13c0-3.314-2.686-6-6-6z" />
+                  <circle cx="12" cy="8" r="2" />
+                </svg>
+                <input
+                  value={location}
+                  onChange={(event) => setLocation(event.target.value)}
+                  className="app-input"
+                  style={{ paddingLeft: '3rem' }}
+                  placeholder="remote"
+                  required
+                />
+              </div>
             </label>
             <button
               type="submit"
               disabled={isLoading}
-              className="rounded-full bg-cyan-400 px-6 py-3 text-sm font-medium uppercase tracking-[0.2em] text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-300"
+              className="app-button self-end disabled:cursor-not-allowed disabled:opacity-50"
             >
               {isLoading ? 'Searching...' : 'Search jobs'}
             </button>
@@ -139,8 +171,8 @@ export default function JobSearch() {
                 onClick={() => setSelectedFilter(option)}
                 className={`rounded-full px-4 py-2 text-xs uppercase tracking-[0.22em] transition ${
                   selectedFilter === option
-                    ? 'bg-cyan-400 text-slate-950'
-                    : 'border border-slate-700 text-slate-300 hover:border-slate-500'
+                    ? 'bg-[var(--accent)] text-slate-950'
+                    : 'border border-[var(--border)] text-[var(--muted-strong)] hover:border-[var(--accent)]/40 hover:text-[var(--text)]'
                 }`}
               >
                 {option}
@@ -148,13 +180,13 @@ export default function JobSearch() {
             ))}
           </div>
 
-          <div className="mt-5 flex flex-wrap gap-3 text-xs text-slate-400">
-            <span className="rounded-full border border-white/10 px-3 py-1">
+          <div className="mt-5 flex flex-wrap gap-3 text-xs text-[var(--muted-strong)]">
+            <span className="rounded-full border border-[var(--border)] px-3 py-1">
               Session: {auth.isAuthenticated ? auth.user?.email || 'Signed in' : auth.guestMode ? 'Guest mode' : 'Anonymous'}
             </span>
-            {meta?.usedFallback ? <span className="rounded-full border border-amber-400/30 px-3 py-1 text-amber-200">DDGS fallback used</span> : null}
+            {meta?.usedFallback ? <span className="rounded-full border border-[var(--warning-border)] bg-[var(--warning-soft)] px-3 py-1 text-[var(--warning-text)]">DDGS fallback used</span> : null}
             {meta?.sources?.map((source) => (
-              <span key={source.source} className="rounded-full border border-white/10 px-3 py-1">
+              <span key={source.source} className="rounded-full border border-[var(--border)] px-3 py-1">
                 {source.source}: {source.ok ? `${source.count} jobs` : 'failed'}
               </span>
             ))}
@@ -162,11 +194,11 @@ export default function JobSearch() {
         </section>
 
         {status ? (
-          <div className="rounded-3xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-4 text-sm text-emerald-200">{status}</div>
+          <div className="rounded-3xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-4 text-sm text-emerald-700 dark:text-emerald-200">{status}</div>
         ) : null}
 
         {error ? (
-          <div className="rounded-3xl border border-rose-500/30 bg-rose-500/10 px-5 py-4 text-sm text-rose-200">{error}</div>
+          <div className="rounded-3xl border border-rose-500/30 bg-rose-500/10 px-5 py-4 text-sm text-rose-700 dark:text-rose-200">{error}</div>
         ) : null}
 
         <section className="grid gap-5">
@@ -183,7 +215,7 @@ export default function JobSearch() {
               />
             ))
           ) : (
-            <div className="rounded-[2rem] border border-dashed border-slate-700 bg-slate-900/50 px-6 py-12 text-center text-sm text-slate-400">
+            <div className="rounded-[2rem] border border-dashed border-[var(--border)] bg-[var(--panel-soft)] px-6 py-12 text-center text-sm text-[var(--muted-strong)]">
               Search for a role to load jobs from the configured sources.
             </div>
           )}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector, useStore } from 'react-redux';
 import {
@@ -287,9 +287,10 @@ export default function AuthPermanent() {
     }
   }
 
-  async function handleGoogleLogin(credential) {
+  const handleGoogleLogin = useCallback(async (credential) => {
     setIsSubmitting(true);
-    resetMessages();
+    setErrorMessage('');
+    setStatusMessage('');
     dispatch(exitGuestMode());
 
     try {
@@ -300,7 +301,7 @@ export default function AuthPermanent() {
     } finally {
       setIsSubmitting(false);
     }
-  }
+  }, [dispatch, navigate, store]);
 
   async function handleResendVerification() {
     const email = pendingVerificationEmail || formState.email.trim();
@@ -367,7 +368,7 @@ export default function AuthPermanent() {
             </div>
           </div>
 
-          <div className="mono-text flex justify-between text-[10px] uppercase tracking-[0.24em] text-zinc-600">
+          <div className="mono-text flex justify-between pt-6 text-[10px] uppercase tracking-[0.24em] text-zinc-600">
             <span>System v5.0.0</span>
             <span>(c) 2026 Aptico</span>
           </div>
@@ -375,7 +376,7 @@ export default function AuthPermanent() {
 
         <section className="flex items-center justify-center bg-[var(--bg)] p-6 sm:p-12">
           <div className="w-full max-w-[420px] space-y-8">
-            <div className="flex items-center justify-between lg:hidden">
+            <div className="flex items-center justify-between border-b border-[var(--border)] pb-4 lg:hidden">
               <Link to="/" className="flex items-center gap-2">
                 <div className="flex h-6 w-6 items-center justify-center rounded bg-[var(--accent)] text-[10px] font-black text-[#003824]">A</div>
                 <span className="text-lg font-black uppercase tracking-[-0.05em] text-[var(--text)]">Aptico</span>
@@ -501,7 +502,7 @@ export default function AuthPermanent() {
                   <div className="h-px flex-1 bg-[var(--border)]" />
                 </div>
 
-                <GoogleButton onError={setErrorMessage} onSuccess={(credential) => void handleGoogleLogin(credential)} />
+                <GoogleButton onError={setErrorMessage} onSuccess={handleGoogleLogin} />
               </>
             ) : null}
 
