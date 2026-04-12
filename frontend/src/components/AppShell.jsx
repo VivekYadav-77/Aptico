@@ -2,13 +2,18 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { logoutRequest } from '../api/authApi.js';
+import { getMyProfile } from '../api/socialApi.js';
+import NotificationBell from './NotificationBell.jsx';
 import ThemeToggle from './ThemeToggle.jsx';
 import { selectAuth } from '../store/authSlice.js';
 
 const NAV_ITEMS = [
+  { to: '/home', label: 'Home', icon: 'home', description: 'Your career network feed' },
+  { to: '/people', label: 'People', icon: 'diversity_3', description: 'Find people to connect with' },
   { to: '/dashboard', label: 'Dashboard', icon: 'dashboard', description: 'Your career overview and activity' },
   { to: '/analysis', label: 'Analysis', icon: 'analytics', description: 'Resume and job match analysis' },
   { to: '/jobs', label: 'Job Search', icon: 'work', description: 'Discover and filter roles' },
+  { to: '/wins', label: 'Community', icon: 'groups', description: 'Community wins and career stories' },
   { to: '/profile', label: 'Profile', icon: 'person', description: 'Edit your professional profile' },
   { to: '/settings', label: 'Settings', icon: 'settings', description: 'Account, career, and theme settings' }
 ];
@@ -182,6 +187,7 @@ export default function AppShell({ title, description, actions, children, banner
   const auth = useSelector(selectAuth);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const [socialProfile, setSocialProfile] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -203,6 +209,18 @@ export default function AppShell({ title, description, actions, children, banner
 
     return 'Visitor';
   }, [auth.guestMode, auth.user]);
+
+  const profileHref = socialProfile?.username ? `/u/${socialProfile.username}` : '/settings';
+  const profileLabel = socialProfile?.username ? userLabel : 'Set up profile';
+
+  useEffect(() => {
+    if (!auth.isAuthenticated) {
+      setSocialProfile(null);
+      return;
+    }
+
+    getMyProfile().then(setSocialProfile).catch(() => setSocialProfile(null));
+  }, [auth.isAuthenticated]);
 
   // Close search on outside click
   useEffect(() => {
@@ -284,12 +302,16 @@ export default function AppShell({ title, description, actions, children, banner
           {/* Right: theme, notifications, user label, auth button */}
           <div className="flex shrink-0 items-center gap-2">
             <ThemeToggle compact />
-            <button type="button" className="app-icon-button hidden sm:inline-flex">
-              <span className="material-symbols-outlined text-[20px]">notifications</span>
-            </button>
-            <div className="hidden rounded-full border border-[var(--border)] px-4 py-2 text-sm text-[var(--muted-strong)] lg:block">
-              {userLabel}
-            </div>
+            {auth.isAuthenticated ? <NotificationBell /> : null}
+            {auth.isAuthenticated ? (
+              <Link to={profileHref} className="hidden rounded-full border border-[var(--border)] px-4 py-2 text-sm text-[var(--muted-strong)] transition hover:bg-[var(--panel-soft)] lg:block">
+                {profileLabel}
+              </Link>
+            ) : (
+              <div className="hidden rounded-full border border-[var(--border)] px-4 py-2 text-sm text-[var(--muted-strong)] lg:block">
+                {userLabel}
+              </div>
+            )}
             {auth.isAuthenticated || auth.guestMode ? (
               <button type="button" onClick={handleSignOut} className="app-button-secondary hidden sm:inline-flex">
                 {auth.guestMode ? 'Exit guest' : 'Sign out'}
@@ -397,15 +419,15 @@ export default function AppShell({ title, description, actions, children, banner
 
         {/* User info + auth actions */}
         <div className="border-t border-[var(--border)] px-4 py-4 space-y-3">
-          <div className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-3">
+          <Link to={auth.isAuthenticated ? profileHref : '/auth'} className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-sm font-black text-slate-950">
               {userLabel.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-[var(--text)]">{userLabel}</p>
+              <p className="truncate text-sm font-semibold text-[var(--text)]">{auth.isAuthenticated ? profileLabel : userLabel}</p>
               <p className="text-xs text-[var(--muted-strong)]">{auth.isAuthenticated ? 'Authenticated' : auth.guestMode ? 'Guest session' : 'Not signed in'}</p>
             </div>
-          </div>
+          </Link>
           <div className="flex gap-2">
             <ThemeToggle compact />
             {auth.isAuthenticated || auth.guestMode ? (

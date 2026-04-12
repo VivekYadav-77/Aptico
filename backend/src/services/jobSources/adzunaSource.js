@@ -3,18 +3,26 @@ import { axiosClient, buildNormalizedJob, deriveJobType, getEffectiveQuery, norm
 export async function adzunaSource({ query, location, jobType, role, redisService, env, logger = console }) {
   const effectiveQuery = getEffectiveQuery({ query, role });
   const country = location?.toLowerCase().includes('india') || !location ? 'in' : 'gb';
+  const credentials = env.adzunaCredentials || [];
 
   return withSourceExecution({
     source: 'adzuna',
-    params: { query: effectiveQuery, location, jobType, country },
+    params: { query: effectiveQuery, location, jobType, country, credentials },
     redisService,
     logger,
-    loader: async () => {
+    loader: async (credential) => {
+      const appId = credential?.appId || env.adzunaAppId;
+      const appKey = credential?.appKey || env.adzunaAppKey;
+
+      if (!appId || !appKey) {
+        throw new Error('Adzuna credentials are not configured.');
+      }
+
       const endpoint = env.adzunaApiBaseUrl.replace('/jobs/in/search/1', `/jobs/${country}/search/1`);
       const response = await axiosClient.get(endpoint, {
         params: {
-          app_id: env.adzunaAppId,
-          app_key: env.adzunaAppKey,
+          app_id: appId,
+          app_key: appKey,
           results_per_page: 20,
           what: effectiveQuery,
           where: location,
@@ -36,7 +44,7 @@ export async function adzunaSource({ query, location, jobType, role, redisServic
           salary: resolvedType === 'internship' ? null : normalizeCompensation({ min: job.salary_min, max: job.salary_max }),
           applyUrl: job.redirect_url,
           postedAt: job.created,
-          description: normalizeText(job.description, null)
+          description: job.description
         });
       });
     }

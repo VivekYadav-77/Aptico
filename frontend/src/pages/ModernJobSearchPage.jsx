@@ -1,13 +1,13 @@
-﻿import { useDeferredValue, useEffect, useMemo, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from 'react-router-dom';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import api from '../api/axios.js';
 import { fetchJobs } from '../api/jobsApi.js';
 import AppShell from '../components/AppShell.jsx';
-import ApplyKitModal from '../components/ApplyKitModal.jsx';
 import { selectAuth } from '../store/authSlice.js';
-import { selectCurrentAnalysis } from '../store/historySlice.js';
+import { clearJobSearchState, selectCurrentAnalysis, selectJobSearchState, setJobSearchState } from '../store/historySlice.js';
+import { saveSavedJobDetails } from '../utils/savedJobsStorage.js';
 
 const JOB_TYPE_OPTIONS = [
   { label: 'Remote', value: 'remote', icon: 'wifi' },
@@ -152,22 +152,25 @@ function getProgressBarClasses(color) {
 export default function ModernJobSearchPage() {
   const auth = useSelector(selectAuth);
   const currentAnalysis = useSelector(selectCurrentAnalysis);
+  const persistedJobSearchState = useSelector(selectJobSearchState);
+  const dispatch = useDispatch();
   const navigate = useNavigate();
   const [formState, setFormState] = useState({
-    query: '',
-    jobType: 'full-time',
-    location: 'India',
-    useAnalysis: false
+    query: persistedJobSearchState?.formState?.query || '',
+    jobType: persistedJobSearchState?.formState?.jobType || 'full-time',
+    location: persistedJobSearchState?.formState?.location || 'India',
+    useAnalysis: persistedJobSearchState?.formState?.useAnalysis || false
   });
   const [submittedSearch, setSubmittedSearch] = useState(null);
-  const [activeFocus, setActiveFocus] = useState('best-match');
-  const [localSearch, setLocalSearch] = useState('');
-  const [selectedJobId, setSelectedJobId] = useState(null);
+  const [activeFocus, setActiveFocus] = useState(persistedJobSearchState?.activeFocus || 'best-match');
+  const [localSearch, setLocalSearch] = useState(persistedJobSearchState?.localSearch || '');
+  const [selectedJobId, setSelectedJobId] = useState(persistedJobSearchState?.selectedJobId || null);
   const [statusMessage, setStatusMessage] = useState('');
   const [actionError, setActionError] = useState('');
   const [savingJobId, setSavingJobId] = useState(null);
-  const [activeJob, setActiveJob] = useState(null);
+  const [savedJobIds, setSavedJobIds] = useState(() => new Set(persistedJobSearchState?.savedJobIds || []));
   const [showBenchmarks, setShowBenchmarks] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
   const deferredLocalSearch = useDeferredValue(localSearch);
 
   const matchedSkills = useMemo(
@@ -214,11 +217,11 @@ export default function ModernJobSearchPage() {
     queryKey: ['jobs-search', submittedSearch],
     queryFn: () => fetchJobs(submittedSearch),
     enabled: Boolean(submittedSearch),
-    retry: false,
-    placeholderData: (previousData) => previousData
+    retry: false
   });
 
-  const result = jobsQuery.data || {
+  const persistedResult = persistedJobSearchState?.result || null;
+  const result = jobsQuery.data || persistedResult || {
     jobs: [],
     exhausted: false,
     sourcesUsed: [],
@@ -226,6 +229,24 @@ export default function ModernJobSearchPage() {
     matchedSkills: [],
     dashboardStats: null
   };
+
+  useEffect(() => {
+    if (!submittedSearch && !(result.jobs || []).length && !localSearch && activeFocus === 'best-match') {
+      return;
+    }
+
+    dispatch(
+      setJobSearchState({
+        formState,
+        submittedSearch,
+        activeFocus,
+        localSearch,
+        selectedJobId,
+        result,
+        savedJobIds: Array.from(savedJobIds)
+      })
+    );
+  }, [activeFocus, dispatch, formState, localSearch, result, selectedJobId, submittedSearch, savedJobIds]);
 
   const enrichedJobs = useMemo(() => {
     const analysisTerms = result.matchedSkills?.length ? result.matchedSkills : matchedSkills;
@@ -285,17 +306,25 @@ export default function ModernJobSearchPage() {
       });
   }, [activeFocus, deferredLocalSearch, enrichedJobs]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [submittedSearch, activeFocus, deferredLocalSearch]);
+
+  const ITEMS_PER_PAGE = 5;
+  const totalPages = Math.ceil((filteredJobs?.length || 0) / ITEMS_PER_PAGE);
+  const paginatedJobs = filteredJobs.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
   const selectedJob = useMemo(() => {
-    if (!filteredJobs.length) {
+    if (!selectedJobId || !filteredJobs.length) {
       return null;
     }
 
-    return filteredJobs.find((job) => job.id === selectedJobId) || filteredJobs[0];
+    return filteredJobs.find((job) => job.id === selectedJobId) || null;
   }, [filteredJobs, selectedJobId]);
 
   useEffect(() => {
-    if (selectedJob?.id !== selectedJobId) {
-      setSelectedJobId(selectedJob?.id ?? null);
+    if (selectedJobId && !selectedJob) {
+      setSelectedJobId(null);
     }
   }, [selectedJob, selectedJobId]);
 
@@ -343,9 +372,32 @@ export default function ModernJobSearchPage() {
     }));
   }
 
+  function handleClearSearchWorkspace() {
+    setFormState({
+      query: '',
+      jobType: 'full-time',
+      location: 'India',
+      useAnalysis: false
+    });
+    setSubmittedSearch(null);
+    setActiveFocus('best-match');
+    setLocalSearch('');
+    setSelectedJobId(null);
+    setStatusMessage('');
+    setActionError('');
+    setShowBenchmarks(false);
+    setSavedJobIds(new Set());
+    dispatch(clearJobSearchState());
+  }
+
   async function handleSaveToPipeline(job) {
     if (!auth.isAuthenticated) {
       setActionError('Sign in to save jobs to your pipeline.');
+      return;
+    }
+
+    if (savedJobIds.has(job.id)) {
+      setStatusMessage(`${job.title} is already saved.`);
       return;
     }
 
@@ -354,13 +406,30 @@ export default function ModernJobSearchPage() {
     setStatusMessage('');
 
     try {
-      await api.post('/api/jobs/save', {
+      const response = await api.post('/api/jobs/save', {
         title: job.title,
         company: job.company,
         source: job.source,
         url: job.applyUrl,
         stipend: job.stipend || null,
         matchPercent: job.match?.matchScore ?? job.matchScore
+      });
+
+      saveSavedJobDetails(response.data?.data?.id, {
+        description: job.description || '',
+        location: job.location || '',
+        jobType: job.jobType || job.normalizedType || '',
+        postedAt: job.postedAt || null,
+        source: job.source || '',
+        url: job.applyUrl || job.url || '',
+        stipend: job.stipend || job.salary || null,
+        matchPercent: job.match?.matchScore ?? job.matchScore ?? null
+      });
+
+      setSavedJobIds((prev) => {
+        const next = new Set(prev);
+        next.add(job.id);
+        return next;
       });
 
       setStatusMessage(`${job.title} was saved to your pipeline.`);
@@ -372,12 +441,21 @@ export default function ModernJobSearchPage() {
   }
 
   function handleGenerateApplyKit(job) {
-    setActiveJob({
-      ...job,
-      url: job.applyUrl
+    const fullJobDescription = [
+      `Job Title: ${job.title || 'Not specified'}`,
+      `Company: ${job.company || 'Not specified'}`,
+      `Location: ${job.location || 'Not specified'}`,
+      `Compensation: ${job.compensation || 'Not specified'}`,
+      '',
+      'Job Description:',
+      job.description || 'Not provided.'
+    ].join('\n');
+
+    navigate('/analysis', {
+      state: {
+        jobDescription: fullJobDescription
+      }
     });
-    setActionError('');
-    setStatusMessage('');
   }
 
   function handleSkillClick(skill) {
@@ -398,341 +476,226 @@ export default function ModernJobSearchPage() {
         <>
           <Link to="/analysis" className="app-button-secondary">Analysis</Link>
           <Link to="/profile" className="app-button-secondary">Profile</Link>
+          {(submittedSearch || (result.jobs || []).length) ? (
+            <button type="button" onClick={handleClearSearchWorkspace} className="app-button-secondary">
+              Remove content
+            </button>
+          ) : null}
         </>
       }
     >
-      <section className="grid gap-6 2xl:grid-cols-[1.15fr_0.85fr]">
-        <article className="app-panel relative overflow-hidden">
-          <div className="absolute inset-x-0 top-0 h-28 bg-[linear-gradient(135deg,rgba(78,222,163,0.22),rgba(113,161,255,0.08),transparent)]" />
-          <div className="relative space-y-6">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-              <div className="max-w-2xl space-y-3">
-                <p className="app-kicker">Search cockpit</p>
-                <h2 className="text-2xl font-black tracking-[-0.05em] text-[var(--text)] sm:text-4xl">
-                  Discover roles with stronger context, less scrolling, and faster decision-making.
-                </h2>
-                <p className="max-w-xl text-sm leading-7 text-[var(--muted-strong)] sm:text-base">
-                  Inspired by your HTML reference, this version adds a richer header, contextual search setup, quick-focus filtering, and a structured job preview panel.
-                </p>
-              </div>
-
-              <div className="flex shrink-0 gap-3">
-                {[
-                  ['Live sources', String(sourceCount || 0)],
-                  ['Visible roles', String(filteredJobs.length || 0)],
-                  ['Avg. fit', averageMatch ? `${averageMatch}%` : '--']
-                ].map(([label, value]) => (
-                  <div key={label} className="min-w-[6.5rem] rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-4">
-                    <p className="app-field-label whitespace-nowrap">{label}</p>
-                    <p className="mt-3 text-2xl font-black tracking-[-0.04em] text-[var(--text)]">{value}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
+      <section className="app-panel relative overflow-hidden mb-6 py-6 px-6">
+        <div className="absolute inset-x-0 top-0 h-24 bg-[linear-gradient(135deg,rgba(78,222,163,0.15),rgba(113,161,255,0.05),transparent)]" />
+        <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          <div className="space-y-2 max-w-2xl">
+            <h2 className="text-xl md:text-2xl font-black tracking-[-0.03em] text-[var(--text)]">
+              Discover roles with stronger context, less scrolling, and faster decision-making.
+            </h2>
+            <div className="flex flex-wrap gap-2 mt-3">
               {(analysisHighlights.length ? analysisHighlights : ['Analysis-guided search', 'Remote-aware filtering', 'Source transparency']).map((item) => (
                 <span key={item} className="app-chip">{item}</span>
               ))}
             </div>
           </div>
-        </article>
-
-        <aside className="app-panel space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="app-kicker">Why this works</p>
-              <h3 className="mt-2 text-xl font-bold text-[var(--text)]">Better search UX for job triage</h3>
-            </div>
-            <span className="material-symbols-outlined rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] p-3 text-[var(--accent-strong)]">
-              insights
-            </span>
-          </div>
-
-          <div className="grid gap-3">
+          
+          <div className="flex shrink-0 gap-3">
             {[
-              ['Analysis mode', 'Turn resume or role analysis into one-click search context.'],
-              ['Quick focus views', 'Flip between fit, remote, salary, and verified-first priorities.'],
-              ['Detail-first layout', 'Review one role deeply while keeping the results queue nearby.'],
-              ['Local refinement', 'Filter fetched roles instantly without firing a new API request.']
-            ].map(([title, copy]) => (
-              <div key={title} className="rounded-[1.15rem] border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-4">
-                <p className="font-semibold text-[var(--text)]">{title}</p>
-                <p className="mt-2 text-sm leading-7 text-[var(--muted-strong)]">{copy}</p>
+              ['Live sources', String(sourceCount || 0)],
+              ['Visible roles', String(filteredJobs.length || 0)],
+              ['Avg. fit', averageMatch ? `${averageMatch}%` : '--']
+            ].map(([label, value]) => (
+              <div key={label} className="min-w-[5.5rem] rounded-[1rem] border border-[var(--border)] bg-[var(--panel-soft)] px-3 py-2">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--muted-strong)] whitespace-nowrap">{label}</p>
+                <p className="mt-1 text-xl font-black tracking-[-0.04em] text-[var(--text)]">{value}</p>
               </div>
             ))}
           </div>
-        </aside>
+        </div>
       </section>
-      <section className="mt-6 grid gap-6 xl:grid-cols-[0.82fr_1.18fr]">
-        <form className="app-panel space-y-5 xl:sticky xl:top-24 xl:h-fit" onSubmit={handleSubmit}>
-          <div className="flex items-start justify-between gap-4">
+
+      <div className="space-y-6">
+        <form className="app-panel py-5 px-6 space-y-5" onSubmit={handleSubmit}>
+          <div className="flex items-center justify-between">
             <div>
-              <p className="app-kicker">Search setup</p>
-              <h3 className="mt-2 text-xl font-bold text-[var(--text)]">Tune your job pull</h3>
+              <h3 className="text-[17px] font-bold tracking-[-0.02em] text-[var(--text)]">Search criteria</h3>
             </div>
-            <span className="rounded-full border border-[var(--border)] bg-[var(--panel-soft)] px-3 py-2 text-xs font-semibold text-[var(--muted-strong)]">
-              Multi-source
-            </span>
-          </div>
-
-          {analysisSearchText ? (
-            <label className="flex items-center justify-between gap-4 rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] px-5 py-4">
-              <div>
-                <p className="font-medium text-[var(--text)]">Use my latest analysis context</p>
-                <p className="mt-1 text-sm text-[var(--muted-strong)]">Pull matched skills and target role into the search automatically.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => updateField('useAnalysis', !formState.useAnalysis)}
-                className={`app-switch ${formState.useAnalysis ? 'is-on' : ''}`}
-                aria-pressed={formState.useAnalysis}
-                aria-label="Toggle analysis context"
-              />
-            </label>
-          ) : null}
-
-          {!formState.useAnalysis ? (
-            <label className="space-y-2">
-              <span className="app-field-label">Role or keywords</span>
-              <div className="relative">
-                <span className="material-symbols-outlined pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--muted)]">search</span>
-                <input
-                  value={formState.query}
-                  onChange={(event) => updateField('query', event.target.value)}
-                  className="app-input"
-                  style={{ paddingLeft: '3rem' }}
-                  placeholder="React developer, product designer, data analyst"
-                  required
-                />
-              </div>
-            </label>
-          ) : (
-            <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--accent-soft)] px-4 py-4 text-sm leading-7 text-[var(--accent-strong)]">
-              Searching with: {analysisSearchText}
-            </div>
-          )}
-
-          {!isRemoteType(formState.jobType) ? (
-            <label className="space-y-2">
-              <span className="app-field-label">Location</span>
-              <div className="relative">
-                <span className="material-symbols-outlined pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--muted)]">location_on</span>
-                <input
-                  value={formState.location}
-                  onChange={(event) => updateField('location', event.target.value)}
-                  className="app-input"
-                  style={{ paddingLeft: '3rem' }}
-                  placeholder="Bangalore, Mumbai, Pune"
-                />
-              </div>
-            </label>
-          ) : (
-            <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-4 text-sm text-[var(--muted-strong)]">
-              Remote search is active, so location is automatically set to Remote.
-            </div>
-          )}
-
-          <div className="space-y-3">
-            <span className="app-field-label">Job type</span>
-            <div className="grid gap-3 sm:grid-cols-2">
-              {JOB_TYPE_OPTIONS.map((option) => (
+            {analysisSearchText ? (
+              <label className="flex items-center gap-3 cursor-pointer select-none">
+                <span className="text-sm font-medium text-[var(--text)]">Use analysis context</span>
                 <button
-                  key={option.value}
                   type="button"
-                  onClick={() => updateField('jobType', option.value)}
-                  className={`flex items-center gap-3 rounded-[1rem] border px-4 py-3 text-left text-xs sm:text-sm transition ${
-                    formState.jobType === option.value
-                      ? 'border-transparent bg-[var(--accent)] text-slate-950'
-                      : 'border-[var(--border)] bg-[var(--panel-soft)] text-[var(--text)] hover:border-[var(--accent)]/40'
-                  }`}
+                  onClick={() => updateField('useAnalysis', !formState.useAnalysis)}
+                  className={`app-switch ${formState.useAnalysis ? 'is-on' : ''}`}
+                  aria-pressed={formState.useAnalysis}
+                  aria-label="Toggle analysis context"
+                />
+              </label>
+            ) : null}
+          </div>
+
+          <div className="flex flex-col md:flex-row md:items-end gap-4">
+            {!formState.useAnalysis ? (
+              <label className="flex-1 space-y-2 block">
+                <span className="app-field-label">Role or keywords</span>
+                <div className="relative mt-2">
+                  <span className="material-symbols-outlined pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--muted)] text-[18px]">search</span>
+                  <input
+                    value={formState.query}
+                    onChange={(event) => updateField('query', event.target.value)}
+                    className="app-input text-sm w-full"
+                    style={{ paddingLeft: '2.5rem' }}
+                    placeholder="React developer, designer..."
+                    required
+                  />
+                </div>
+              </label>
+            ) : (
+              <div className="flex-1 min-w-0 rounded-[1.25rem] border border-[var(--border)] bg-[var(--accent-soft)] px-4 py-3 min-h-[44px] flex items-center text-sm leading-6 text-[var(--accent-strong)]">
+                <span className="truncate">Searching with: {analysisSearchText}</span>
+              </div>
+            )}
+
+            {!isRemoteType(formState.jobType) ? (
+              <label className="flex-1 space-y-2 block">
+                <span className="app-field-label">Location</span>
+                <div className="relative mt-2">
+                  <span className="material-symbols-outlined pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--muted)] text-[18px]">location_on</span>
+                  <input
+                    value={formState.location}
+                    onChange={(event) => updateField('location', event.target.value)}
+                    className="app-input text-sm w-full"
+                    style={{ paddingLeft: '2.5rem' }}
+                    placeholder="Bangalore, Mumbai, Pune"
+                  />
+                </div>
+              </label>
+            ) : (
+              <div className="flex-1 rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-3 min-h-[44px] flex items-center text-sm text-[var(--muted-strong)]">
+                Remote search is active.
+              </div>
+            )}
+
+            <div className="flex-1 space-y-2 block">
+              <span className="app-field-label">Job type</span>
+              <div className="relative mt-2">
+                <select
+                  value={formState.jobType}
+                  onChange={(event) => updateField('jobType', event.target.value)}
+                  className="app-input text-sm w-full appearance-none pr-10"
                 >
-                  <span className="material-symbols-outlined text-[20px]">{option.icon}</span>
-                  <span className="font-semibold">{option.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] p-4">
-            <p className="app-field-label">Quick notes</p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-[1.4fr_1fr_1fr]">
-              <div>
-                <p className="text-sm font-semibold text-[var(--text)]">Search query</p>
-                <p className="mt-1 flex-1 text-sm text-[var(--muted-strong)] pr-2">
-                  {formState.useAnalysis ? analysisSearchText || 'Waiting for analysis context' : formState.query || 'Add a role or skill set'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-[var(--text)]">Location mode</p>
-                <p className="mt-1 text-sm text-[var(--muted-strong)]">{isRemoteType(formState.jobType) ? 'Remote only' : formState.location || 'India default'}</p>
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-[var(--text)]">Analysis assist</p>
-                <p className="mt-1 text-sm text-[var(--muted-strong)]">{formState.useAnalysis ? 'On' : 'Off'}</p>
+                  {JOB_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+                <span className="material-symbols-outlined pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[var(--muted)] text-[18px]">expand_more</span>
               </div>
             </div>
-          </div>
 
-          <button
-            type="submit"
-            disabled={jobsQuery.isFetching || (formState.useAnalysis ? !analysisSearchText.trim() : !formState.query.trim())}
-            className="app-button w-full justify-center"
-          >
-            <span className="material-symbols-outlined text-[18px]">{jobsQuery.isFetching ? 'progress_activity' : 'travel_explore'}</span>
-            {jobsQuery.isFetching ? 'Searching jobs...' : 'Find jobs'}
-          </button>
+            <button
+              type="submit"
+              disabled={jobsQuery.isFetching || (formState.useAnalysis ? !analysisSearchText.trim() : !formState.query.trim())}
+              className="app-button justify-center shrink-0 w-full md:w-auto h-[44px]"
+            >
+              <span className="material-symbols-outlined text-[18px]">{jobsQuery.isFetching ? 'progress_activity' : 'travel_explore'}</span>
+              {jobsQuery.isFetching ? 'Searching jobs...' : 'Find jobs'}
+            </button>
+          </div>
         </form>
 
-        <div className="space-y-5">
+        <main className="min-w-0 w-full space-y-5">
           {statusMessage ? (
-            <div className="rounded-[1.5rem] border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+            <div className="rounded-[1.25rem] border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
               {statusMessage}
             </div>
           ) : null}
 
           {actionError ? (
-            <div className="rounded-[1.5rem] border border-[var(--danger-border)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-rose-300">
+            <div className="rounded-[1.25rem] border border-[var(--danger-border)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-rose-300">
               {actionError}
             </div>
           ) : null}
 
           {jobsQuery.error ? (
-            <div className="rounded-[1.5rem] border border-[var(--danger-border)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-rose-300">
+            <div className="rounded-[1.25rem] border border-[var(--danger-border)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-rose-300">
               {jobsQuery.error.response?.data?.error || 'Could not load jobs.'}
             </div>
           ) : null}
 
-          <section className="app-panel space-y-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <p className="app-kicker">Result controls</p>
-                <h3 className="mt-2 text-xl font-bold text-[var(--text)]">Filter and inspect faster</h3>
+          <section className="app-panel space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex flex-wrap gap-2">
+                {FOCUS_TAGS.map((option) => (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setActiveFocus(option.value)}
+                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                      activeFocus === option.value
+                        ? 'bg-[var(--accent)] text-slate-950'
+                        : 'border border-[var(--border)] bg-[var(--panel-soft)] text-[var(--text)] hover:border-[var(--accent)]/40'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
               </div>
 
-              <div className="relative w-full lg:max-w-sm">
-                <span className="material-symbols-outlined pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--muted)]">manage_search</span>
+              <div className="relative w-full md:max-w-[14rem]">
+                <span className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)] text-[18px]">manage_search</span>
                 <input
                   value={localSearch}
                   onChange={(event) => setLocalSearch(event.target.value)}
-                  className="app-input"
-                  style={{ paddingLeft: '3rem' }}
+                  className="app-input text-sm py-2 w-full"
+                  style={{ paddingLeft: '2.25rem' }}
                   placeholder="Refine visible results"
                 />
               </div>
             </div>
-
-            <div className="flex flex-wrap gap-3">
-              {FOCUS_TAGS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setActiveFocus(option.value)}
-                  className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                    activeFocus === option.value
-                      ? 'bg-[var(--accent)] text-slate-950'
-                      : 'border border-[var(--border)] bg-[var(--panel-soft)] text-[var(--text)]'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-
-            {submittedSearch ? (
-              <div className="grid gap-4 lg:grid-cols-[1.05fr_0.95fr]">
-                <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] p-4">
-                  <p className="app-field-label">Search snapshot</p>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                    <div>
-                      <p className="text-sm font-semibold text-[var(--text)]">Role query</p>
-                      <p className="mt-1 text-sm text-[var(--muted-strong)]">{submittedSearch.query || '--'}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-[var(--text)]">Job type</p>
-                      <p className="mt-1 text-sm capitalize text-[var(--muted-strong)]">{submittedSearch.jobType.replace(/-/g, ' ')}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-[var(--text)]">Location</p>
-                      <p className="mt-1 text-sm text-[var(--muted-strong)]">{submittedSearch.location}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-[var(--text)]">Analysis assist</p>
-                      <p className="mt-1 text-sm text-[var(--muted-strong)]">{submittedSearch.useAnalysis ? 'Enabled' : 'Disabled'}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] p-4">
-                  <p className="app-field-label">Source status</p>
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {(result.sourcesUsed || []).length ? (
-                      (result.sourcesUsed || []).map((source) => (
-                        <span key={source} className="app-chip">
-                          {renderSourceTone(source)}
-                          {(result.cachedSources || []).includes(source) ? ' cached' : ''}
-                        </span>
-                      ))
-                    ) : (
-                      <span className="text-sm text-[var(--muted-strong)]">Sources will appear after the first search.</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ) : null}
           </section>
+
           {submittedSearch ? (
             filteredJobs.length ? (
               <>
                 {result.jobs.length ? (
-                  <section className="app-panel space-y-4">
-                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                      <div className={getStatCardClasses('green')}>
-                        <p className="app-field-label">Fresh Listings</p>
-                        <p className="mt-3 text-2xl font-black tracking-[-0.04em]">{dashboardStats.freshJobs}</p>
-                        <p className="mt-2 text-sm">Posted in last 7 days</p>
-                      </div>
-
-                      <div className={getStatCardClasses(dashboardStats.averageGhostRisk >= 50 ? 'red' : 'amber')}>
-                        <p className="app-field-label">Ghost Risk</p>
-                        <p className="mt-3 text-2xl font-black tracking-[-0.04em]">{dashboardStats.averageGhostRisk}%</p>
-                        <p className="mt-2 text-sm">{dashboardStats.ghostAlertCount} listings flagged as high risk</p>
-                      </div>
-
-                      {submittedSearch.useAnalysis ? (
-                        <div className={getStatCardClasses('purple')}>
-                          <p className="app-field-label">Strong Matches</p>
-                          <p className="mt-3 text-2xl font-black tracking-[-0.04em]">{dashboardStats.strongMatchCount}</p>
-                          <p className="mt-2 text-sm">Jobs matching your profile 70%+</p>
-                        </div>
-                      ) : null}
-
-                      {isInternshipSearch ? (
-                        <div className={getStatCardClasses('red')}>
-                          <p className="app-field-label">Exploitation Alerts</p>
-                          <p className="mt-3 text-2xl font-black tracking-[-0.04em]">{dashboardStats.exploitationCount}</p>
-                          <p className="mt-2 text-sm">Internships with unfair stipends</p>
-                        </div>
-                      ) : null}
+                  <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className={getStatCardClasses('green')}>
+                      <p className="app-field-label">Fresh Listings</p>
+                      <p className="mt-2 text-2xl font-black tracking-[-0.04em]">{dashboardStats.freshJobs}</p>
+                      <p className="mt-1 text-xs">Posted in last 7 days</p>
                     </div>
 
-                    <p className="text-sm text-[var(--muted-strong)]">
-                      Searched across {sourceSummary || 'no sources'}
-                      {cachedSourceCount ? ` · ${cachedSourceCount} source(s) from cache` : ''}
-                    </p>
+                    <div className={getStatCardClasses(dashboardStats.averageGhostRisk >= 50 ? 'red' : 'amber')}>
+                      <p className="app-field-label">Ghost Risk</p>
+                      <p className="mt-2 text-2xl font-black tracking-[-0.04em]">{dashboardStats.averageGhostRisk}%</p>
+                      <p className="mt-1 text-xs">{dashboardStats.ghostAlertCount} listings flagged as high risk</p>
+                    </div>
+
+                    {submittedSearch.useAnalysis ? (
+                      <div className={getStatCardClasses('purple')}>
+                        <p className="app-field-label">Strong Matches</p>
+                        <p className="mt-2 text-2xl font-black tracking-[-0.04em]">{dashboardStats.strongMatchCount}</p>
+                        <p className="mt-1 text-xs">Jobs matching your profile 70%+</p>
+                      </div>
+                    ) : null}
+
+                    {isInternshipSearch ? (
+                      <div className={getStatCardClasses('red')}>
+                        <p className="app-field-label">Exploitation Alerts</p>
+                        <p className="mt-2 text-2xl font-black tracking-[-0.04em]">{dashboardStats.exploitationCount}</p>
+                        <p className="mt-1 text-xs">Internships with unfair stipends</p>
+                      </div>
+                    ) : null}
                   </section>
                 ) : null}
 
-                <section className="grid gap-5 2xl:grid-cols-[0.88fr_1.12fr]">
-                <div className="space-y-4">
-                  {result.exhausted ? (
-                    <div className="rounded-[1.5rem] border border-[var(--warning-border)] bg-[var(--warning-soft)] px-4 py-3 text-sm text-[var(--warning-text)]">
-                      Some sources are limited right now. Aptico is showing the results that were still available.
-                    </div>
-                  ) : null}
+                <section className="space-y-3">
+                    {result.exhausted ? (
+                      <div className="rounded-[1.25rem] border border-[var(--warning-border)] bg-[var(--warning-soft)] px-4 py-3 text-sm text-[var(--warning-text)]">
+                        Some sources are limited right now. Aptico is showing the results that were still available.
+                      </div>
+                    ) : null}
 
-                    <div className="space-y-3">
-                      {filteredJobs.map((job) => {
+                    {paginatedJobs.map((job) => {
                       const isSelected = selectedJob?.id === job.id;
 
                       return (
@@ -740,243 +703,245 @@ export default function ModernJobSearchPage() {
                           key={job.id}
                           type="button"
                           onClick={() => setSelectedJobId(job.id)}
-                          className={`w-full rounded-[1.5rem] border p-5 text-left transition ${
+                          className={`w-full rounded-[1.25rem] border p-4 text-left transition ${
                             isSelected
-                              ? 'border-[var(--accent)] bg-[var(--accent-soft)] shadow-[0_14px_30px_rgba(0,0,0,0.08)]'
-                              : 'border-[var(--border)] bg-[var(--panel)] hover:bg-[var(--panel-soft)]'
+                              ? 'border-[var(--accent)] bg-[var(--accent-soft)] shadow-[0_8px_20px_rgba(0,0,0,0.06)] ring-1 ring-[var(--accent)]'
+                              : 'border-[var(--border)] bg-[var(--panel)] hover:bg-[var(--panel-soft)] hover:border-[var(--accent)]/30'
                           }`}
                         >
                           {job.isScam ? (
                             <div
                               title="Shows patterns common in fraudulent job postings"
-                              className="mb-4 rounded-[1rem] border border-rose-500/30 bg-rose-500/15 px-4 py-3 text-sm font-medium text-rose-200"
+                              className="mb-3 rounded-[0.75rem] border border-rose-500/30 bg-rose-500/15 px-3 py-2 text-xs font-medium text-rose-200"
                             >
                               ⚠ Unverified listing - verify before applying
                             </div>
                           ) : null}
 
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="space-y-2">
-                              <div className="flex flex-wrap gap-2">
-                                <span className={`rounded-full border px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] ${job.tone.className}`}>
-                                  {job.tone.label}
-                                </span>
-                                <span className="rounded-full border border-[var(--border)] px-3 py-1 text-[11px] uppercase tracking-[0.18em] text-[var(--muted-strong)]">
-                                  {renderSourceTone(job.source)}
-                                </span>
-                              </div>
-                              <div>
-                                <h4 className="text-lg font-bold tracking-[-0.03em] text-[var(--text)]">{job.title}</h4>
-                                <p className="mt-1 text-sm text-[var(--muted-strong)]">
-                                  {job.company} · {job.location}
-                                </p>
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="space-y-1.5 flex-1 min-w-0">
+                              <div className="flex items-center gap-3">
+                                <div className="min-w-[48px] shrink-0 rounded-[0.5rem] border border-[var(--border)] bg-[var(--panel-soft)] px-2 py-1.5 text-center flex flex-col justify-center items-center">
+                                  <p className="text-base font-black tracking-[-0.04em] text-[var(--text)]">{job.matchScore}</p>
+                                  <p className="text-[9px] uppercase font-bold text-[var(--muted-strong)] tracking-wider">Fit</p>
+                                </div>
+                                <div className="min-w-0">
+                                  <h4 className="text-base font-bold tracking-[-0.02em] text-[var(--text)] truncate">{job.title}</h4>
+                                  <p className="text-sm font-medium text-[var(--muted-strong)] truncate mt-0.5">
+                                    {job.company} · {job.location}
+                                  </p>
+                                </div>
                               </div>
                             </div>
-
-                            <div className="min-w-[74px] rounded-[1rem] border border-[var(--border)] bg-[var(--panel-soft)] px-3 py-3 text-center">
-                              <p className="text-2xl font-black tracking-[-0.04em] text-[var(--text)]">{job.matchScore}</p>
-                              <p className="app-field-label mt-1">Fit</p>
-                              </div>
+                            <div className="flex shrink-0 items-center justify-end gap-3">
+                               <div className="hidden md:flex flex-wrap items-center justify-end gap-2 max-w-[400px]">
+                                 <span className="app-chip py-1 px-2.5 text-[11px] whitespace-nowrap">{job.compensation}</span>
+                                 <span className="app-chip py-1 px-2.5 text-[11px] whitespace-nowrap">{job.postedLabel}</span>
+                                 {job.isScam ? (
+                                   <span className="rounded-full border border-[var(--danger-border)] bg-[var(--danger-soft)] px-2 py-1 text-[11px] font-medium text-rose-300">
+                                     Verify carefully
+                                   </span>
+                                 ) : null}
+                               </div>
+                               <span className="material-symbols-outlined text-[var(--muted)]">chevron_right</span>
                             </div>
-
-                            <div className="mt-4 flex flex-wrap gap-2">
-                              <span title={job.applyWindow?.windowMessage} className={`rounded-full border px-3 py-1 text-xs ${getSignalClasses(job.applyWindow?.windowColor)}`}>
-                                {job.applyWindow?.windowLabel}
-                              </span>
-                              {job.ghost?.ghostScore > 25 ? (
-                                <span title={`Ghost Score: ${job.ghost.ghostScore}/100`} className={`rounded-full border px-3 py-1 text-xs ${getSignalClasses(job.ghost.ghostColor)}`}>
-                                  {job.ghost.ghostLabel}
-                                </span>
-                              ) : null}
-                              <span title={job.responseLikelihood?.likelihoodTip} className={`rounded-full border px-3 py-1 text-xs ${getSignalClasses(job.responseLikelihood?.likelihoodColor)}`}>
-                                {job.responseLikelihood?.likelihoodLabel}
-                              </span>
-                              {job.stipendFairness ? (
-                                <span title={job.stipendFairness.fairnessMessage} className={`rounded-full border px-3 py-1 text-xs ${getSignalClasses(job.stipendFairness.fairnessColor)}`}>
-                                  {job.stipendFairness.fairnessLabel}
-                                </span>
-                              ) : null}
-                            </div>
-
-                            <p className="mt-4 line-clamp-2 text-sm leading-7 text-[var(--muted-strong)]">
-                              {job.description || 'No description was provided by this source.'}
-                            </p>
-
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            <span className="rounded-full border border-[var(--border)] px-3 py-1 text-xs text-[var(--muted-strong)]">{job.compensation}</span>
-                            <span className="rounded-full border border-[var(--border)] px-3 py-1 text-xs text-[var(--muted-strong)]">{job.postedLabel}</span>
-                            {job.isScam ? (
-                              <span className="rounded-full border border-[var(--danger-border)] bg-[var(--danger-soft)] px-3 py-1 text-xs text-rose-300">
-                                Verify carefully
-                              </span>
-                            ) : (
-                              <span className="rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-300">
-                                Lower risk
-                              </span>
-                            )}
                           </div>
                         </button>
                       );
                     })}
-                  </div>
-                </div>
 
-                <aside className="app-panel h-fit 2xl:sticky 2xl:top-24">
-                  {selectedJob ? (
-                    <div className="space-y-6">
-                      {selectedJob.isScam ? (
-                        <div title="Shows patterns common in fraudulent job postings" className="rounded-[1.2rem] border border-rose-500/30 bg-rose-500/15 px-4 py-3 text-sm font-medium text-rose-200">
-                          ⚠ Unverified listing - verify before applying
-                        </div>
-                      ) : null}
-
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="space-y-2">
-                          <p className="app-kicker">Selected role</p>
-                          <h3 className="text-2xl font-black tracking-[-0.04em] text-[var(--text)]">{selectedJob.title}</h3>
-                          <p className="text-sm text-[var(--muted-strong)]">
-                            {selectedJob.company} · {selectedJob.location}
-                          </p>
-                        </div>
-
-                        <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-4 text-center">
-                          <p className={`text-3xl font-black tracking-[-0.05em] ${selectedJob.match?.matchColor === 'green' ? 'text-emerald-300' : selectedJob.match?.matchColor === 'amber' ? 'text-amber-300' : 'text-rose-300'}`}>
-                            {selectedJob.matchScore}%
-                          </p>
-                          <p className="app-field-label mt-1">Match</p>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        <span className="app-chip">{renderSourceTone(selectedJob.source)}</span>
-                        <span className="app-chip">{selectedJob.compensation}</span>
-                        <span className="app-chip">{selectedJob.postedLabel}</span>
-                        <span title={selectedJob.applyWindow?.windowMessage} className={`rounded-full border px-3 py-1 text-xs ${getSignalClasses(selectedJob.applyWindow?.windowColor)}`}>
-                          {selectedJob.applyWindow?.windowLabel}
-                        </span>
-                        {selectedJob.ghost?.ghostScore > 25 ? (
-                          <span title={`Ghost Score: ${selectedJob.ghost.ghostScore}/100`} className={`rounded-full border px-3 py-1 text-xs ${getSignalClasses(selectedJob.ghost.ghostColor)}`}>
-                            {selectedJob.ghost.ghostLabel}
-                          </span>
-                        ) : null}
-                        <span title={selectedJob.responseLikelihood?.likelihoodTip} className={`rounded-full border px-3 py-1 text-xs ${getSignalClasses(selectedJob.responseLikelihood?.likelihoodColor)}`}>
-                          {selectedJob.responseLikelihood?.likelihoodLabel}
-                        </span>
-                        {selectedJob.stipendFairness ? (
-                          <span title={selectedJob.stipendFairness.fairnessMessage} className={`rounded-full border px-3 py-1 text-xs ${getSignalClasses(selectedJob.stipendFairness.fairnessColor)}`}>
-                            {selectedJob.stipendFairness.fairnessLabel}
-                          </span>
-                        ) : null}
-                      </div>
-
-                      {selectedJob.match ? (
-                        <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] p-5">
-                          <div className="flex items-center gap-4">
-                            <span className="text-sm font-semibold text-[var(--text)]">Your Match</span>
-                            <div className="h-3 flex-1 overflow-hidden rounded-full bg-[var(--panel-strong)]">
-                              <div className={`h-full rounded-full ${getProgressBarClasses(selectedJob.match.matchColor)}`} style={{ width: `${selectedJob.match.matchScore}%` }} />
-                            </div>
-                            <span className={`text-sm font-bold ${selectedJob.match.matchColor === 'green' ? 'text-emerald-300' : selectedJob.match.matchColor === 'amber' ? 'text-amber-300' : 'text-rose-300'}`}>
-                              {selectedJob.match.matchScore}%
-                            </span>
-                          </div>
-
-                          {selectedJob.match.missingFromThisJob?.length ? (
-                            <div className="mt-4 space-y-3">
-                              <p className="text-sm text-[var(--muted-strong)]">Missing:</p>
-                              <div className="flex flex-wrap gap-2">
-                                {selectedJob.match.missingFromThisJob.map((skill) => (
-                                  <button
-                                    key={skill}
-                                    type="button"
-                                    onClick={() => handleSkillClick(skill)}
-                                    className="rounded-full border border-cyan-500/25 bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-200 transition hover:border-cyan-400/40"
-                                  >
-                                    {skill}
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : null}
-
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-soft)] p-4">
-                          <p className="app-field-label">Apply window</p>
-                          <p className="mt-3 text-sm leading-7 text-[var(--muted-strong)]">{selectedJob.applyWindow?.windowMessage}</p>
-                        </div>
-                        <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-soft)] p-4">
-                          <p className="app-field-label">Response signal</p>
-                          <p className="mt-3 text-sm leading-7 text-[var(--muted-strong)]">{selectedJob.responseLikelihood?.likelihoodTip}</p>
-                        </div>
-                      </div>
-
-                      {selectedJob.stipendFairness ? (
-                        <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-soft)] p-4">
-                          <p className="app-field-label">Stipend fairness</p>
-                          <p className="mt-3 text-sm leading-7 text-[var(--muted-strong)]">{selectedJob.stipendFairness.fairnessMessage}</p>
-                        </div>
-                      ) : null}
-
-                      <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] p-5">
-                        <p className="app-field-label">Role summary</p>
-                        <p className="mt-4 text-sm leading-7 text-[var(--muted-strong)]">
-                          {selectedJob.description || 'No description was provided by this source.'}
-                        </p>
-                      </div>
-
-                      {matchedSkills.length ? (
-                        <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] p-5">
-                          <p className="app-field-label">Your matched skills</p>
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            {matchedSkills.map((skill) => (
-                              <span key={skill} className="app-chip">{skill}</span>
-                            ))}
-                          </div>
-                        </div>
-                      ) : null}
-
-                      <div className="flex flex-wrap gap-3">
-                        <a href={selectedJob.applyUrl} target="_blank" rel="noreferrer" className="app-button">
-                          <span className="material-symbols-outlined text-[18px]">open_in_new</span>
-                          View &amp; Apply
-                        </a>
+                    {totalPages > 1 && (
+                      <div className="flex items-center justify-between mt-6 rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-3">
                         <button
                           type="button"
-                          onClick={() => {
-                            void handleSaveToPipeline(selectedJob);
-                          }}
-                          disabled={!auth.isAuthenticated || savingJobId === selectedJob.id}
-                          className="app-button-secondary"
+                          className="app-button-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={currentPage === 1}
+                          onClick={() => setCurrentPage((prev) => prev - 1)}
                         >
-                          <span className="material-symbols-outlined text-[18px]">bookmark</span>
-                          {savingJobId === selectedJob.id ? 'Saving...' : 'Save to Pipeline'}
+                          Previous
                         </button>
-                        <button type="button" onClick={() => handleGenerateApplyKit(selectedJob)} className="app-button-secondary">
-                          <span className="material-symbols-outlined text-[18px]">assignment</span>
-                          Generate Apply Kit
+                        <span className="text-sm font-medium text-[var(--muted-strong)]">
+                          Page {currentPage} of {totalPages}
+                        </span>
+                        <button
+                          type="button"
+                          className="app-button-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                          disabled={currentPage === totalPages}
+                          onClick={() => setCurrentPage((prev) => prev + 1)}
+                        >
+                          Next
                         </button>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="rounded-[1.5rem] border border-dashed border-[var(--border)] px-6 py-12 text-center text-sm text-[var(--muted-strong)]">
-                      Select a job to inspect the details panel.
-                    </div>
-                  )}
-                </aside>
+                    )}
                 </section>
 
+                {selectedJobId && selectedJob ? (
+                  <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
+                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setSelectedJobId(null)} />
+                    <div className="relative w-full max-w-2xl max-h-[90vh] bg-[var(--bg)] rounded-[1.5rem] border border-[var(--border)] shadow-2xl flex flex-col overflow-hidden z-10">
+                      <header className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] bg-[var(--panel-soft)] shrink-0">
+                        <h3 className="text-[15px] font-bold tracking-[-0.01em] text-[var(--text)] truncate pr-4">Role Details</h3>
+                        <button type="button" onClick={() => setSelectedJobId(null)} className="flex items-center justify-center hover:bg-[var(--border)]/50 rounded-full p-1.5 transition text-[var(--muted-strong)] hover:text-[var(--text)]">
+                          <span className="material-symbols-outlined text-[20px]">close</span>
+                        </button>
+                      </header>
+                      <div className="flex-1 overflow-y-auto p-6 custom-scrollbar space-y-6">
+                        {selectedJob.isScam ? (
+                          <div title="Shows patterns common in fraudulent job postings" className="rounded-[1rem] border border-rose-500/30 bg-rose-500/15 px-4 py-3 text-sm font-medium text-rose-200">
+                            ⚠ Unverified listing - verify before applying
+                          </div>
+                        ) : null}
+
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="space-y-3">
+                            <div className="flex flex-wrap gap-2">
+                              {renderSourceTone(selectedJob.source) && (
+                                <span className="rounded-full border border-[var(--border)] bg-[var(--panel-soft)] px-2.5 py-1 text-[10px] uppercase tracking-[0.15em] text-[var(--muted-strong)] font-semibold">
+                                  {renderSourceTone(selectedJob.source)}
+                                </span>
+                              )}
+                              <span className={`rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.15em] font-semibold ${selectedJob.tone.className}`}>
+                                {selectedJob.tone.label}
+                              </span>
+                            </div>
+                            <div>
+                              <h3 className="text-xl font-black tracking-[-0.03em] text-[var(--text)]">{selectedJob.title}</h3>
+                              <p className="text-sm font-medium text-[var(--muted-strong)] mt-1">
+                                {selectedJob.company} · {selectedJob.location}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="min-w-[72px] shrink-0 rounded-[1rem] border border-[var(--border)] bg-[var(--panel-soft)] px-3 py-3 text-center">
+                            <p className={`text-2xl font-black tracking-[-0.05em] ${selectedJob.match?.matchColor === 'green' ? 'text-emerald-300' : selectedJob.match?.matchColor === 'amber' ? 'text-amber-300' : 'text-rose-300'}`}>
+                              {selectedJob.matchScore}%
+                            </p>
+                            <p className="app-field-label mt-1">Match</p>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                          <span className="app-chip">{selectedJob.compensation}</span>
+                          <span className="app-chip">{selectedJob.postedLabel}</span>
+                          <span title={selectedJob.applyWindow?.windowMessage} className={`rounded-full border px-3 py-1 text-xs ${getSignalClasses(selectedJob.applyWindow?.windowColor)}`}>
+                            {selectedJob.applyWindow?.windowLabel}
+                          </span>
+                          {selectedJob.ghost?.ghostScore > 25 ? (
+                            <span title={`Ghost Score: ${selectedJob.ghost.ghostScore}/100`} className={`rounded-full border px-3 py-1 text-xs ${getSignalClasses(selectedJob.ghost.ghostColor)}`}>
+                              {selectedJob.ghost.ghostLabel}
+                            </span>
+                          ) : null}
+                          <span title={selectedJob.responseLikelihood?.likelihoodTip} className={`rounded-full border px-3 py-1 text-xs ${getSignalClasses(selectedJob.responseLikelihood?.likelihoodColor)}`}>
+                            {selectedJob.responseLikelihood?.likelihoodLabel}
+                          </span>
+                          {selectedJob.stipendFairness ? (
+                            <span title={selectedJob.stipendFairness.fairnessMessage} className={`rounded-full border px-3 py-1 text-xs ${getSignalClasses(selectedJob.stipendFairness.fairnessColor)}`}>
+                              {selectedJob.stipendFairness.fairnessLabel}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        {selectedJob.match ? (
+                          <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-soft)] p-4">
+                            <div className="flex items-center gap-4">
+                              <span className="text-xs font-semibold text-[var(--muted-strong)] uppercase tracking-wider whitespace-nowrap">Your Fit</span>
+                              <div className="h-2 flex-1 overflow-hidden rounded-full bg-[var(--panel-strong)]">
+                                <div className={`h-full rounded-full ${getProgressBarClasses(selectedJob.match.matchColor)}`} style={{ width: `${selectedJob.match.matchScore}%` }} />
+                              </div>
+                            </div>
+
+                            {selectedJob.match.missingFromThisJob?.length ? (
+                              <div className="mt-4 space-y-2.5">
+                                <p className="text-xs text-[var(--text)] font-medium">Missing Skills:</p>
+                                <div className="flex flex-wrap gap-2">
+                                  {selectedJob.match.missingFromThisJob.map((skill) => (
+                                    <button
+                                      key={skill}
+                                      type="button"
+                                      onClick={() => handleSkillClick(skill)}
+                                      className="rounded-[0.5rem] border border-cyan-500/25 bg-cyan-500/10 px-2.5 py-1 text-[11px] font-semibold text-cyan-200 transition hover:border-cyan-400/40"
+                                    >
+                                      {skill}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                        ) : null}
+
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-soft)] p-3.5">
+                            <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted-strong)] mb-1.5">Apply Window</p>
+                            <p className="text-sm leading-6 text-[var(--text)]">{selectedJob.applyWindow?.windowMessage}</p>
+                          </div>
+                          <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-soft)] p-3.5">
+                            <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted-strong)] mb-1.5">Response Signal</p>
+                            <p className="text-sm leading-6 text-[var(--text)]">{selectedJob.responseLikelihood?.likelihoodTip}</p>
+                          </div>
+                        </div>
+
+                        {selectedJob.stipendFairness ? (
+                          <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-soft)] p-3.5">
+                            <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted-strong)] mb-1.5">Stipend Fairness</p>
+                            <p className="text-sm leading-6 text-[var(--text)]">{selectedJob.stipendFairness.fairnessMessage}</p>
+                          </div>
+                        ) : null}
+
+                        <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-soft)] p-4">
+                          <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted-strong)] mb-3">Role Summary</p>
+                          <div className="text-sm leading-relaxed text-[var(--text)] whitespace-pre-wrap max-h-[22rem] overflow-y-auto pr-2 custom-scrollbar">
+                            {selectedJob.description || 'No description was provided by this source.'}
+                          </div>
+                        </div>
+
+                        {matchedSkills.length ? (
+                          <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-soft)] p-4">
+                            <p className="text-[11px] font-semibold uppercase tracking-wider text-[var(--muted-strong)] mb-3">Matched Skills</p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {matchedSkills.map((skill) => (
+                                <span key={skill} className="app-chip py-1 text-[11px]">{skill}</span>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
+
+                        <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                          <a href={selectedJob.applyUrl} target="_blank" rel="noreferrer" className="app-button flex-1 justify-center py-2.5 shadow-sm">
+                            <span className="material-symbols-outlined text-[18px]">open_in_new</span>
+                            Apply
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              void handleSaveToPipeline(selectedJob);
+                            }}
+                            disabled={!auth.isAuthenticated || savingJobId === selectedJob.id || savedJobIds.has(selectedJob.id)}
+                            className="app-button-secondary flex-1 justify-center py-2.5 shadow-sm"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">{(savingJobId === selectedJob.id || savedJobIds.has(selectedJob.id)) ? 'bookmark_added' : 'bookmark'}</span>
+                            {savingJobId === selectedJob.id ? 'Saving...' : savedJobIds.has(selectedJob.id) ? 'Saved' : 'Save'}
+                          </button>
+                          <button type="button" onClick={() => handleGenerateApplyKit(selectedJob)} className="app-button-secondary flex-1 justify-center py-2.5 shadow-sm">
+                            <span className="material-symbols-outlined text-[18px]">assignment</span>
+                            Apply Kit
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
                 {isInternshipSearch ? (
-                  <section className="app-panel space-y-4">
+                  <section className="app-panel mt-6 space-y-4">
                     <button type="button" onClick={() => setShowBenchmarks((current) => !current)} className="flex items-center gap-3 text-left text-sm font-semibold text-[var(--text)]">
                       <span className="material-symbols-outlined text-[18px]">{showBenchmarks ? 'expand_less' : 'expand_more'}</span>
                       Show Stipend Benchmarks
                     </button>
 
                     {showBenchmarks ? (
-                      <div className="space-y-4 rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] p-5">
-                        <h3 className="text-lg font-bold text-[var(--text)]">Internship Stipend Benchmarks - India 2025</h3>
+                      <div className="space-y-4 rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-soft)] p-5 mt-3">
+                        <h3 className="text-base font-bold text-[var(--text)]">Internship Stipend Benchmarks - India 2025</h3>
 
                         <div className="overflow-x-auto">
                           <table className="min-w-full divide-y divide-[var(--border)] text-sm text-[var(--muted-strong)]">
@@ -990,52 +955,53 @@ export default function ModernJobSearchPage() {
                             <tbody className="divide-y divide-[var(--border)]">
                               {STIPEND_BENCHMARK_ROWS.map(([role, tier, range]) => (
                                 <tr key={`${role}-${tier}`}>
-                                  <td className="py-3 pr-4">{role}</td>
-                                  <td className="py-3 pr-4">{tier}</td>
-                                  <td className="py-3">{range}</td>
+                                  <td className="py-2.5 pr-4">{role}</td>
+                                  <td className="py-2.5 pr-4">{tier}</td>
+                                  <td className="py-2.5">{range}</td>
                                 </tr>
                               ))}
                             </tbody>
                           </table>
                         </div>
 
-                        <p className="text-xs text-[var(--muted-strong)]">Listings below minimum are flagged as Exploitation Risk in the search results.</p>
+                        <p className="text-xs text-[var(--muted-strong)] leading-relaxed">Listings below minimum are flagged as Exploitation Risk in the search results.</p>
                       </div>
                     ) : null}
                   </section>
                 ) : null}
               </>
+            ) : jobsQuery.isFetching ? (
+              <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] px-6 py-12 text-center flex flex-col items-center justify-center space-y-4">
+                <span className="material-symbols-outlined animate-spin text-3xl text-[var(--accent)]">progress_activity</span>
+                <p className="text-sm font-medium text-[var(--text)]">Searching active sources...</p>
+              </div>
             ) : (
-              <div className="rounded-[2rem] border border-dashed border-[var(--border)] px-6 py-12 text-center text-sm text-[var(--muted-strong)]">
+              <div className="rounded-[1.5rem] border border-dashed border-[var(--border)] px-6 py-12 text-center text-sm text-[var(--muted-strong)]">
                 {result.exhausted ? (
-                  <>
-                    All sources are temporarily limited. Please retry in a few minutes.
-                    <div className="mt-5">
-                      <button type="button" onClick={handleRetry} className="app-button-secondary">
-                        Retry search
-                      </button>
-                    </div>
-                  </>
+                  <div className="space-y-4">
+                    <p>All sources are temporarily limited. Please retry in a few minutes.</p>
+                    <button type="button" onClick={handleRetry} className="app-button-secondary mx-auto">
+                      Retry search
+                    </button>
+                  </div>
                 ) : (
                   'No roles matched your current search and filter combination. Try a broader title, a different focus, or clear the local refinement box.'
                 )}
               </div>
             )
           ) : (
-            <div className="rounded-[2rem] border border-dashed border-[var(--border)] px-6 py-12 text-center text-sm text-[var(--muted-strong)]">
-              Start a search to pull jobs from the routed Aptico sources and inspect them in the new split-view layout.
+            <div className="rounded-[1.5rem] border border-dashed border-[var(--border)] px-6 py-12 text-center text-sm text-[var(--muted-strong)]">
+              Start a search to pull jobs from the routed Aptico sources.
             </div>
           )}
 
           {submittedSearch && cachedSourceCount ? (
-            <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-4 text-sm text-[var(--muted-strong)]">
-              {cachedSourceCount} source{cachedSourceCount > 1 ? 's were' : ' was'} served from cache to keep the experience responsive.
+            <div className="rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-3 text-sm text-[var(--muted-strong)] mt-4 inline-block">
+              {cachedSourceCount} source{cachedSourceCount > 1 ? 's were' : ' was'} served from cache.
             </div>
           ) : null}
-        </div>
-      </section>
-      <ApplyKitModal isOpen={Boolean(activeJob)} onClose={() => setActiveJob(null)} job={activeJob} analysisId={currentAnalysis?.id || null} />
+        </main>
+      </div>
     </AppShell>
   );
 }
-

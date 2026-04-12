@@ -22,7 +22,7 @@ export async function ddgsSource({ query, location, jobType, role, redisService,
           jobType,
           applyUrl: job.url,
           postedAt: job.published || null,
-          description: normalizeText(job.description, null)
+          description: job.description
         })
       );
     }

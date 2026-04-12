@@ -1,5 +1,7 @@
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 import {
+  boolean,
+  check,
   date,
   index,
   integer,
@@ -8,7 +10,8 @@ import {
   text,
   timestamp,
   uniqueIndex,
-  uuid
+  uuid,
+  varchar
 } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
@@ -201,3 +204,188 @@ export const profileSettingsRelations = relations(profileSettings, ({ one }) => 
     references: [users.id]
   })
 }));
+
+export const userProfiles = pgTable(
+  'user_profiles',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    username: varchar('username', { length: 50 }).notNull(),
+    headline: varchar('headline', { length: 120 }),
+    location: varchar('location', { length: 100 }),
+    skills: text('skills').array(),
+    isPublic: boolean('is_public').default(true),
+    followerCount: integer('follower_count').default(0),
+    followingCount: integer('following_count').default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
+  },
+  (table) => ({
+    userIdIdx: uniqueIndex('user_profiles_user_id_idx').on(table.userId),
+    usernameIdx: uniqueIndex('user_profiles_username_idx').on(table.username)
+  })
+);
+
+export const follows = pgTable(
+  'follows',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    followerId: uuid('follower_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    followingId: uuid('following_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
+  },
+  (table) => ({
+    followerFollowingIdx: uniqueIndex('follows_follower_id_following_id_idx').on(table.followerId, table.followingId),
+    noSelfFollowCheck: check('follows_no_self_follow_check', sql`${table.followerId} <> ${table.followingId}`)
+  })
+);
+
+export const communityWins = pgTable(
+  'community_wins',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    roleTitle: varchar('role_title', { length: 100 }).notNull(),
+    companyName: varchar('company_name', { length: 100 }),
+    searchDurationWeeks: integer('search_duration_weeks'),
+    message: text('message'),
+    likesCount: integer('likes_count').default(0),
+    isVisible: boolean('is_visible').default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
+  },
+  (table) => ({
+    visibleCreatedAtIdx: index('community_wins_is_visible_created_at_idx').on(table.isVisible, table.createdAt),
+    userIdIdx: index('community_wins_user_id_idx').on(table.userId)
+  })
+);
+
+export const publicJobCache = pgTable(
+  'public_job_cache',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    jobId: varchar('job_id', { length: 200 }).notNull(),
+    title: varchar('title', { length: 200 }).notNull(),
+    company: varchar('company', { length: 200 }).notNull(),
+    location: varchar('location', { length: 200 }),
+    jobType: varchar('job_type', { length: 50 }),
+    stipend: varchar('stipend', { length: 100 }),
+    salary: varchar('salary', { length: 100 }),
+    applyUrl: text('apply_url').notNull(),
+    source: varchar('source', { length: 100 }).notNull(),
+    ghostScore: integer('ghost_score'),
+    postedAt: timestamp('posted_at', { withTimezone: true }),
+    cachedAt: timestamp('cached_at', { withTimezone: true }).defaultNow(),
+    searchCount: integer('search_count').default(1)
+  },
+  (table) => ({
+    jobIdIdx: uniqueIndex('public_job_cache_job_id_idx').on(table.jobId),
+    publicFeedIdx: index('public_job_cache_search_count_cached_at_idx').on(table.searchCount, table.cachedAt)
+  })
+);
+
+export const posts = pgTable(
+  'posts',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    postType: varchar('post_type', { length: 30 }).notNull(),
+    content: text('content').notNull(),
+    analysisId: uuid('analysis_id').references(() => analyses.id, { onDelete: 'set null' }),
+    jobData: jsonb('job_data'),
+    careerUpdateType: varchar('career_update_type', { length: 30 }),
+    likesCount: integer('likes_count').default(0),
+    commentsCount: integer('comments_count').default(0),
+    isVisible: boolean('is_visible').default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
+  },
+  (table) => ({
+    userCreatedAtIdx: index('posts_user_id_created_at_idx').on(table.userId, table.createdAt),
+    visibleCreatedAtIdx: index('posts_is_visible_created_at_idx').on(table.isVisible, table.createdAt),
+    postTypeCheck: check(
+      'posts_post_type_check',
+      sql`${table.postType} in ('career_update', 'job_tip', 'job_share', 'analysis_share', 'question')`
+    ),
+    careerUpdateTypeCheck: check(
+      'posts_career_update_type_check',
+      sql`${table.careerUpdateType} is null or ${table.careerUpdateType} in ('got_hired', 'got_promoted', 'started_learning', 'completed_course', 'new_project')`
+    )
+  })
+);
+
+export const postComments = pgTable(
+  'post_comments',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    postId: uuid('post_id')
+      .notNull()
+      .references(() => posts.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    content: text('content').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
+  },
+  (table) => ({
+    postCreatedAtIdx: index('post_comments_post_id_created_at_idx').on(table.postId, table.createdAt)
+  })
+);
+
+export const connections = pgTable(
+  'connections',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    requesterId: uuid('requester_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    recipientId: uuid('recipient_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    status: varchar('status', { length: 20 }).notNull().default('pending'),
+    requesterNote: text('requester_note'),
+    requesterRole: varchar('requester_role', { length: 100 }),
+    requesterLearning: varchar('requester_learning', { length: 100 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
+  },
+  (table) => ({
+    requesterRecipientIdx: uniqueIndex('connections_requester_id_recipient_id_idx').on(table.requesterId, table.recipientId),
+    recipientStatusIdx: index('connections_recipient_id_status_idx').on(table.recipientId, table.status),
+    statusCheck: check('connections_status_check', sql`${table.status} in ('pending', 'accepted', 'declined')`),
+    noSelfConnectionCheck: check('connections_no_self_connection_check', sql`${table.requesterId} <> ${table.recipientId}`)
+  })
+);
+
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    type: varchar('type', { length: 40 }).notNull(),
+    actorId: uuid('actor_id').references(() => users.id, { onDelete: 'set null' }),
+    entityId: uuid('entity_id'),
+    entityType: varchar('entity_type', { length: 30 }),
+    message: text('message').notNull(),
+    isRead: boolean('is_read').default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
+  },
+  (table) => ({
+    userReadCreatedAtIdx: index('notifications_user_id_is_read_created_at_idx').on(table.userId, table.isRead, table.createdAt),
+    typeCheck: check(
+      'notifications_type_check',
+      sql`${table.type} in ('new_follower', 'new_connection_request', 'connection_accepted', 'post_like', 'post_comment', 'job_match_alert')`
+    )
+  })
+);

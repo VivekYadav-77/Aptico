@@ -44,6 +44,7 @@ const envSchema = z.object({
   JSEARCH_API_HOST: z.string().trim().min(1).default('jsearch.p.rapidapi.com'),
   JSEARCH_API_KEY: z.string().trim().min(1).optional(),
   JSEARCH_RAPIDAPI_KEY: z.string().trim().min(1).optional(),
+  JOOBLE_API_BASE_URL: z.string().trim().url().default('https://jooble.org/api'),
   MUSE_API_BASE_URL: z.string().trim().url().default('https://www.themuse.com/api/public/v2/jobs'),
   REED_API_BASE_URL: z.string().trim().url().default('https://www.reed.co.uk/api/1.0/search'),
   REMOTIVE_API_BASE_URL: z.string().trim().url().default('https://remotive.com/api/remote-jobs'),
@@ -60,6 +61,80 @@ if (!parsedEnv.success) {
   throw new Error(`Invalid environment configuration: ${parsedEnv.error.message}`);
 }
 
+function uniqueNonEmpty(values) {
+  return [...new Set(values.map((value) => String(value || '').trim()).filter(Boolean))];
+}
+
+function collectIndexedEnvValues({ indexedPrefix, maxIndex, legacyNames = [] }) {
+  const indexedValues = Array.from({ length: maxIndex }, (_, offset) => process.env[`${indexedPrefix}${offset + 1}`]);
+  const legacyValues = legacyNames.map((name) => process.env[name]);
+  return uniqueNonEmpty([...indexedValues, ...legacyValues]);
+}
+
+function collectIndexedCredentialPairs({
+  indexedIdPrefix,
+  indexedKeyPrefix,
+  maxIndex,
+  legacyIdNames = [],
+  legacyKeyNames = []
+}) {
+  const credentials = [];
+
+  for (let index = 1; index <= maxIndex; index += 1) {
+    const appId = String(process.env[`${indexedIdPrefix}${index}`] || '').trim();
+    const appKey = String(process.env[`${indexedKeyPrefix}${index}`] || '').trim();
+
+    if (appId && appKey) {
+      credentials.push({
+        slot: index,
+        appId,
+        appKey
+      });
+    }
+  }
+
+  const legacyAppId = uniqueNonEmpty(legacyIdNames.map((name) => process.env[name]))[0];
+  const legacyAppKey = uniqueNonEmpty(legacyKeyNames.map((name) => process.env[name]))[0];
+
+  if (legacyAppId && legacyAppKey) {
+    credentials.push({
+      slot: credentials.length + 1,
+      appId: legacyAppId,
+      appKey: legacyAppKey
+    });
+  }
+
+  return credentials.filter(
+    (credential, index, items) =>
+      items.findIndex((candidate) => candidate.appId === credential.appId && candidate.appKey === credential.appKey) === index
+  );
+}
+
+const serperApiKeys = collectIndexedEnvValues({
+  indexedPrefix: 'SERPER_API_KEY',
+  maxIndex: 5,
+  legacyNames: ['SERPER_API_KEY']
+});
+
+const jsearchApiKeys = collectIndexedEnvValues({
+  indexedPrefix: 'JSEARCH_API_KEY',
+  maxIndex: 5,
+  legacyNames: ['JSEARCH_API_KEY', 'JSEARCH_RAPIDAPI_KEY']
+});
+
+const joobleApiKeys = collectIndexedEnvValues({
+  indexedPrefix: 'JOOBLE_API_KEY',
+  maxIndex: 3
+});
+
+const adzunaCredentials = collectIndexedCredentialPairs({
+  indexedIdPrefix: 'ADZUNA_APP_ID',
+  indexedKeyPrefix: 'ADZUNA_APP_KEY',
+  maxIndex: 5,
+  legacyIdNames: ['ADZUNA_APP_ID'],
+  legacyKeyNames: ['ADZUNA_APP_KEY']
+});
+
 // Startup key-presence warnings
 const KEY_NAMES = ['GEMINI_PRECHECK_API_KEY', 'GEMINI_KEY_1', 'GEMINI_KEY_2', 'GEMINI_KEY_3', 'GEMINI_KEY_FALLBACK'];
 for (const keyName of KEY_NAMES) {
@@ -72,8 +147,9 @@ export const env = {
   nodeEnv: parsedEnv.data.NODE_ENV,
   host: parsedEnv.data.HOST,
   port: parsedEnv.data.PORT,
-  adzunaAppId: parsedEnv.data.ADZUNA_APP_ID || null,
-  adzunaAppKey: parsedEnv.data.ADZUNA_APP_KEY || null,
+  adzunaAppId: adzunaCredentials[0]?.appId || parsedEnv.data.ADZUNA_APP_ID || null,
+  adzunaAppKey: adzunaCredentials[0]?.appKey || parsedEnv.data.ADZUNA_APP_KEY || null,
+  adzunaCredentials,
   adzunaApiBaseUrl: parsedEnv.data.ADZUNA_API_BASE_URL,
   databaseUrl: parsedEnv.data.DATABASE_URL || null,
   duckDuckGoHtmlUrl: parsedEnv.data.DUCKDUCKGO_HTML_URL,
@@ -97,8 +173,12 @@ export const env = {
   googleTokenInfoUrl: parsedEnv.data.GOOGLE_TOKENINFO_URL,
   jsearchApiBaseUrl: parsedEnv.data.JSEARCH_API_BASE_URL,
   jsearchApiHost: parsedEnv.data.JSEARCH_API_HOST,
-  jsearchApiKey: parsedEnv.data.JSEARCH_API_KEY || parsedEnv.data.JSEARCH_RAPIDAPI_KEY || null,
-  jsearchRapidapiKey: parsedEnv.data.JSEARCH_RAPIDAPI_KEY || parsedEnv.data.JSEARCH_API_KEY || null,
+  jsearchApiKey: jsearchApiKeys[0] || parsedEnv.data.JSEARCH_API_KEY || parsedEnv.data.JSEARCH_RAPIDAPI_KEY || null,
+  jsearchApiKeys,
+  jsearchRapidapiKey: jsearchApiKeys[0] || parsedEnv.data.JSEARCH_RAPIDAPI_KEY || parsedEnv.data.JSEARCH_API_KEY || null,
+  joobleApiBaseUrl: parsedEnv.data.JOOBLE_API_BASE_URL,
+  joobleApiKey: joobleApiKeys[0] || null,
+  joobleApiKeys,
   museApiBaseUrl: parsedEnv.data.MUSE_API_BASE_URL,
   museApiKey: parsedEnv.data.MUSE_API_KEY || null,
   reedApiBaseUrl: parsedEnv.data.REED_API_BASE_URL,
@@ -106,7 +186,8 @@ export const env = {
   remotiveApiBaseUrl: parsedEnv.data.REMOTIVE_API_BASE_URL,
   jwtSecret: parsedEnv.data.JWT_SECRET,
   serperApiUrl: parsedEnv.data.SERPER_API_URL,
-  serperApiKey: parsedEnv.data.SERPER_API_KEY || null,
+  serperApiKey: serperApiKeys[0] || parsedEnv.data.SERPER_API_KEY || null,
+  serperApiKeys,
   upstashRedisRestUrl: parsedEnv.data.UPSTASH_REDIS_REST_URL || null,
   upstashRedisRestToken: parsedEnv.data.UPSTASH_REDIS_REST_TOKEN || null
 };

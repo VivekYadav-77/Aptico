@@ -1,6 +1,6 @@
 import { desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { analyses, generatedContent, profileSettings, savedJobs } from '../db/schema.js';
+import { analyses, generatedContent, profileSettings, savedJobs, users } from '../db/schema.js';
 
 const profileSettingsSchema = z.object({
   firstName: z.string().trim().max(100),
@@ -108,6 +108,17 @@ export async function upsertProfileSettingsController(request, reply) {
       });
     }
 
+    const firstName = body.firstName?.trim() || '';
+    const lastName = body.lastName?.trim() || '';
+    const fullName = [firstName, lastName].filter(Boolean).join(' ');
+
+    if (fullName) {
+      await request.server.db
+        .update(users)
+        .set({ name: fullName })
+        .where(eq(users.id, request.auth.userId));
+    }
+
     return reply.send({
       success: true,
       data: body
@@ -147,12 +158,13 @@ export async function getDashboardSummaryController(request, reply) {
           company: savedJobs.company,
           source: savedJobs.jobSource,
           url: savedJobs.url,
+          stipend: savedJobs.stipend,
+          matchPercent: savedJobs.matchPercent,
           savedAt: savedJobs.savedAt
         })
         .from(savedJobs)
         .where(eq(savedJobs.userId, userId))
-        .orderBy(desc(savedJobs.savedAt))
-        .limit(4),
+        .orderBy(desc(savedJobs.savedAt)),
       request.server.db
         .select({
           id: generatedContent.id,
@@ -177,13 +189,15 @@ export async function getDashboardSummaryController(request, reply) {
 
     const savedJobsList = savedJobRows.map((row) => ({
       id: row.id,
-        title: row.title,
-        company: row.company,
-        location: `Saved from ${row.source}`,
-        source: row.source,
-        url: row.url,
-        savedAt: row.savedAt
-      }));
+      title: row.title,
+      company: row.company,
+      location: `Saved from ${row.source}`,
+      source: row.source,
+      url: row.url,
+      stipend: row.stipend,
+      matchPercent: row.matchPercent,
+      savedAt: row.savedAt
+    }));
 
     const activity = [
       ...analysisRows.map((row) => ({

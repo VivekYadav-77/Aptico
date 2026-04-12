@@ -2,16 +2,26 @@ import { axiosClient, buildNormalizedJob, deriveJobType, getEffectiveQuery, norm
 
 export async function jsearchSource({ query, location, jobType, role, redisService, env, logger = console }) {
   const effectiveQuery = getEffectiveQuery({ query, role });
+  const credentials = env.jsearchApiKeys.map((apiKey, index) => ({
+    apiKey,
+    slot: index + 1
+  }));
 
   return withSourceExecution({
     source: 'jsearch',
-    params: { query: effectiveQuery, location, jobType },
+    params: { query: effectiveQuery, location, jobType, credentials },
     redisService,
     logger,
-    loader: async () => {
+    loader: async (credential) => {
+      const apiKey = credential?.apiKey || env.jsearchRapidapiKey;
+
+      if (!apiKey) {
+        throw new Error('JSearch credentials are not configured.');
+      }
+
       const response = await axiosClient.get(env.jsearchApiBaseUrl, {
         headers: {
-          'X-RapidAPI-Key': env.jsearchRapidapiKey,
+          'X-RapidAPI-Key': apiKey,
           'X-RapidAPI-Host': env.jsearchApiHost
         },
         params: {
@@ -44,7 +54,7 @@ export async function jsearchSource({ query, location, jobType, role, redisServi
           salary: resolvedType === 'internship' ? null : normalizeCompensation({ min: job.job_min_salary, max: job.job_max_salary, raw: job.job_salary }),
           applyUrl: job.job_apply_link || job.job_google_link,
           postedAt: job.job_posted_at_datetime_utc,
-          description: normalizeText(job.job_description, null)
+          description: job.job_description
         });
       });
     }

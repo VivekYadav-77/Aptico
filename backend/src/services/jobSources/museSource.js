@@ -43,7 +43,7 @@ export async function museSource({ query, location, jobType, role, redisService,
           salary: resolvedType === 'internship' ? null : job.salary,
           applyUrl: job.refs?.landing_page || job.refs?.apply || job.refs?.external,
           postedAt: job.publication_date,
-          description: normalizeText(job.contents, null)
+          description: job.contents
         });
       });
     }

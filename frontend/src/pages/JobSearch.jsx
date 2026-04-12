@@ -6,6 +6,7 @@ import ApplyKitModal from '../components/ApplyKitModal.jsx';
 import JobCard from '../components/JobCard.jsx';
 import { selectAuth } from '../store/authSlice.js';
 import { selectCurrentAnalysis } from '../store/historySlice.js';
+import { saveSavedJobDetails } from '../utils/savedJobsStorage.js';
 
 const FILTER_OPTIONS = ['All', 'Full Time', 'Contract', 'Internship'];
 
@@ -64,13 +65,24 @@ export default function JobSearch() {
     setStatus('');
 
     try {
-      await api.post('/api/jobs/save', {
+      const response = await api.post('/api/jobs/save', {
         title: job.title,
         company: job.company,
         source: job.source,
         url: job.url,
         stipend: job.stipend,
         matchPercent: job.matchPercent
+      });
+
+      saveSavedJobDetails(response.data?.data?.id, {
+        description: job.description || '',
+        location: job.location || '',
+        jobType: job.jobType || '',
+        postedAt: job.postedAt || null,
+        source: job.source || '',
+        url: job.url || '',
+        stipend: job.stipend || null,
+        matchPercent: job.matchPercent ?? null
       });
 
       setStatus(`Bookmarked ${job.title}.`);

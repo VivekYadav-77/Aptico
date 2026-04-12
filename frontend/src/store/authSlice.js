@@ -1,5 +1,6 @@
 import { configureStore, createSlice } from '@reduxjs/toolkit';
 import historyReducer, { loadHistoryState, saveHistoryState } from './historySlice.js';
+import analysisReducer from './analysisSlice.js';
 
 const initialState = {
   user: null,
@@ -54,7 +55,8 @@ export const { clearAuthSession, enterGuestMode, exitGuestMode, setAuthReady, se
 export const store = configureStore({
   reducer: {
     auth: authSlice.reducer,
-    history: historyReducer
+    history: historyReducer,
+    analysis: analysisReducer
   },
   preloadedState: {
     history: loadHistoryState()

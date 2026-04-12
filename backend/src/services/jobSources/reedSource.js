@@ -34,7 +34,7 @@ export async function reedSource({ query, location, jobType, role, redisService,
           salary: resolvedType === 'internship' ? null : normalizeCompensation({ min: job.minimumSalary, max: job.maximumSalary, raw: job.salary }),
           applyUrl: job.jobUrl || job.redirectUrl,
           postedAt: job.date,
-          description: normalizeText(job.jobDescription, null)
+          description: job.jobDescription
         });
       });
     }

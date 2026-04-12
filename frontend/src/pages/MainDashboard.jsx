@@ -1,18 +1,22 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { useSelector } from 'react-redux';
-import { useQuery } from '@tanstack/react-query';
+import { Link, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import api from '../api/axios.js';
+import { deleteAllSavedJobs, deleteSavedJob } from '../api/jobsApi.js';
 import { fetchDashboardSummary } from '../api/profileApi.js';
 import AppShell from '../components/AppShell.jsx';
 import { selectAuth } from '../store/authSlice.js';
-import { selectCurrentAnalysis } from '../store/historySlice.js';
-
-const recentAnalysesFallback = [
-  { role: 'Sr. Product Designer', time: '2h ago', company: 'Stripe', score: 94, tone: 'good' },
-  { role: 'Creative Lead', time: 'Yesterday', company: 'Airbnb', score: 78, tone: 'warning' },
-  { role: 'Staff Architect', time: '3d ago', company: 'Linear', score: 88, tone: 'good' }
-];
+import {
+  clearAnalysisHistory,
+  clearInterviewPrep,
+  removeAnalysisRecord,
+  removeInterviewPrep,
+  selectAnalysisHistory,
+  setAnalysisWorkspace,
+  setCurrentAnalysis,
+  selectCurrentAnalysis
+} from '../store/historySlice.js';
 
 const savedJobsFallback = [
   { title: 'Cloud Infrastructure', company: 'Amazon', location: 'Seattle (Remote)', icon: 'cloud' },
@@ -117,26 +121,71 @@ function formatScriptDate(value) {
 export default function MainDashboard() {
   const auth = useSelector(selectAuth);
   const currentAnalysis = useSelector(selectCurrentAnalysis);
+  const analysisHistory = useSelector(selectAnalysisHistory);
+  const dispatch = useDispatch();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
+
   const [expandedJobId, setExpandedJobId] = useState(null);
   const [followUpScriptsByJob, setFollowUpScriptsByJob] = useState({});
   const [loadingJobId, setLoadingJobId] = useState(null);
   const [followUpError, setFollowUpError] = useState('');
   const [copiedKey, setCopiedKey] = useState('');
+
+  const [savedJobsActionError, setSavedJobsActionError] = useState('');
+  const [deletingSavedJobId, setDeletingSavedJobId] = useState(null);
+  const [clearingSavedJobs, setClearingSavedJobs] = useState(false);
+
   const name = auth.user?.name?.split(' ')[0] || (auth.guestMode ? 'Explorer' : 'there');
   const matchedSkills = currentAnalysis?.matchedSkills?.slice(0, 6) || [];
   const score = currentAnalysis?.confidenceScore || 82;
+  
   const quickActions = [
-    ['Continue last analysis', 'play_circle', '/analysis'],
+    ['Continue last analysis', 'play_circle', '/analysis/latest'],
     ['Upload new resume', 'upload_file', '/analysis'],
-    ['View saved jobs', 'bookmark', '/jobs'],
-    ['Interview prep', 'forum', '/analysis']
+    ['View saved jobs', 'bookmark', '/saved-jobs'],
+    ['Interview prep', 'forum', '/interview-prep']
   ];
+  
   const dashboardQuery = useQuery({
     queryKey: ['dashboard-summary'],
     queryFn: fetchDashboardSummary,
     enabled: auth.isAuthenticated,
     retry: false
   });
+
+  const interviewPrepItems = analysisHistory.filter((item) => !item.hideInterviewPrep && (item.stage2?.interviewQuestions?.length || item.stage2?.salaryCoach));
+
+  function continueAnalysis(analysis) {
+    if (!analysis) return;
+    navigate('/analysis-history', { state: { openId: analysis.id || analysis.localId } });
+  }
+
+  async function handleDeleteSavedJob(savedJobId) {
+    setDeletingSavedJobId(savedJobId);
+    setSavedJobsActionError('');
+    try {
+      await deleteSavedJob(savedJobId);
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+    } catch (error) {
+      setSavedJobsActionError(error.response?.data?.error || 'Could not delete this saved job.');
+    } finally {
+      setDeletingSavedJobId(null);
+    }
+  }
+
+  async function handleDeleteAllSavedJobs() {
+    setClearingSavedJobs(true);
+    setSavedJobsActionError('');
+    try {
+      await deleteAllSavedJobs();
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] });
+    } catch (error) {
+      setSavedJobsActionError(error.response?.data?.error || 'Could not delete saved jobs.');
+    } finally {
+      setClearingSavedJobs(false);
+    }
+  }
 
   async function handleCopy(text, key) {
     try {
@@ -179,16 +228,22 @@ export default function MainDashboard() {
   }
 
   const recentAnalyses = useMemo(() => {
-    const apiAnalyses = (dashboardQuery.data?.recentAnalyses || []).map((item) => ({
-      role: item.role,
-      time: formatRelativeTime(item.createdAt),
-      company: item.company,
-      score: item.score,
-      tone: item.score >= 85 ? 'good' : 'warning'
-    }));
+    const historyAnalyses = analysisHistory.slice(0, 3).map((analysis) => {
+      const score = analysis.confidenceScore || 0;
+      return {
+        id: analysis.id,
+        localId: analysis.localId,
+        role: analysis.jobTitle || analysis.stage1?.jobTitle || 'Analysis',
+        time: formatRelativeTime(analysis.createdAt),
+        company: analysis.companyName || analysis.stage1?.companyName || 'Aptico',
+        score,
+        tone: score >= 85 ? 'good' : 'warning',
+        fullAnalysis: analysis
+      };
+    });
 
-    if (apiAnalyses.length) {
-      return apiAnalyses;
+    if (historyAnalyses.length) {
+      return historyAnalyses;
     }
 
     if (currentAnalysis) {
@@ -198,17 +253,18 @@ export default function MainDashboard() {
           time: 'Latest',
           company: currentAnalysis.companyName || 'Aptico workspace',
           score,
-          tone: score >= 85 ? 'good' : 'warning'
-        },
-        ...recentAnalysesFallback.slice(0, 2)
+          tone: score >= 85 ? 'good' : 'warning',
+          fullAnalysis: currentAnalysis
+        }
       ];
     }
 
-    return recentAnalysesFallback;
-  }, [currentAnalysis, dashboardQuery.data?.recentAnalyses, score]);
+    return [];
+  }, [analysisHistory, currentAnalysis, score]);
 
   const savedJobs = useMemo(() => {
     const apiSavedJobs = (dashboardQuery.data?.savedJobs || []).map((job) => ({
+      originalId: job.id,
       id: `saved-${job.id}`,
       title: job.title,
       company: job.company,
@@ -247,6 +303,19 @@ export default function MainDashboard() {
 
     return apiActivity.length ? apiActivity : activityFallback;
   }, [dashboardQuery.data?.activity]);
+
+  const acquiredSkills = useMemo(() => {
+    const skillsSet = new Set();
+    if (currentAnalysis?.matchedSkills) {
+      currentAnalysis.matchedSkills.forEach((s) => skillsSet.add(s));
+    }
+    analysisHistory.forEach((historyItem) => {
+      if (historyItem.matchedSkills) {
+        historyItem.matchedSkills.forEach((s) => skillsSet.add(s));
+      }
+    });
+    return Array.from(skillsSet);
+  }, [currentAnalysis, analysisHistory]);
 
   return (
     <AppShell
@@ -302,43 +371,89 @@ export default function MainDashboard() {
         <GaugeCard score={score} />
       </section>
 
-      <section className="mt-6 grid gap-6 lg:grid-cols-3">
+      <section className="mt-6 grid gap-6 2xl:grid-cols-4 xl:grid-cols-2 lg:grid-cols-2">
         <article className="space-y-4">
           <div className="flex items-center justify-between px-1">
             <p className="app-kicker">Recent analyses</p>
-            <span className="material-symbols-outlined text-[18px] text-[var(--muted)]">more_horiz</span>
-          </div>
-          <div className="app-panel overflow-hidden p-0">
-            <div className="divide-y divide-[var(--border)]">
-              {recentAnalyses.map((item) => (
-                <div key={`${item.role}-${item.company}`} className="flex items-center justify-between px-5 py-4 transition hover:bg-[var(--panel-soft)]">
-                  <div>
-                    <p className="text-[13px] font-semibold text-[var(--text)]">{item.role}</p>
-                    <p className="mt-1 text-[11px] text-[var(--muted-strong)]">
-                      {item.time} - {item.company}
-                    </p>
-                  </div>
-                  <span
-                    className={`mono-text rounded-md border px-2 py-1 text-[12px] ${
-                      item.tone === 'good'
-                        ? 'border-[var(--accent)]/20 bg-[var(--accent-soft)] text-[var(--accent-strong)]'
-                        : 'border-amber-500/20 bg-amber-500/10 text-amber-500'
-                    }`}
-                  >
-                    {item.score}
-                  </span>
-                </div>
-              ))}
+            <div className="flex items-center gap-2">
+              {analysisHistory.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => dispatch(clearAnalysisHistory())}
+                  className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-strong)] hover:text-rose-400 transition"
+                >
+                  Clear All
+                </button>
+              )}
+              <Link to="/analysis-history" className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--accent)] hover:underline">
+                 See more
+              </Link>
             </div>
           </div>
+          {recentAnalyses.length > 0 ? (
+            <div className="app-panel overflow-hidden p-0">
+              <div className="divide-y divide-[var(--border)]">
+                {recentAnalyses.map((item) => (
+                  <div key={`${item.id || item.role}-${item.company}`} className="group flex flex-wrap items-center justify-between gap-2 px-5 py-4 transition hover:bg-[var(--panel-soft)]">
+                    <div>
+                      <p className="text-[13px] font-semibold text-[var(--text)]">{item.role}</p>
+                      <p className="mt-1 text-[11px] text-[var(--muted-strong)]">
+                        {item.time} - {item.company}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {item.fullAnalysis && (
+                        <div className="hidden gap-2 md:flex opacity-0 transition-opacity group-hover:opacity-100">
+                          <button type="button" onClick={() => continueAnalysis(item.fullAnalysis)} className="text-[10px] font-semibold uppercase tracking-wider text-[var(--accent)] hover:underline">Continue</button>
+                          <button type="button" onClick={() => dispatch(removeAnalysisRecord({ id: item.fullAnalysis.id, localId: item.fullAnalysis.localId }))} className="text-[10px] font-semibold uppercase tracking-wider text-rose-400 hover:underline">Delete</button>
+                        </div>
+                      )}
+                      <span
+                        className={`mono-text rounded-md border px-2 py-1 text-[12px] ${
+                          item.tone === 'good'
+                            ? 'border-[var(--accent)]/20 bg-[var(--accent-soft)] text-[var(--accent-strong)]'
+                            : 'border-amber-500/20 bg-amber-500/10 text-amber-500'
+                        }`}
+                      >
+                        {item.score}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-4 text-sm text-[var(--muted-strong)] leading-6">
+              No recent analyses. Upload a resume to get started.
+            </div>
+          )}
         </article>
 
         <article className="space-y-4">
           <div className="flex items-center justify-between px-1">
             <p className="app-kicker">Saved jobs</p>
-            <span className="material-symbols-outlined text-[18px] text-[var(--muted)]">arrow_forward</span>
+            <div className="flex items-center gap-2">
+              {savedJobs.length > 0 && !savedJobs[0].id.startsWith('fallback-') && (
+                <button 
+                  type="button" 
+                  onClick={() => void handleDeleteAllSavedJobs()} 
+                  disabled={clearingSavedJobs}
+                  className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-strong)] hover:text-rose-400 transition"
+                >
+                  {clearingSavedJobs ? 'Deleting...' : 'Delete All'}
+                </button>
+              )}
+              <Link to="/saved-jobs">
+                <span className="material-symbols-outlined text-[18px] text-[var(--muted)] hover:text-[var(--text)] transition">arrow_forward</span>
+              </Link>
+            </div>
           </div>
           <div className="space-y-3">
+            {savedJobsActionError ? (
+              <div className="rounded-2xl border border-[var(--warning-border)] bg-[var(--warning-soft)] px-4 py-3 text-sm text-[var(--warning-text)]">
+                {savedJobsActionError}
+              </div>
+            ) : null}
             {followUpError ? (
               <div className="rounded-2xl border border-[var(--warning-border)] bg-[var(--warning-soft)] px-4 py-3 text-sm text-[var(--warning-text)]">
                 {followUpError}
@@ -350,7 +465,7 @@ export default function MainDashboard() {
                 className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4 transition hover:border-[var(--accent)]/30 hover:bg-[var(--panel-soft)]"
               >
                 <div className="flex items-start justify-between gap-4">
-                  <Link to="/jobs" className="flex min-w-0 flex-1 items-center gap-4">
+                  <Link to="/saved-jobs" className="flex min-w-0 flex-1 items-center gap-4">
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--panel-soft)]">
                       <span className="material-symbols-outlined text-[var(--muted)]">{job.icon}</span>
                     </div>
@@ -361,15 +476,27 @@ export default function MainDashboard() {
                       </p>
                     </div>
                   </Link>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      void handleToggleFollowUp(job);
-                    }}
-                    className="rounded-full border border-[var(--border)] px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text)] transition hover:border-[var(--accent)]/30"
-                  >
-                    Follow-up Scripts
-                  </button>
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void handleToggleFollowUp(job);
+                      }}
+                      className="rounded-full border border-[var(--border)] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text)] transition hover:border-[var(--accent)]/30"
+                    >
+                      Scripts
+                    </button>
+                    {job.originalId && (
+                      <button
+                        type="button"
+                        onClick={() => void handleDeleteSavedJob(job.originalId)}
+                        disabled={deletingSavedJobId === job.originalId}
+                        className="rounded-full border border-[var(--border)] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text)] transition hover:border-rose-500/30 hover:bg-rose-500/10 hover:text-rose-400"
+                      >
+                        {deletingSavedJobId === job.originalId ? 'Deleting...' : 'Delete'}
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {expandedJobId === job.id ? (
@@ -419,6 +546,52 @@ export default function MainDashboard() {
             ))}
           </div>
         </article>
+        
+        <article className="space-y-4">
+          <div className="flex items-center justify-between px-1">
+            <p className="app-kicker">Interview prep</p>
+            <div className="flex items-center gap-2">
+              {interviewPrepItems.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => dispatch(clearInterviewPrep())}
+                  className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted-strong)] hover:text-rose-400 transition"
+                >
+                  Clear All
+                </button>
+              )}
+              <Link to="/interview-prep" className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--accent)] hover:underline">
+                 See more
+              </Link>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {interviewPrepItems.length ? (
+              interviewPrepItems.slice(0, 1).map((item) => (
+                <article
+                  key={item.id || item.localId}
+                  className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4 transition hover:border-[var(--accent)]/30 hover:bg-[var(--panel-soft)] flex flex-wrap items-start justify-between gap-4"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-bold text-[var(--text)]">{item.companyName || item.stage1?.companyName || 'Analysis prep'}</p>
+                    <p className="mt-1 text-[11px] text-[var(--muted-strong)]">{formatRelativeTime(item.createdAt)}</p>
+                    <div className="mt-2 text-[11px] text-[var(--muted)] truncate">
+                       {item.stage2?.salaryCoach ? 'Includes salary data' : 'Includes interview Qs'}
+                    </div>
+                  </div>
+                  <div className="flex flex-col gap-2 shrink-0">
+                    <Link to="/interview-prep" className="rounded-full border border-[var(--border)] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text)] transition hover:border-[var(--accent)]/30 text-center">Open</Link>
+                    <button type="button" onClick={() => dispatch(removeInterviewPrep({ id: item.id, localId: item.localId }))} className="rounded-full border border-[var(--border)] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--text)] transition hover:border-rose-500/30 hover:bg-rose-500/10 hover:text-rose-400">Delete</button>
+                  </div>
+                </article>
+              ))
+            ) : (
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-4 text-sm text-[var(--muted-strong)] leading-6">
+                  No interview prep saved yet. Run an analysis to generate prep materials.
+                </div>
+            )}
+          </div>
+        </article>
 
         <article className="space-y-4">
           <div className="flex items-center justify-between px-1">
@@ -447,44 +620,21 @@ export default function MainDashboard() {
       <section className="mt-10 grid gap-10 border-t border-[var(--border)]/60 pt-10 xl:grid-cols-2">
         <article>
           <p className="app-kicker">Skill acquisition</p>
-          <div className="mt-6 space-y-6">
-            {(matchedSkills.length
-              ? matchedSkills.slice(0, 3).map((skill, index) => [skill, [92, 68, 44][index] || 40])
-              : skillProgressFallback
-            ).map(([label, value]) => (
-              <div key={label} className="space-y-2">
-                <div className="flex items-center justify-between px-1">
-                  <span className="text-[12px] font-bold text-[var(--text)]">{label}</span>
-                  <span className="mono-text text-[12px] text-[var(--muted-strong)]">{value}%</span>
-                </div>
-                <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--panel-strong)]">
-                  <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${value}%` }} />
-                </div>
-              </div>
+          <div className="mt-6 flex flex-wrap gap-2">
+            {(acquiredSkills.length > 0
+              ? acquiredSkills
+              : ['Technical Project Management', 'Next.js Framework Architect', 'AI Engineering Fundamentals']
+            ).map((skill) => (
+              <span
+                key={skill}
+                className="inline-flex items-center rounded-full border border-[var(--border)] bg-[var(--panel-soft)] px-3 py-1.5 text-[12px] font-semibold text-[var(--text)] transition hover:border-[var(--accent)]/50 hover:bg-[var(--panel)]"
+              >
+                {skill}
+              </span>
             ))}
           </div>
         </article>
 
-        <article>
-          <p className="app-kicker">Activity timeline</p>
-          <div className="relative mt-6 space-y-8 pl-8">
-            <div className="absolute bottom-0 left-[3px] top-0 w-px bg-[var(--border)]" />
-            {activity.map(([title, subtitle, time, isActive]) => (
-              <div key={`${title}-${time}`} className="relative">
-                <div
-                  className={`absolute -left-[29px] top-1 h-2.5 w-2.5 rounded-full ring-4 ring-[var(--bg)] ${
-                    isActive ? 'bg-[var(--accent)]' : 'bg-[var(--muted)]'
-                  }`}
-                />
-                <div>
-                  <p className="text-[13px] font-bold text-[var(--text)]">{title}</p>
-                  <p className="mt-1 text-[11px] text-[var(--muted-strong)]">{subtitle}</p>
-                  <p className="mono-text mt-1 text-[10px] text-[var(--muted)]">{time}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </article>
       </section>
     </AppShell>
   );

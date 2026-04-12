@@ -1,15 +1,16 @@
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { analyses } from '../db/schema.js';
+import { analyses, savedJobs } from '../db/schema.js';
 import { searchJobs } from '../services/jobSearchService.js';
 import { saveJob } from '../services/jobScraperService.js';
+import { addJobsToPublicCache } from '../services/socialService.js';
 import { generateFollowUpScripts } from '../utils/followUpScripts.js';
 
 const searchQuerySchema = z.object({
   query: z.string().trim().min(1),
   location: z.string().trim().min(1).default('India'),
   jobType: z.enum(['remote', 'hybrid', 'full-time', 'internship-remote', 'internship-onsite']),
-  useAnalysis: z.coerce.boolean().default(false)
+  useAnalysis: z.union([z.boolean(), z.string()]).transform((val) => val === true || val === 'true').default(false)
 });
 
 const saveJobSchema = z.object({
@@ -26,6 +27,10 @@ const followUpScriptsSchema = z.object({
   companyName: z.string().trim().min(1),
   appliedDate: z.string().datetime(),
   userName: z.string().trim().optional()
+});
+
+const deleteSavedJobParamsSchema = z.object({
+  savedJobId: z.string().trim().min(1)
 });
 
 export async function getJobsController(request, reply) {
@@ -70,6 +75,12 @@ export async function getJobsController(request, reply) {
       env: request.server.env || null,
       logger: request.log
     });
+
+    if (request.auth?.userId && request.server.db) {
+      addJobsToPublicCache(request.server.db, result.jobs).catch((err) =>
+        request.log.warn('Public job cache update failed:', err)
+      );
+    }
 
     return reply.send({
       success: true,
@@ -128,6 +139,79 @@ export async function getFollowUpScriptsController(request, reply) {
     return reply.code(statusCode).send({
       success: false,
       error: error.message || 'Could not generate follow-up scripts.'
+    });
+  }
+}
+
+export async function deleteSavedJobController(request, reply) {
+  try {
+    if (!request.server.db) {
+      return reply.code(503).send({
+        success: false,
+        error: 'Database is not configured yet.'
+      });
+    }
+
+    const { savedJobId } = deleteSavedJobParamsSchema.parse(request.params || {});
+
+    const rows = await request.server.db
+      .delete(savedJobs)
+      .where(and(eq(savedJobs.id, savedJobId), eq(savedJobs.userId, request.auth.userId)))
+      .returning({ id: savedJobs.id });
+
+    if (!rows[0]) {
+      return reply.code(404).send({
+        success: false,
+        error: 'Saved job was not found.'
+      });
+    }
+
+    return reply.send({
+      success: true,
+      data: {
+        id: rows[0].id
+      }
+    });
+  } catch (error) {
+    const statusCode = error.name === 'ZodError' ? 400 : error.statusCode || 500;
+    return reply.code(statusCode).send({
+      success: false,
+      error: error.message || 'Could not delete saved job.'
+    });
+  }
+}
+
+export async function deleteAllSavedJobsController(request, reply) {
+  try {
+    if (!request.server.db) {
+      return reply.code(503).send({
+        success: false,
+        error: 'Database is not configured yet.'
+      });
+    }
+
+    if (!request.auth?.userId) {
+      return reply.code(401).send({
+        success: false,
+        error: 'A valid user session is required to delete saved jobs.'
+      });
+    }
+
+    const rows = await request.server.db
+      .delete(savedJobs)
+      .where(eq(savedJobs.userId, request.auth.userId))
+      .returning({ id: savedJobs.id });
+
+    return reply.send({
+      success: true,
+      data: {
+        deletedCount: rows.length
+      }
+    });
+  } catch (error) {
+    return reply.code(error.statusCode || 500).send({
+      success: false,
+      error: error.message || 'Could not clear saved jobs.'
     });
   }
 }

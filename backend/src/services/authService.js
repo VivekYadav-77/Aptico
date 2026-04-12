@@ -149,8 +149,8 @@ async function upsertGoogleUser(db, payload) {
     const updatedUsers = await db
       .update(users)
       .set({
-        name: payload.name ?? existingUser.name,
-        avatarUrl: payload.avatarUrl ?? existingUser.avatarUrl,
+        name: existingUser.name || payload.name,
+        avatarUrl: existingUser.avatarUrl || payload.avatarUrl,
         googleSubject: payload.googleSubject ?? existingUser.googleSubject,
         emailVerifiedAt: existingUser.emailVerifiedAt || now,
         authProvider: resolveAuthProvider(existingUser, 'google'),

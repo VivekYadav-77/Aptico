@@ -29,7 +29,7 @@ export async function remotiveSource({ query, location, jobType, role, redisServ
           salary: resolvedType === 'internship' ? null : job.salary,
           applyUrl: job.url,
           postedAt: job.publication_date,
-          description: normalizeText(job.description, null)
+          description: job.description
         });
       });
     }

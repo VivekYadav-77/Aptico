@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { startBackgroundAnalysis, abortActiveAnalysis, getActiveController } from '../api/analysisManager.js';
 import DiffViewer from '../components/DiffViewer.jsx';
@@ -16,7 +16,9 @@ import {
   clearAnalysisWorkspace,
   clearCurrentAnalysis,
   clearGeneratedItemsForAnalysis,
+  clearAnalysisHistory,
   removeAnalysisRecord,
+  selectAnalysisHistory,
   selectAnalysisWorkspace,
   setAnalysisWorkspace
 } from '../store/historySlice.js';
@@ -733,316 +735,163 @@ function OutreachView({ content }) {
   );
 }
 
-export default function AnalysisWorkspace() {
-  const auth = useSelector(selectAuth);
-  const persistedWorkspace = useSelector(selectAnalysisWorkspace);
-  const analysisState = useSelector(selectAnalysis);
+
+export default function AnalysisHistoryPage() {
+  const analysisHistory = useSelector(selectAnalysisHistory);
   const dispatch = useDispatch();
-  const fileInputRef = useRef(null);
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [selectedFileMeta, setSelectedFileMeta] = useState(persistedWorkspace?.selectedFileMeta || null);
   const location = useLocation();
-  const [jobDescription, setJobDescription] = useState(location.state?.jobDescription ?? persistedWorkspace?.jobDescription ?? '');
-  const navigate = useNavigate();
-
-  // Force job description update on navigation if it's provided in state,
-  // and clear any existing active analysis so the user gets a fresh workspace.
-  useEffect(() => {
-    if (location.state?.jobDescription) {
-      setJobDescription(location.state.jobDescription);
-      
-      // Clear out any old analysis results 
-      dispatch(clearAnalysisWorkspace());
-      dispatch(resetAnalysisLiveState());
-      
-      // Remove the jobDescription from the route state so it doesn't persist on refresh
-      // We pass an empty state to ensure it doesn't trigger again
-      navigate(location.pathname, { replace: true, state: {} });
-    }
-  }, [location.state, dispatch, navigate, location.pathname]);
-
-  // Read live analysis state from Redux (survives navigation)
-  const isSubmitting = analysisState.isSubmitting;
-  const globalError = analysisState.globalError;
-  const selectedTab = analysisState.selectedTab;
-  const precheck = analysisState.precheck;
-  const stage1 = analysisState.stage1;
-  const stage2 = analysisState.stage2;
-  const stage3 = analysisState.stage3;
-  const loadingStages = analysisState.loadingStages;
-
-  const setSelectedTab = useCallback((tab) => dispatch(setAnalysisSelectedTab(tab)), [dispatch]);
-  const setGlobalError = useCallback((msg) => dispatch(setAnalysisGlobalError(msg)), [dispatch]);
-
-  // On mount: hydrate Redux live state from persisted workspace if no active stream
-  useEffect(() => {
-    const hasActiveStream = getActiveController() !== null;
-    if (!hasActiveStream && persistedWorkspace && !analysisState.stage1) {
-      dispatch(hydrateFromWorkspace(persistedWorkspace));
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Sync selectedTab changes back to the persisted workspace
-  useEffect(() => {
-    if (persistedWorkspace) {
-      dispatch(
-        setAnalysisWorkspace({
-          ...persistedWorkspace,
-          selectedTab
-        })
-      );
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedTab]);
-
-  const modeLabel = useMemo(() => {
-    if (auth.isAuthenticated) return auth.user?.email || 'Authenticated session';
-    if (auth.guestMode) return 'Guest mode';
-    return 'Visitor session';
-  }, [auth.guestMode, auth.isAuthenticated, auth.user]);
-
-  const readyTabs = useMemo(
-    () => ({
-      1: Boolean(stage1),
-      2: Boolean(stage1),
-      3: Boolean(stage1),
-      4: Boolean(stage2),
-      5: Boolean(stage2),
-      6: Boolean(stage2),
-      7: Boolean(stage3),
-      8: Boolean(stage3)
-    }),
-    [stage1, stage2, stage3]
-  );
-
-  const tabLoading = useMemo(
-    () => ({
-      1: loadingStages.stage1,
-      2: loadingStages.stage1,
-      3: loadingStages.stage1,
-      4: loadingStages.stage2,
-      5: loadingStages.stage2,
-      6: loadingStages.stage2,
-      7: loadingStages.stage3,
-      8: loadingStages.stage3
-    }),
-    [loadingStages.stage1, loadingStages.stage2, loadingStages.stage3]
-  );
-
-  const availableTab = useMemo(() => INSIGHT_TABS.find((tab) => readyTabs[tab.id])?.id || 1, [readyTabs]);
-  const activeFileMeta = selectedFile ? { name: selectedFile.name, size: selectedFile.size, type: selectedFile.type } : selectedFileMeta;
-  const hasAnyContent = Boolean(activeFileMeta || jobDescription.trim() || precheck || stage1 || stage2 || stage3);
-  const scoreValue = stage1?.confidenceScore || precheck?.score || 0;
-  const mismatchCount = stage1?.keywordMismatches?.length || 0;
-  const matchedSkills = stage1?.skillsPresent || [];
-  const skillsCoverage = matchedSkills.length + mismatchCount > 0 ? (matchedSkills.length / (matchedSkills.length + mismatchCount)) * 100 : stage1 ? 100 : 0;
-  const seniorityScore = stage1?.seniorityMismatches?.length ? 100 - Math.min(80, stage1.seniorityMismatches.length * 25) : stage1 ? 88 : 0;
-  const keywordScore = stage1 ? clampPercent((clampPercent(stage1.confidenceScore) + clampPercent(skillsCoverage)) / 2) : 0;
-  const topMissingSkills = useMemo(
-    () => (stage1?.keywordMismatches || []).map((item) => item.keyword).filter(Boolean).slice(0, 4),
-    [stage1]
-  );
-
-  const progressSteps = [
-    { key: 'upload', label: 'Upload' },
-    { key: 'parse', label: 'Parse' },
-    { key: 'match', label: 'Match' },
-    { key: 'insights', label: 'Insights' },
-    { key: 'finalize', label: 'Finalize' }
-  ];
-  const handleAnalyze = useCallback(
-    (event) => {
-      event.preventDefault();
-      setGlobalError('');
-
-      if (!selectedFile) {
-        setGlobalError('Please choose a PDF or DOCX resume first.');
-        return;
-      }
-
-      if (selectedFile.size > MAX_FILE_BYTES) {
-        setGlobalError('File must be under 5 MB.');
-        return;
-      }
-
-      const fileMeta = { name: selectedFile.name, size: selectedFile.size, type: selectedFile.type };
-      setSelectedFileMeta(fileMeta);
-
-      // Delegate to the background manager — stream runs outside component lifecycle
-      startBackgroundAnalysis(
-        { file: selectedFile, jobDescription },
-        { selectedFileMeta: fileMeta }
-      );
-    },
-    [jobDescription, selectedFile, setGlobalError]
-  );
-
+  const [expandedId, setExpandedId] = useState(location.state?.openId || null);
 
   return (
     <AppShell
-      title="AI analysis workspace"
-      description="Upload your resume and paste the target job description to get actionable gap analysis, interview preparation, and tailored learning paths."
+      title="Analysis history"
+      description="Review all your past resume-to-job matches and tailored AI insights here. Access any report at any time."
       actions={
         <>
+          <Link to="/analysis" className="app-button">New analysis</Link>
           <Link to="/dashboard" className="app-button-secondary">Main dashboard</Link>
-          <Link to="/analysis-history" className="app-button-secondary">Analyzed history</Link>
-          <Link to="/jobs" className="app-button-secondary">Job search</Link>
+          {analysisHistory.length > 0 && (
+            <button type="button" onClick={() => dispatch(clearAnalysisHistory())} className="app-button-secondary !text-red-500 hover:!bg-red-500/10 hover:!border-red-500/20">
+              Clear All
+            </button>
+          )}
         </>
       }
     >
-      <section className="grid gap-6 xl:grid-cols-[180px_minmax(0,1fr)_260px]">
-        <aside className="app-panel h-fit xl:sticky xl:top-24">
-          <div className="space-y-4">
-            {progressSteps.map((step) => (
-              <ProgressStep
-                key={step.key}
-                label={step.label}
-                state={getStepState(step.key, {
-                  hasResume: Boolean(activeFileMeta),
-                  hasJobDescription: Boolean(jobDescription.trim()),
-                  isSubmitting,
-                  precheck,
-                  stage1,
-                  stage2,
-                  stage3
-                })}
-              />
-            ))}
-          </div>
-        </aside>
+      <div className="space-y-6">
+        {analysisHistory.length === 0 ? (
+           <EmptyState message="No analysis history found. Start by running a new analysis." />
+        ) : (
+          analysisHistory.map(analysis => (
+            <AnalysisHistoryCard 
+               key={analysis.id || analysis.localId} 
+               analysis={analysis} 
+               isExpanded={expandedId === (analysis.id || analysis.localId)}
+               onToggle={() => setExpandedId(expandedId === (analysis.id || analysis.localId) ? null : (analysis.id || analysis.localId))}
+               dispatch={dispatch}
+            />
+          ))
+        )}
+      </div>
+    </AppShell>
+  );
+}
 
-        <section className="space-y-6">
-          <article className="app-panel">
-            <form className="space-y-5" onSubmit={handleAnalyze}>
-              <div className="flex items-start gap-3 rounded-[1.5rem] border border-[var(--border)] bg-[var(--accent-soft)] p-5 transition hover:border-[var(--accent)]">
-                <span className="material-symbols-outlined mt-0.5 text-[var(--accent-strong)]">lightbulb</span>
+function AnalysisHistoryCard({ analysis, isExpanded, onToggle, dispatch }) {
+  const [selectedTab, setSelectedTab] = useState(1);
+  const { stage1, stage2, stage3, precheck } = analysis;
+
+  const readyTabs = useMemo(() => ({
+    1: Boolean(stage1), 2: Boolean(stage1), 3: Boolean(stage1),
+    4: Boolean(stage2), 5: Boolean(stage2), 6: Boolean(stage2),
+    7: Boolean(stage3), 8: Boolean(stage3)
+  }), [stage1, stage2, stage3]);
+
+  const loadingStates = {}; 
+
+  const scoreValue = stage1?.confidenceScore || precheck?.score || 0;
+  const mismatchCount = stage1?.keywordMismatches?.length || 0;
+  const matchedSkills = Array.isArray(analysis.matchedSkills) ? analysis.matchedSkills : (stage1?.skillsPresent || []);
+  const skillsCoverage = matchedSkills.length + mismatchCount > 0 ? (matchedSkills.length / (matchedSkills.length + mismatchCount)) * 100 : stage1 ? 100 : 0;
+  const seniorityScore = stage1?.seniorityMismatches?.length ? 100 - Math.min(80, stage1.seniorityMismatches.length * 25) : stage1 ? 88 : 0;
+  const keywordScore = stage1 ? clampPercent((clampPercent(stage1.confidenceScore) + clampPercent(skillsCoverage)) / 2) : 0;
+  const topMissingSkills = useMemo(() => (stage1?.keywordMismatches || []).map((item) => item.keyword).filter(Boolean).slice(0, 4), [stage1]);
+
+  return (
+    <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel)] transition-all overflow-hidden flex flex-col">
+       <div className="flex flex-wrap items-center justify-between p-6 cursor-pointer hover:bg-[var(--panel-soft)]" onClick={onToggle}>
+         <div>
+            <p className="app-kicker">Saved analysis report</p>
+            <h3 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[var(--text)] transition-colors">{analysis.companyName || stage1?.companyName || 'Role analysis'}</h3>
+            <p className="mt-2 text-sm text-[var(--muted-strong)]">{stage1?.jobTitle || analysis.jobTitle || 'Analysis'} - {new Date(analysis.createdAt).toLocaleString()}</p>
+         </div>
+         <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+               <span className="text-[24px] font-bold text-[var(--accent)]">{scoreValue}%</span>
+               <span className="text-[10px] uppercase tracking-wider text-[var(--muted)]">Match</span>
+            </div>
+            <button type="button" onClick={(e) => { e.stopPropagation(); dispatch(removeAnalysisRecord({ id: analysis.id, localId: analysis.localId })); }} className="app-button-secondary !py-2 !px-4 !text-red-500 hover:!bg-red-500/10 hover:!border-red-500/20">Delete</button>
+            <button
+              type="button"
+              className="ml-1 flex h-10 w-10 items-center justify-center rounded-full hover:bg-[var(--panel-soft)] transition-colors focus:outline-none"
+              aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`transform transition-transform duration-300 text-[var(--muted-strong)] ${isExpanded ? 'rotate-180' : ''}`}>
+                <path d="m6 9 6 6 6-6"/>
+              </svg>
+            </button>
+         </div>
+       </div>
+
+       {isExpanded && (
+         <div className="border-t border-[var(--border)] p-8 bg-[var(--panel-soft)] space-y-8 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
+              <div className="flex flex-col items-center justify-center">
+                <ScoreRing value={scoreValue} />
+              </div>
+
+              <div className="flex-1 space-y-5">
                 <div>
-                  <p className="text-base font-bold text-[var(--text)]">Optimize your results</p>
-                  <p className="mt-1 text-sm leading-6 text-[var(--text)]">
-                    For the most accurate alignment scores and high-quality AI insights, please ensure you provide a comprehensive and detailed job description.
+                  <p className="app-kicker">Analysis summary</p>
+                  <h2 className="mt-2 text-2xl font-black tracking-[-0.03em] text-[var(--text)]">
+                    {stage1?.companyName || 'Target role'}
+                  </h2>
+                  <p className="mt-3 text-sm leading-7 text-[var(--muted-strong)]">
+                    {analysis.summary || stage1?.summary || 'No summary generated.'}
                   </p>
                 </div>
+
+                <div className="space-y-4">
+                  <SummaryMetric label="Hard skills" value={skillsCoverage} />
+                  <SummaryMetric label="Experience" value={seniorityScore} tone={seniorityScore < 55 ? 'warning' : 'accent'} />
+                  <SummaryMetric label="Keywords" value={keywordScore} tone={keywordScore < 55 ? 'warning' : 'accent'} />
+                </div>
+
+                <div className="flex flex-wrap gap-2 border-t border-[var(--border)] pt-5">
+                  {(matchedSkills.length ? matchedSkills : topMissingSkills).slice(0, 6).map((skill) => (
+                    <span key={skill} className="rounded-md border border-[var(--border)] bg-[var(--panel)] px-3 py-1 font-mono text-[11px] text-[var(--accent-strong)]">
+                      {skill}
+                    </span>
+                  ))}
+                </div>
               </div>
+            </div>
 
-              <div className="grid gap-4 lg:grid-cols-2">
-                <label className="group relative flex min-h-56 cursor-pointer flex-col justify-between rounded-[1.5rem] border-2 border-dashed border-[var(--border)] bg-[var(--panel-soft)] p-5 transition hover:border-[var(--accent)]">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                    onChange={(event) => {
-                      const nextFile = event.target.files?.[0] || null;
-                      setSelectedFile(nextFile);
-                      setSelectedFileMeta(nextFile ? { name: nextFile.name, size: nextFile.size, type: nextFile.type } : null);
-                    }}
-                    className="sr-only"
-                  />
-                  <div>
-                    <span className="app-field-label">Resume upload</span>
-                    <div className="mt-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--panel)] text-[var(--muted)] transition group-hover:border-[var(--accent)] group-hover:text-[var(--accent)]">
-                      <span className="material-symbols-outlined text-[28px]">upload_file</span>
-                    </div>
-                    <p className="mt-5 text-lg font-semibold text-[var(--text)]">
-                      {activeFileMeta ? activeFileMeta.name : 'Drop resume or click to browse'}
-                    </p>
-                    <p className="mt-2 text-sm leading-7 text-[var(--muted-strong)]">
-                      {activeFileMeta
-                        ? `${formatFileSize(activeFileMeta.size)} - ${activeFileMeta.type || 'Document ready for analysis'}`
-                        : 'Upload a PDF or DOCX file to begin the alignment check.'}
-                    </p>
-                  </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="mono-text text-[10px] uppercase tracking-[0.22em] text-[var(--muted)]">PDF or DOCX - Max 5 MB</span>
-                    <span className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-1 text-xs font-semibold text-[var(--text)]">Choose file</span>
-                  </div>
-                </label>
-
-                <label className="flex min-h-56 flex-col rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] p-5">
-                  <span className="app-field-label">Job description</span>
-                  <textarea
-                    value={jobDescription}
-                    onChange={(event) => setJobDescription(event.target.value)}
-                    className="mt-4 min-h-[188px] w-full resize-none border-none bg-transparent p-0 text-sm leading-7 text-[var(--text)] outline-none placeholder:text-[var(--muted)]"
-                    placeholder="Paste the target job description here..."
-                    required
-                  />
-                </label>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-3">
-                <button type="submit" disabled={isSubmitting} className="app-button min-w-[220px]">
-                  {isSubmitting ? 'Analyzing...' : 'Analyze alignment'}
-                </button>
-                <span className="rounded-full border border-[var(--border)] px-4 py-2 text-sm text-[var(--muted-strong)]">{modeLabel}</span>
-              </div>
-            </form>
-
-            {globalError ? (
-              <div className="mt-5 rounded-[1.25rem] border border-[var(--danger-border)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-rose-300">
-                {globalError}
+            {precheck && !precheck.canProceed ? (
+              <div className="rounded-[1.5rem] border border-[var(--danger-border)] bg-[var(--danger-soft)] p-6">
+                <p className="app-kicker">Compatibility check</p>
+                <h3 className="mt-2 text-xl font-bold text-[var(--text)]">{precheck.score}/100 compatibility</h3>
+                <p className="mt-3 text-sm leading-7 text-[var(--muted-strong)]">{precheck.reason}</p>
               </div>
             ) : null}
-          </article>
 
-          {isSubmitting ? (
-            <article className="app-panel flex flex-col items-center justify-center p-10">
-               <div className="h-8 w-8 animate-spin rounded-full border-4 border-[var(--border)] border-t-[var(--accent)] mb-4"></div>
-               <p className="text-sm font-semibold text-[var(--accent-strong)]">Analysis in progress...</p>
-               <p className="mt-2 text-xs text-[var(--muted-strong)]">Please wait while Aptico parses the resume and job description.</p>
-            </article>
-          ) : (stage1 || precheck || stage2 || stage3) ? (
-            <article className="app-panel flex flex-col items-center justify-center p-10 text-center">
-               <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)] mb-4">
-                  <span className="material-symbols-outlined text-3xl">check_circle</span>
-               </div>
-               <h3 className="text-xl font-bold text-[var(--text)]">Analysis complete</h3>
-               <p className="mt-2 mb-6 text-sm text-[var(--muted-strong)]">
-                  Your resume has been successfully aligned against the target role.
-               </p>
-               <button
-                  type="button"
-                  onClick={() => navigate('/analysis-history', { state: { openId: persistedWorkspace?.id || persistedWorkspace?.localId } })}
-                  className="app-button"
-               >
-                  See current report
-               </button>
-            </article>
-          ) : null}
-        </section>
+            {precheck?.canProceed || stage1 || stage2 || stage3 ? (
+              <div className="mt-8">
+                <div className="flex flex-wrap gap-3">
+                  {INSIGHT_TABS.map((tab) => (
+                    <FeatureButton
+                      key={tab.id}
+                      active={selectedTab === tab.id}
+                      ready={readyTabs[tab.id]}
+                      label={tab.label}
+                      shortLabel={tab.shortLabel}
+                      onClick={() => setSelectedTab(tab.id)}
+                    />
+                  ))}
+                </div>
 
-        <aside className="hidden space-y-6 xl:block">
-          <article className="app-panel">
-            <div className="flex items-center justify-between gap-3">
-              <span className="app-field-label">Status</span>
-              <span className="rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[var(--accent-strong)]">
-                {stage3 ? 'Ready' : stage1 || stage2 ? 'In progress' : 'Waiting'}
-              </span>
-            </div>
+                <div className="mt-6 rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel)] p-6">
+                  <div className="mb-6">
+                    <p className="app-kicker">Selected insight</p>
+                    <h3 className="mt-2 text-xl font-bold text-[var(--text)]">{INSIGHT_TABS.find((tab) => tab.id === selectedTab)?.label}</h3>
+                  </div>
 
-            <div className="mt-5 space-y-1">
-              <h3 className="text-sm font-bold text-[var(--text)]">{stage1?.companyName || 'Target role pending'}</h3>
-              <p className="text-xs text-[var(--muted)]">{activeFileMeta?.name || 'Resume not uploaded yet'}</p>
-            </div>
-
-            <div className="mt-5 border-t border-[var(--border)] pt-4">
-              <p className="app-field-label">Top missing skills</p>
-              <div className="mt-3 space-y-2">
-                {topMissingSkills.length ? (
-                  topMissingSkills.map((skill) => (
-                    <div key={skill} className="flex items-center gap-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
-                      <span className="mono-text text-[11px] text-[var(--text)]">{skill}</span>
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-xs leading-6 text-[var(--muted-strong)]">Missing skills will surface here after match analysis runs.</p>
-                )}
+                  <InsightContent selectedTab={selectedTab} stage1={stage1} stage2={stage2} stage3={stage3} loadingStates={loadingStates} />
+                </div>
               </div>
-            </div>
-          </article>
-        </aside>
-      </section>
-    </AppShell>
+            ) : null}
+         </div>
+       )}
+    </div>
   );
 }

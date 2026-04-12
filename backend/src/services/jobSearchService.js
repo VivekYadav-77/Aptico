@@ -2,6 +2,7 @@ import { adzunaSource } from './jobSources/adzunaSource.js';
 import { searchDuckDuckGoFallback } from './ddgsFallbackService.js';
 import { ddgsSource } from './jobSources/ddgsSource.js';
 import { jsearchSource } from './jobSources/jsearchSource.js';
+import { joobleSource } from './jobSources/joobleSource.js';
 import { museSource } from './jobSources/museSource.js';
 import { reedSource } from './jobSources/reedSource.js';
 import { remotiveSource } from './jobSources/remotiveSource.js';
@@ -173,16 +174,21 @@ export async function searchJobs({ query, location, jobType, role, analysisData,
       combinedJobs = combinedJobs.concat(await runSource('reed', reedSource, sharedArgs, sourceState));
     }
 
+    if (combinedJobs.length < 12) {
+      combinedJobs = combinedJobs.concat(await runSource('jooble', joobleSource, sharedArgs, sourceState));
+    }
+
     resultBuckets = [combinedJobs];
   } else if (jobType === 'internship-onsite') {
     const adzunaJobs = indiaSearch ? await runSource('adzuna', adzunaSource, sharedArgs, sourceState) : [];
     const jsearchJobs = indiaSearch && adzunaJobs.length < 5 ? await runSource('jsearch', jsearchSource, sharedArgs, sourceState) : [];
+    const joobleJobs = indiaSearch && adzunaJobs.length + jsearchJobs.length < 8 ? await runSource('jooble', joobleSource, sharedArgs, sourceState) : [];
     const [museJobs, serperJobs] = await Promise.all([
       runSource('muse', museSource, sharedArgs, sourceState),
       indiaSearch ? runSource('serper', serperSource, sharedArgs, sourceState) : Promise.resolve([])
     ]);
 
-    resultBuckets = [adzunaJobs, jsearchJobs, museJobs, serperJobs];
+    resultBuckets = [adzunaJobs, jsearchJobs, joobleJobs, museJobs, serperJobs];
   } else if (jobType === 'internship-remote') {
     const [remotiveJobs, ddgsJobs, museJobs] = await Promise.all([
       runSource('remotive', remotiveSource, sharedArgs, sourceState),
@@ -193,18 +199,23 @@ export async function searchJobs({ query, location, jobType, role, analysisData,
     let combinedJobs = [...remotiveJobs, ...ddgsJobs, ...museJobs];
 
     if (combinedJobs.length < 5) {
+      combinedJobs = combinedJobs.concat(await runSource('jooble', joobleSource, sharedArgs, sourceState));
+    }
+
+    if (combinedJobs.length < 8) {
       combinedJobs = combinedJobs.concat(await runSource('jsearch', jsearchSource, sharedArgs, sourceState));
     }
 
     resultBuckets = [combinedJobs];
   } else if (jobType === 'full-time') {
     const adzunaJobs = indiaSearch ? await runSource('adzuna', adzunaSource, sharedArgs, sourceState) : [];
-    const [museJobs, reedJobs] = await Promise.all([
+    const [museJobs, reedJobs, joobleJobs] = await Promise.all([
       runSource('muse', museSource, sharedArgs, sourceState),
-      runSource('reed', reedSource, sharedArgs, sourceState)
+      runSource('reed', reedSource, sharedArgs, sourceState),
+      runSource('jooble', joobleSource, sharedArgs, sourceState)
     ]);
 
-    let combinedJobs = [...adzunaJobs, ...museJobs, ...reedJobs];
+    let combinedJobs = [...adzunaJobs, ...museJobs, ...reedJobs, ...joobleJobs];
 
     if (indiaSearch && combinedJobs.length < 8) {
       combinedJobs = combinedJobs.concat(await runSource('serper', serperSource, sharedArgs, sourceState));
@@ -212,12 +223,13 @@ export async function searchJobs({ query, location, jobType, role, analysisData,
 
     resultBuckets = [combinedJobs];
   } else if (jobType === 'hybrid') {
-    const [museJobs, reedJobs] = await Promise.all([
+    const [museJobs, reedJobs, joobleJobs] = await Promise.all([
       runSource('muse', museSource, sharedArgs, sourceState),
-      runSource('reed', reedSource, sharedArgs, sourceState)
+      runSource('reed', reedSource, sharedArgs, sourceState),
+      runSource('jooble', joobleSource, sharedArgs, sourceState)
     ]);
 
-    let combinedJobs = [...museJobs, ...reedJobs];
+    let combinedJobs = [...museJobs, ...reedJobs, ...joobleJobs];
 
     if (indiaSearch && combinedJobs.length < 8) {
       combinedJobs = combinedJobs.concat(await runSource('adzuna', adzunaSource, sharedArgs, sourceState));
@@ -234,10 +246,9 @@ export async function searchJobs({ query, location, jobType, role, analysisData,
       runSource('remotive', remotiveSource, sharedArgs, sourceState),
       runSource('ddgs', ddgsSource, sharedArgs, sourceState),
       runSource('muse', museSource, sharedArgs, sourceState),
-      runSource('reed', reedSource, sharedArgs, sourceState)
+      runSource('reed', reedSource, sharedArgs, sourceState),
+      runSource('jooble', joobleSource, sharedArgs, sourceState)
     ]);
-
-    const primaryJobs = resultBuckets.flat();
   }
 
   let jobs = sortJobs(flagScamJobs(dedupeJobs(resultBuckets.flat())));

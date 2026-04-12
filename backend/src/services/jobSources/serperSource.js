@@ -15,13 +15,23 @@ function resolveTargetSite(jobType) {
 export async function serperSource({ query, location, jobType, role, redisService, env, logger = console }) {
   const effectiveQuery = getEffectiveQuery({ query, role });
   const targetSite = resolveTargetSite(jobType);
+  const credentials = env.serperApiKeys.map((apiKey, index) => ({
+    apiKey,
+    slot: index + 1
+  }));
 
   return withSourceExecution({
     source: 'serper',
-    params: { query: effectiveQuery, location, jobType, targetSite },
+    params: { query: effectiveQuery, location, jobType, targetSite, credentials },
     redisService,
     logger,
-    loader: async () => {
+    loader: async (credential) => {
+      const apiKey = credential?.apiKey || env.serperApiKey;
+
+      if (!apiKey) {
+        throw new Error('Serper credentials are not configured.');
+      }
+
       const response = await axiosClient.post(
         env.serperApiUrl,
         {
@@ -31,7 +41,7 @@ export async function serperSource({ query, location, jobType, role, redisServic
         {
           headers: {
             'Content-Type': 'application/json',
-            'X-API-KEY': env.serperApiKey
+            'X-API-KEY': apiKey
           }
         }
       );
@@ -46,7 +56,7 @@ export async function serperSource({ query, location, jobType, role, redisServic
           jobType: jobType?.includes('internship') ? 'internship' : 'full-time',
           applyUrl: job.link,
           postedAt: job.date,
-          description: normalizeText(job.snippet, null)
+          description: job.snippet
         })
       );
     }
