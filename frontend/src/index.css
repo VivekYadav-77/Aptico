@@ -305,3 +305,9 @@ body {
 kbd {
   font-family: "JetBrains Mono", monospace;
 }
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}

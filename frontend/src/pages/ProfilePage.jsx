@@ -5,6 +5,7 @@ import AppShell from '../components/AppShell.jsx';
 import { useProfileSettings } from '../hooks/useProfileSettings.js';
 import { selectAuth } from '../store/authSlice.js';
 import { selectCurrentAnalysis } from '../store/historySlice.js';
+import ResumeTemplate from '../components/ResumeTemplate.jsx';
 
 // Reusable SVG icons
 const Icons = {
@@ -98,6 +99,39 @@ export default function ProfilePage() {
   const matchScore = analysis?.confidenceScore ? `${analysis.confidenceScore}%` : 'Pending';
   
   const publicLinks = [profile.website, profile.portfolio, profile.linkedin, profile.github].filter(Boolean);
+  
+  const printStyles = `
+    @media print {
+      /* Base resets */
+      html, body { background: white !important; color: black !important; margin: 0 !important; padding: 0 !important; width: 100% !important; height: auto !important; overflow: visible !important; }
+      
+      /* Hide all web interface components */
+      header, nav, aside, footer, .no-print, nav, .app-shell-header, .app-shell-sidebar, [role="navigation"], [role="banner"], button {
+        display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+      }
+
+      /* Clean page container */
+      main { padding: 0 !important; margin: 0 !important; width: 100% !important; display: block !important; }
+      .app-page { display: block !important; padding: 0 !important; margin: 0 !important; }
+      
+      /* Target the resume specifically */
+      .resume-print-view {
+        display: block !important;
+        visibility: visible !important;
+        position: relative !important;
+        width: 100% !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        z-index: 9999 !important;
+      }
+    }
+  `;
 
   return (
     <AppShell
@@ -105,6 +139,11 @@ export default function ProfilePage() {
       description="Your professional presence, structured to highlight your best achievements, network, and skills."
       actions={
         <div className="flex gap-3">
+          <style>{printStyles}</style>
+          <button onClick={() => window.print()} className="app-button-secondary hover:bg-[var(--panel-soft)] transition-colors flex items-center gap-2" title="Export as PDF">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+            <span className="hidden sm:inline">Export Resume</span>
+          </button>
           <Link to="/settings" className="app-button-secondary hover:bg-[var(--panel-soft)] transition-colors">
             Edit Information
           </Link>
@@ -276,7 +315,26 @@ export default function ProfilePage() {
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                   <div className="group rounded-2xl bg-[var(--panel-soft)] p-6 border border-transparent hover:border-[var(--border)] transition-colors shadow-sm">
                     <h3 className="mb-5 text-xs font-bold uppercase tracking-widest text-[var(--muted-strong)] group-hover:text-[var(--text)] transition-colors">Top Skills</h3>
-                    <ChipList items={profile.topSkills} emptyLabel="No skills added yet." accent />
+                    {!profile.topSkills.length ? (
+                      <p className="text-sm italic text-[var(--muted-strong)]">No skills added yet.</p>
+                    ) : (
+                      <div className="space-y-4">
+                        {profile.topSkills.map((skill, index) => {
+                           const level = Math.max(65, 100 - (index * 12)); 
+                           return (
+                              <div key={skill} className="space-y-1.5 transition-all duration-300 hover:-translate-y-0.5" style={{ animationDelay: `${index * 50}ms` }}>
+                                <div className="flex justify-between items-end text-sm">
+                                  <span className="font-bold text-[var(--accent-strong)]">{skill}</span>
+                                  <span className="text-[10px] uppercase font-black text-[var(--muted-strong)] opacity-60">Demonstrated</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-[var(--panel)] rounded-full overflow-hidden border border-[var(--border)]">
+                                   <div className="h-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent-strong)] rounded-full transition-all duration-1000 ease-out" style={{ width: `${level}%` }}></div>
+                                </div>
+                              </div>
+                           );
+                        })}
+                      </div>
+                    )}
                   </div>
 
                   <div className="group rounded-2xl bg-[var(--panel-soft)] p-6 border border-transparent hover:border-[var(--border)] transition-colors shadow-sm">
@@ -454,6 +512,9 @@ export default function ProfilePage() {
             </AnimatedSection>
           </aside>
         </div>
+        
+        {/* Professional Resume Template (Hidden on screen, Visible on print) */}
+        <ResumeTemplate profile={profile} />
       </div>
     </AppShell>
   );

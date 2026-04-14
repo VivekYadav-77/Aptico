@@ -1,7 +1,7 @@
 import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { analyses, communityWins, connections, notifications, publicJobCache, userProfiles, users } from '../db/schema.js';
-import { authenticateRequest } from '../middlewares/authMiddleware.js';
+import { authenticateRequest, optionalAuthenticateRequest } from '../middlewares/authMiddleware.js';
 import {
   createOrUpdateProfile,
   followUser,
@@ -171,19 +171,27 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.get('/profile/:username', async (request, reply) => {
+  app.get('/profile/:username', { preHandler: optionalAuthenticateRequest }, async (request, reply) => {
     try {
       const username = String(request.params.username || '').trim();
-      const cacheKey = `profile:username:${username}`;
+      const viewerId = request.auth?.userId || null;
       const redis = request.server.services?.redis;
-      const cached = parseCachedJson(await redis?.get(cacheKey));
 
-      if (cached) {
-        return reply.send(cached);
+      // Authenticated viewers always get fresh data (settings changes, visibility updates)
+      // Only anonymous visitors use cache
+      if (!viewerId) {
+        const cacheKey = `profile:username:${username}`;
+        const cached = parseCachedJson(await redis?.get(cacheKey));
+        if (cached) {
+          return reply.send(cached);
+        }
+
+        const profile = await getPublicProfile(request.server.db, username, null);
+        await redis?.set(cacheKey, JSON.stringify(profile), 120);
+        return reply.send(profile);
       }
 
-      const profile = await getPublicProfile(request.server.db, username);
-      await redis?.set(cacheKey, JSON.stringify(profile), 300);
+      const profile = await getPublicProfile(request.server.db, username, viewerId);
       return reply.send(profile);
     } catch (error) {
       if (error.statusCode === 404) {

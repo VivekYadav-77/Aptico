@@ -78,8 +78,31 @@ function createDefaults(auth, analysis) {
       'Complete identity, work intent, education, achievements, and skills to make this profile platform-ready for future recruiter discovery.',
     notificationAnalysisUpdates: true,
     notificationOpportunityNudges: true,
-    notificationSecurityAlerts: true
+    notificationSecurityAlerts: true,
+    // Section visibility (everyone / connections / only_me)
+    sectionVisibility: {
+      about: 'everyone',
+      featured: 'everyone',
+      activity: 'everyone',
+      experience: 'everyone',
+      education: 'everyone',
+      licenses: 'everyone',
+      skills: 'everyone',
+      honorsAwards: 'everyone'
+    },
+    // Multi-entry sections
+    featured: [],
+    experiences: [],
+    educationEntries: [],
+    licenses: [],
+    honorsAwards: []
   };
+}
+
+function parseArrayField(value, fallback) {
+  if (Array.isArray(value) && value.length) return value;
+  if (Array.isArray(fallback)) return fallback;
+  return [];
 }
 
 function mergeWithDefaults(defaults, incoming) {
@@ -92,7 +115,13 @@ function mergeWithDefaults(defaults, incoming) {
     topSkills: parseList(nextValue.topSkills || defaults.topSkills),
     tools: parseList(nextValue.tools || defaults.tools),
     languages: parseList(nextValue.languages || defaults.languages),
-    achievements: parseList(nextValue.achievements || defaults.achievements)
+    achievements: parseList(nextValue.achievements || defaults.achievements),
+    sectionVisibility: { ...defaults.sectionVisibility, ...(nextValue.sectionVisibility || {}) },
+    featured: parseArrayField(nextValue.featured, defaults.featured),
+    experiences: parseArrayField(nextValue.experiences, defaults.experiences),
+    educationEntries: parseArrayField(nextValue.educationEntries, defaults.educationEntries),
+    licenses: parseArrayField(nextValue.licenses, defaults.licenses),
+    honorsAwards: parseArrayField(nextValue.honorsAwards, defaults.honorsAwards)
   };
 }
 

@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { and, desc, eq, inArray, ne, or, sql } from 'drizzle-orm';
-import { analyses, connections, follows, userProfiles, users } from '../db/schema.js';
+import { analyses, connections, follows, profileSettings, userProfiles, users } from '../db/schema.js';
 import { createNotification } from '../utils/notificationHelper.js';
 
 const USERNAME_PATTERN = /^[a-z0-9_-]{3,30}$/;
@@ -138,7 +138,7 @@ export async function createOrUpdateProfile(db, userId, data) {
   return rows[0];
 }
 
-export async function getPublicProfile(db, username) {
+export async function getPublicProfile(db, username, viewerId = null) {
   const rows = await db
     .select({
       user_id: userProfiles.userId,
@@ -161,6 +161,130 @@ export async function getPublicProfile(db, username) {
     throw serviceError('Profile not found', 404);
   }
 
+  const profileOwnerId = rows[0].user_id;
+
+  // Fetch profile_settings for enriched sections
+  const settingsRows = await db
+    .select({ settingsJson: profileSettings.settingsJson })
+    .from(profileSettings)
+    .where(eq(profileSettings.userId, profileOwnerId))
+    .limit(1);
+
+  const rawSettings = settingsRows[0]?.settingsJson || {};
+
+  // Determine viewer relationship
+  const isSelf = viewerId && viewerId === profileOwnerId;
+  let isConnected = false;
+
+  if (viewerId && !isSelf) {
+    const connRows = await db
+      .select({ id: connections.id })
+      .from(connections)
+      .where(and(
+        or(
+          and(eq(connections.requesterId, viewerId), eq(connections.recipientId, profileOwnerId)),
+          and(eq(connections.requesterId, profileOwnerId), eq(connections.recipientId, viewerId))
+        ),
+        eq(connections.status, 'accepted')
+      ))
+      .limit(1);
+    isConnected = Boolean(connRows[0]);
+  }
+
+  // Section visibility defaults to 'everyone' if not set
+  const sectionVis = rawSettings.sectionVisibility || {};
+  const defaultVis = 'everyone';
+
+  function canViewSection(sectionKey) {
+    const vis = sectionVis[sectionKey] || defaultVis;
+    if (vis === 'everyone') return true;
+    if (vis === 'connections' && (isSelf || isConnected)) return true;
+    if (vis === 'only_me' && isSelf) return true;
+    return false;
+  }
+
+  // Build enriched settings — only include sections the viewer can see
+  const enrichedSettings = {
+    sectionVisibility: sectionVis,
+    viewerRelationship: isSelf ? 'self' : isConnected ? 'connected' : 'public'
+  };
+
+  // About section
+  if (canViewSection('about')) {
+    enrichedSettings.bio = rawSettings.bio || null;
+    enrichedSettings.currentTitle = rawSettings.currentTitle || null;
+    enrichedSettings.currentCompany = rawSettings.currentCompany || null;
+    enrichedSettings.yearsExperience = rawSettings.yearsExperience || null;
+    enrichedSettings.currentStatus = rawSettings.currentStatus || null;
+    enrichedSettings.employmentType = rawSettings.employmentType || null;
+    enrichedSettings.industry = rawSettings.industry || null;
+    enrichedSettings.availability = rawSettings.availability || null;
+    enrichedSettings.openToWork = rawSettings.openToWork || false;
+  }
+
+  // Featured section
+  if (canViewSection('featured')) {
+    enrichedSettings.featured = Array.isArray(rawSettings.featured) ? rawSettings.featured : [];
+  }
+
+  // Experience section
+  if (canViewSection('experience')) {
+    enrichedSettings.experiences = Array.isArray(rawSettings.experiences) ? rawSettings.experiences : [];
+  }
+
+  // Education section
+  if (canViewSection('education')) {
+    enrichedSettings.educationEntries = Array.isArray(rawSettings.educationEntries) ? rawSettings.educationEntries : [];
+    // Fallback: build from legacy single-entry fields
+    if (!enrichedSettings.educationEntries.length && (rawSettings.school || rawSettings.degree)) {
+      enrichedSettings.educationEntries = [{
+        school: rawSettings.school || '',
+        degree: rawSettings.degree || '',
+        field: rawSettings.fieldOfStudy || '',
+        startYear: '',
+        endYear: rawSettings.graduationYear || '',
+        activities: rawSettings.learningFocus || ''
+      }];
+    }
+  }
+
+  // Licenses & Certifications
+  if (canViewSection('licenses')) {
+    enrichedSettings.licenses = Array.isArray(rawSettings.licenses) ? rawSettings.licenses : [];
+    // Fallback: parse legacy comma-separated certifications
+    if (!enrichedSettings.licenses.length && rawSettings.certifications) {
+      const certList = typeof rawSettings.certifications === 'string'
+        ? rawSettings.certifications.split(',').map(s => s.trim()).filter(Boolean)
+        : [];
+      enrichedSettings.licenses = certList.map(name => ({ name, issuingOrg: '', issueDate: '', credentialUrl: '' }));
+    }
+  }
+
+  // Skills section
+  if (canViewSection('skills')) {
+    enrichedSettings.topSkills = Array.isArray(rawSettings.topSkills)
+      ? rawSettings.topSkills
+      : (typeof rawSettings.topSkills === 'string' ? rawSettings.topSkills.split(',').map(s => s.trim()).filter(Boolean) : []);
+    enrichedSettings.tools = Array.isArray(rawSettings.tools)
+      ? rawSettings.tools
+      : (typeof rawSettings.tools === 'string' ? rawSettings.tools.split(',').map(s => s.trim()).filter(Boolean) : []);
+    enrichedSettings.languages = Array.isArray(rawSettings.languages)
+      ? rawSettings.languages
+      : (typeof rawSettings.languages === 'string' ? rawSettings.languages.split(',').map(s => s.trim()).filter(Boolean) : []);
+  }
+
+  // Honors & Awards
+  if (canViewSection('honorsAwards')) {
+    enrichedSettings.honorsAwards = Array.isArray(rawSettings.honorsAwards) ? rawSettings.honorsAwards : [];
+    // Fallback: parse legacy achievements
+    if (!enrichedSettings.honorsAwards.length && rawSettings.achievements) {
+      const achList = Array.isArray(rawSettings.achievements) ? rawSettings.achievements
+        : (typeof rawSettings.achievements === 'string' ? rawSettings.achievements.split(',').map(s => s.trim()).filter(Boolean) : []);
+      enrichedSettings.honorsAwards = achList.map(title => ({ title, issuer: '', date: '', description: '' }));
+    }
+  }
+
+  // Fetch analysis, connections as before
   const latestAnalysisRows = await db
     .select({
       target_role: analyses.companyName,
@@ -168,7 +292,7 @@ export async function getPublicProfile(db, username) {
       gap_analysis_json: analyses.gapAnalysisJson
     })
     .from(analyses)
-    .where(eq(analyses.userId, rows[0].user_id))
+    .where(eq(analyses.userId, profileOwnerId))
     .orderBy(desc(analyses.createdAt))
     .limit(1);
 
@@ -177,9 +301,9 @@ export async function getPublicProfile(db, username) {
   const connectionRows = await db
     .select()
     .from(connections)
-    .where(and(or(eq(connections.requesterId, rows[0].user_id), eq(connections.recipientId, rows[0].user_id)), eq(connections.status, 'accepted')));
+    .where(and(or(eq(connections.requesterId, profileOwnerId), eq(connections.recipientId, profileOwnerId)), eq(connections.status, 'accepted')));
 
-  const otherIds = connectionRows.map((connection) => (connection.requesterId === rows[0].user_id ? connection.recipientId : connection.requesterId));
+  const otherIds = connectionRows.map((connection) => (connection.requesterId === profileOwnerId ? connection.recipientId : connection.requesterId));
   const connectionPreview = otherIds.length
     ? await db
       .select({
@@ -195,6 +319,7 @@ export async function getPublicProfile(db, username) {
 
   return {
     ...rows[0],
+    enriched_settings: enrichedSettings,
     connection_count: connectionRows.length,
     connections_preview: connectionPreview,
     latest_analysis: latestAnalysis

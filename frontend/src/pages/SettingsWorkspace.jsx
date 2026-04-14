@@ -24,13 +24,20 @@ const Icons = {
   Save: ({className = "w-4 h-4"}) => <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" /></svg>,
   Reset: ({className = "w-4 h-4"}) => <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>,
   Check: ({className = "w-4 h-4"}) => <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>,
-  AlertCircle: ({className = "w-4 h-4"}) => <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+  AlertCircle: ({className = "w-4 h-4"}) => <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+  Featured: ({className = "w-4 h-4"}) => <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>,
+  Award: ({className = "w-4 h-4"}) => <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" /></svg>,
+  Certificate: ({className = "w-4 h-4"}) => <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>
 };
 
 const settingSections = [
   { id: 'Profile', icon: Icons.Profile, description: 'Basic identity & links' },
   { id: 'Career', icon: Icons.Career, description: 'Job status & experience' },
+  { id: 'Experience', icon: Icons.Career, description: 'Work history entries' },
   { id: 'Education', icon: Icons.Education, description: 'Schools & learning' },
+  { id: 'Licenses', icon: Icons.Certificate, description: 'Certifications & credentials' },
+  { id: 'Featured', icon: Icons.Featured, description: 'Showcase your best work' },
+  { id: 'Honors', icon: Icons.Award, description: 'Awards & recognition' },
   { id: 'Visibility', icon: Icons.Visibility, description: 'Public footprint' },
   { id: 'Notifications', icon: Icons.Notifications, description: 'Alerts & nudges' },
   { id: 'Theme', icon: Icons.Theme, description: 'Display preferences' }
@@ -437,6 +444,127 @@ export default function SettingsWorkspace() {
                       </div>
                     </div>
                   )}
+                  {/* --- EXPERIENCE SECTION --- */}
+                  {activeSection === 'Experience' && (
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-[var(--muted-strong)]">Add your work history entries. Most recent first.</p>
+                        <button type="button" className="app-button text-sm py-2 px-4" onClick={() => updateField('experiences', [...(draft.experiences || []), { title: '', company: '', location: '', startDate: '', endDate: '', description: '', isCurrent: false }])}>+ Add Experience</button>
+                      </div>
+                      {(draft.experiences || []).length === 0 && (
+                        <div className="p-8 rounded-2xl border border-dashed border-[var(--border)] text-center text-[var(--muted-strong)] bg-[var(--panel-soft)]">
+                          <Icons.Career className="w-8 h-8 mx-auto mb-3 opacity-40" />
+                          <p className="font-bold text-sm">No experience added yet</p>
+                          <p className="text-xs mt-1">Click "Add Experience" to start building your work history.</p>
+                        </div>
+                      )}
+                      {(draft.experiences || []).map((exp, idx) => (
+                        <div key={idx} className="p-6 rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] space-y-4 relative group">
+                          <button type="button" onClick={() => updateField('experiences', draft.experiences.filter((_, i) => i !== idx))} className="absolute top-3 right-3 text-xs font-bold text-[var(--warning-text)] opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[var(--warning-soft)] px-2 py-1 rounded-lg">Remove</button>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <InputField label="Job Title" value={exp.title} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], title: e.target.value }; updateField('experiences', next); }} placeholder="e.g. Software Engineer" />
+                            <InputField label="Company" value={exp.company} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], company: e.target.value }; updateField('experiences', next); }} placeholder="e.g. Google" />
+                            <InputField label="Location" value={exp.location} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], location: e.target.value }; updateField('experiences', next); }} placeholder="e.g. San Francisco, CA" />
+                            <div className="grid grid-cols-2 gap-3">
+                              <InputField label="Start Date" value={exp.startDate} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], startDate: e.target.value }; updateField('experiences', next); }} placeholder="e.g. Jan 2022" />
+                              <InputField label="End Date" value={exp.endDate} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], endDate: e.target.value }; updateField('experiences', next); }} placeholder="Present" />
+                            </div>
+                          </div>
+                          <TextAreaField label="Description" value={exp.description} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], description: e.target.value }; updateField('experiences', next); }} placeholder="Describe your responsibilities and achievements..." minHeight="min-h-[80px]" />
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" checked={exp.isCurrent || false} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], isCurrent: e.target.checked }; updateField('experiences', next); }} className="accent-[var(--accent)]" />
+                            <span className="text-sm font-medium text-[var(--text)]">I currently work here</span>
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* --- LICENSES & CERTIFICATIONS SECTION --- */}
+                  {activeSection === 'Licenses' && (
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-[var(--muted-strong)]">Add professional licenses and certifications.</p>
+                        <button type="button" className="app-button text-sm py-2 px-4" onClick={() => updateField('licenses', [...(draft.licenses || []), { name: '', issuingOrg: '', issueDate: '', expiryDate: '', credentialId: '', credentialUrl: '' }])}>+ Add License</button>
+                      </div>
+                      {(draft.licenses || []).length === 0 && (
+                        <div className="p-8 rounded-2xl border border-dashed border-[var(--border)] text-center text-[var(--muted-strong)] bg-[var(--panel-soft)]">
+                          <Icons.Certificate className="w-8 h-8 mx-auto mb-3 opacity-40" />
+                          <p className="font-bold text-sm">No licenses or certifications added yet</p>
+                          <p className="text-xs mt-1">Click "Add License" to showcase your credentials.</p>
+                        </div>
+                      )}
+                      {(draft.licenses || []).map((lic, idx) => (
+                        <div key={idx} className="p-6 rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] space-y-4 relative group">
+                          <button type="button" onClick={() => updateField('licenses', draft.licenses.filter((_, i) => i !== idx))} className="absolute top-3 right-3 text-xs font-bold text-[var(--warning-text)] opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[var(--warning-soft)] px-2 py-1 rounded-lg">Remove</button>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <InputField label="Certificate / License Name" value={lic.name} onChange={(e) => { const next = [...draft.licenses]; next[idx] = { ...next[idx], name: e.target.value }; updateField('licenses', next); }} placeholder="e.g. AWS Solutions Architect" />
+                            <InputField label="Issuing Organization" value={lic.issuingOrg} onChange={(e) => { const next = [...draft.licenses]; next[idx] = { ...next[idx], issuingOrg: e.target.value }; updateField('licenses', next); }} placeholder="e.g. Amazon Web Services" />
+                            <InputField label="Issue Date" value={lic.issueDate} onChange={(e) => { const next = [...draft.licenses]; next[idx] = { ...next[idx], issueDate: e.target.value }; updateField('licenses', next); }} placeholder="e.g. March 2024" />
+                            <InputField label="Expiry Date" value={lic.expiryDate} onChange={(e) => { const next = [...draft.licenses]; next[idx] = { ...next[idx], expiryDate: e.target.value }; updateField('licenses', next); }} placeholder="No expiration" />
+                            <InputField label="Credential ID" value={lic.credentialId} onChange={(e) => { const next = [...draft.licenses]; next[idx] = { ...next[idx], credentialId: e.target.value }; updateField('licenses', next); }} placeholder="e.g. ABC-123-XYZ" />
+                            <InputField label="Credential URL" value={lic.credentialUrl} onChange={(e) => { const next = [...draft.licenses]; next[idx] = { ...next[idx], credentialUrl: e.target.value }; updateField('licenses', next); }} placeholder="https://verify.example.com/..." />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* --- FEATURED SECTION --- */}
+                  {activeSection === 'Featured' && (
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-[var(--muted-strong)]">Showcase projects, articles, or achievements visitors should see first.</p>
+                        <button type="button" className="app-button text-sm py-2 px-4" onClick={() => updateField('featured', [...(draft.featured || []), { title: '', description: '', link: '', type: 'project' }])}>+ Add Item</button>
+                      </div>
+                      {(draft.featured || []).length === 0 && (
+                        <div className="p-8 rounded-2xl border border-dashed border-[var(--border)] text-center text-[var(--muted-strong)] bg-[var(--panel-soft)]">
+                          <Icons.Featured className="w-8 h-8 mx-auto mb-3 opacity-40" />
+                          <p className="font-bold text-sm">No featured items yet</p>
+                          <p className="text-xs mt-1">Add projects, articles, or posts to highlight on your profile.</p>
+                        </div>
+                      )}
+                      {(draft.featured || []).map((item, idx) => (
+                        <div key={idx} className="p-6 rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] space-y-4 relative group">
+                          <button type="button" onClick={() => updateField('featured', draft.featured.filter((_, i) => i !== idx))} className="absolute top-3 right-3 text-xs font-bold text-[var(--warning-text)] opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[var(--warning-soft)] px-2 py-1 rounded-lg">Remove</button>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <InputField label="Title" value={item.title} onChange={(e) => { const next = [...draft.featured]; next[idx] = { ...next[idx], title: e.target.value }; updateField('featured', next); }} placeholder="e.g. E-Commerce Platform" />
+                            <SelectField label="Type" value={item.type} onChange={(e) => { const next = [...draft.featured]; next[idx] = { ...next[idx], type: e.target.value }; updateField('featured', next); }} options={[{ value: 'project', label: 'Project' }, { value: 'article', label: 'Article' }, { value: 'post', label: 'Post' }, { value: 'link', label: 'External Link' }]} />
+                          </div>
+                          <TextAreaField label="Description" value={item.description} onChange={(e) => { const next = [...draft.featured]; next[idx] = { ...next[idx], description: e.target.value }; updateField('featured', next); }} placeholder="Brief description of this featured item..." minHeight="min-h-[60px]" />
+                          <InputField label="Link URL" value={item.link} onChange={(e) => { const next = [...draft.featured]; next[idx] = { ...next[idx], link: e.target.value }; updateField('featured', next); }} placeholder="https://..." />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* --- HONORS & AWARDS SECTION --- */}
+                  {activeSection === 'Honors' && (
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between">
+                        <p className="text-sm font-medium text-[var(--muted-strong)]">Highlight recognitions, awards, and accomplishments.</p>
+                        <button type="button" className="app-button text-sm py-2 px-4" onClick={() => updateField('honorsAwards', [...(draft.honorsAwards || []), { title: '', issuer: '', date: '', description: '' }])}>+ Add Award</button>
+                      </div>
+                      {(draft.honorsAwards || []).length === 0 && (
+                        <div className="p-8 rounded-2xl border border-dashed border-[var(--border)] text-center text-[var(--muted-strong)] bg-[var(--panel-soft)]">
+                          <Icons.Award className="w-8 h-8 mx-auto mb-3 opacity-40" />
+                          <p className="font-bold text-sm">No honors or awards added yet</p>
+                          <p className="text-xs mt-1">Click "Add Award" to showcase your recognitions.</p>
+                        </div>
+                      )}
+                      {(draft.honorsAwards || []).map((award, idx) => (
+                        <div key={idx} className="p-6 rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] space-y-4 relative group">
+                          <button type="button" onClick={() => updateField('honorsAwards', draft.honorsAwards.filter((_, i) => i !== idx))} className="absolute top-3 right-3 text-xs font-bold text-[var(--warning-text)] opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[var(--warning-soft)] px-2 py-1 rounded-lg">Remove</button>
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <InputField label="Award Title" value={award.title} onChange={(e) => { const next = [...draft.honorsAwards]; next[idx] = { ...next[idx], title: e.target.value }; updateField('honorsAwards', next); }} placeholder="e.g. Dean's List" />
+                            <InputField label="Issuer" value={award.issuer} onChange={(e) => { const next = [...draft.honorsAwards]; next[idx] = { ...next[idx], issuer: e.target.value }; updateField('honorsAwards', next); }} placeholder="e.g. University of Example" />
+                            <InputField label="Date" value={award.date} onChange={(e) => { const next = [...draft.honorsAwards]; next[idx] = { ...next[idx], date: e.target.value }; updateField('honorsAwards', next); }} placeholder="e.g. 2024" />
+                          </div>
+                          <TextAreaField label="Description" value={award.description} onChange={(e) => { const next = [...draft.honorsAwards]; next[idx] = { ...next[idx], description: e.target.value }; updateField('honorsAwards', next); }} placeholder="Brief description of this recognition..." minHeight="min-h-[60px]" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   {/* --- VISIBILITY SECTION --- */}
                   {activeSection === 'Visibility' && (
@@ -481,6 +609,51 @@ export default function SettingsWorkspace() {
                             checked={draft.showPhone}
                             onToggle={() => updateField('showPhone', !draft.showPhone)}
                           />
+                        </div>
+                      </div>
+
+                      {/* Section Visibility Controls */}
+                      <div className="pt-8 border-t border-[var(--border)]">
+                        <h3 className="text-sm font-bold text-[var(--text)] mb-2">Section Visibility</h3>
+                        <p className="text-xs text-[var(--muted-strong)] mb-6">Control who can see each section on your public profile.</p>
+                        <div className="space-y-3">
+                          {[
+                            { key: 'about', label: 'About' },
+                            { key: 'featured', label: 'Featured' },
+                            { key: 'activity', label: 'Activity' },
+                            { key: 'experience', label: 'Experience' },
+                            { key: 'education', label: 'Education' },
+                            { key: 'licenses', label: 'Licenses & Certifications' },
+                            { key: 'skills', label: 'Skills' },
+                            { key: 'honorsAwards', label: 'Honors & Awards' }
+                          ].map(({ key, label }) => {
+                            const currentValue = draft.sectionVisibility?.[key] || 'everyone';
+                            return (
+                              <div key={key} className="flex items-center justify-between gap-4 p-4 rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] hover:border-[var(--muted-strong)] transition-colors">
+                                <span className="text-sm font-bold text-[var(--text)]">{label}</span>
+                                <div className="flex rounded-lg border border-[var(--border)] overflow-hidden">
+                                  {[
+                                    { value: 'everyone', icon: '🌐', tip: 'Everyone' },
+                                    { value: 'connections', icon: '🤝', tip: 'Connections' },
+                                    { value: 'only_me', icon: '🔒', tip: 'Only me' }
+                                  ].map((opt) => (
+                                    <button
+                                      key={opt.value}
+                                      type="button"
+                                      title={opt.tip}
+                                      onClick={() => {
+                                        const next = { ...(draft.sectionVisibility || {}), [key]: opt.value };
+                                        updateField('sectionVisibility', next);
+                                      }}
+                                      className={`px-3 py-1.5 text-xs font-bold transition-all ${currentValue === opt.value ? 'bg-[var(--accent)] text-white' : 'bg-[var(--panel)] text-[var(--muted-strong)] hover:text-[var(--text)] hover:bg-[var(--panel-soft)]'}`}
+                                    >
+                                      {opt.icon} {opt.tip}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
 
