@@ -1,8 +1,82 @@
+import crypto from 'node:crypto';
 import { and, desc, eq, inArray, ne, or, sql } from 'drizzle-orm';
 import { analyses, connections, follows, userProfiles, users } from '../db/schema.js';
 import { createNotification } from '../utils/notificationHelper.js';
 
 const USERNAME_PATTERN = /^[a-z0-9_-]{3,30}$/;
+
+/**
+ * Generates a unique username from an email address.
+ * Takes the local part, strips invalid characters, and appends random digits if needed.
+ */
+function generateUsernameFromEmail(email) {
+  const localPart = String(email || '').split('@')[0] || '';
+  let base = localPart.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 20);
+
+  if (base.length < 3) {
+    base = 'user-' + crypto.randomBytes(3).toString('hex');
+  }
+
+  return base;
+}
+
+/**
+ * Ensures a user_profiles row exists for the given user.
+ * If no profile exists, creates one with an auto-generated username.
+ * This is called during registration / login so every user is discoverable.
+ */
+export async function ensureUserProfile(db, user) {
+  if (!user?.id || !user?.email) {
+    return null;
+  }
+
+  const existing = await db
+    .select({ id: userProfiles.id })
+    .from(userProfiles)
+    .where(eq(userProfiles.userId, user.id))
+    .limit(1);
+
+  if (existing[0]) {
+    return existing[0];
+  }
+
+  let username = generateUsernameFromEmail(user.email);
+
+  // Check for uniqueness, append random suffix if taken
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const candidate = attempt === 0 ? username : `${username.slice(0, 24)}-${crypto.randomBytes(2).toString('hex')}`;
+    const taken = await db
+      .select({ id: userProfiles.id })
+      .from(userProfiles)
+      .where(eq(userProfiles.username, candidate))
+      .limit(1);
+
+    if (!taken[0]) {
+      username = candidate;
+      break;
+    }
+  }
+
+  try {
+    const rows = await db
+      .insert(userProfiles)
+      .values({
+        userId: user.id,
+        username,
+        headline: null,
+        location: null,
+        skills: null,
+        isPublic: true
+      })
+      .onConflictDoNothing()
+      .returning();
+
+    return rows[0] || null;
+  } catch {
+    // Profile may have been created concurrently, that's fine
+    return null;
+  }
+}
 
 function serviceError(message, statusCode) {
   const error = new Error(message);

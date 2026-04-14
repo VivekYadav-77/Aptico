@@ -138,14 +138,10 @@ export default function SettingsWorkspace() {
   }
 
   function updateListField(field, value) {
-    setDraft((current) => ({
-      ...current,
-      [field]: value
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean)
-    }));
+    setDraft((current) => ({ ...current, [field]: value }));
   }
+
+  const formatList = (val) => Array.isArray(val) ? val.join(', ') : (val || '');
 
   function toggleListValue(field, value) {
     setDraft((current) => {
@@ -411,12 +407,12 @@ export default function SettingsWorkspace() {
                       <div className="pt-6 border-t border-[var(--border)]">
                         <h3 className="text-sm font-bold text-[var(--text)] mb-4">Expertise & Accomplishments</h3>
                         <div className="grid gap-6 md:grid-cols-2">
-                          <TextAreaField label="Top Skills (Comma separated)" value={draft.topSkills.join(', ')} onChange={(e) => updateListField('topSkills', e.target.value)} placeholder="e.g. React, Node.js, Frontend Architecture" />
-                          <TextAreaField label="Tools & Stack (Comma separated)" value={draft.tools.join(', ')} onChange={(e) => updateListField('tools', e.target.value)} placeholder="e.g. VS Code, Figma, AWS, Next.js" />
+                          <TextAreaField label="Top Skills (Comma separated)" value={formatList(draft.topSkills)} onChange={(e) => updateListField('topSkills', e.target.value)} placeholder="e.g. React, Node.js, Frontend Architecture" />
+                          <TextAreaField label="Tools & Stack (Comma separated)" value={formatList(draft.tools)} onChange={(e) => updateListField('tools', e.target.value)} placeholder="e.g. VS Code, Figma, AWS, Next.js" />
                         </div>
                         <div className="grid gap-6 md:grid-cols-2 mt-6">
-                          <TextAreaField label="Languages (Comma separated)" value={draft.languages.join(', ')} onChange={(e) => updateListField('languages', e.target.value)} placeholder="e.g. English (Native), Spanish (Basic)" />
-                          <TextAreaField label="Key Achievements (Comma separated)" value={draft.achievements.join(', ')} onChange={(e) => updateListField('achievements', e.target.value)} placeholder="e.g. Increased conversion by 20%, Led team of 5" minHeight="min-h-[120px]" />
+                          <TextAreaField label="Languages (Comma separated)" value={formatList(draft.languages)} onChange={(e) => updateListField('languages', e.target.value)} placeholder="e.g. English (Native), Spanish (Basic)" />
+                          <TextAreaField label="Key Achievements (Comma separated)" value={formatList(draft.achievements)} onChange={(e) => updateListField('achievements', e.target.value)} placeholder="e.g. Increased conversion by 20%, Led team of 5" minHeight="min-h-[120px]" />
                         </div>
                       </div>
                     </div>

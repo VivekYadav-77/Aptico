@@ -16,9 +16,9 @@ async function fixDatabase() {
     await pool.query('GRANT ALL ON SCHEMA public TO postgres;');
     await pool.query('GRANT ALL ON SCHEMA public TO public;');
     
-    console.log('✅ Permissions restored perfectly!');
+    console.log(' Permissions restored perfectly!');
   } catch (error) {
-    console.error('❌ Error fixing database:', error);
+    console.error(' Error fixing database:', error);
   } finally {
     await pool.end();
   }

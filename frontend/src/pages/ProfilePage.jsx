@@ -219,14 +219,14 @@ export default function ProfilePage() {
                   <h2 className="text-xl font-bold text-[var(--text)] tracking-tight">Professional Overview</h2>
                 </div>
                 
-                <div className="grid gap-8 lg:grid-cols-[1.5fr_1fr]">
+                <div className="space-y-8">
                   <div className="prose prose-sm sm:prose-base dark:prose-invert max-w-none">
                     <p className="text-[var(--text)] leading-relaxed whitespace-pre-wrap font-medium opacity-90">
                       {profile.bio || 'Provide a compelling professional summary that highlights your unique value proposition, career accomplishments, and future goals.'}
                     </p>
                   </div>
                   
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <InfoCard
                       icon={Icons.Briefcase}
                       label="Current Role"
@@ -237,6 +237,28 @@ export default function ProfilePage() {
                       label="Experience"
                       value={profile.yearsExperience ? `${profile.yearsExperience} Years` : 'Not specified'}
                       tone="accent"
+                    />
+                    <InfoCard
+                      icon={Icons.CheckCircle}
+                      label="Current Status"
+                      value={profile.currentStatus ? formatLabel(profile.currentStatus) : 'Not specified'}
+                      tone={profile.currentStatus ? 'accent' : 'default'}
+                    />
+                    <InfoCard
+                      icon={Icons.Briefcase}
+                      label="Employment Type"
+                      value={profile.employmentType ? formatLabel(profile.employmentType) : 'Not specified'}
+                    />
+                    <InfoCard
+                      icon={Icons.Star}
+                      label="Industry"
+                      value={profile.industry || 'Not specified'}
+                    />
+                    <InfoCard
+                      icon={Icons.MapPin}
+                      label="Availability"
+                      value={profile.availability || 'Not specified'}
+                      tone={profile.availability ? 'accent' : 'default'}
                     />
                   </div>
                 </div>

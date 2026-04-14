@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { and, eq, gt, isNull } from 'drizzle-orm';
 import { env } from '../config/env.js';
 import { authTokens, refreshTokens, users } from '../db/schema.js';
+import { ensureUserProfile } from './profileService.js';
 
 const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
@@ -285,6 +286,9 @@ async function issueSession(db, user, request) {
   });
 
   await touchLastLogin(db, user.id);
+
+  // Auto-create a user_profiles row so the user is discoverable in People Search
+  ensureUserProfile(db, user).catch(() => {});
 
   return {
     user: normalizeUser(user),
