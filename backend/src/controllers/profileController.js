@@ -41,7 +41,53 @@ const profileSettingsSchema = z.object({
   profileStrengthNotes: z.string().trim().max(1000),
   notificationAnalysisUpdates: z.boolean(),
   notificationOpportunityNudges: z.boolean(),
-  notificationSecurityAlerts: z.boolean()
+  notificationSecurityAlerts: z.boolean(),
+
+  // Section visibility map (everyone / connections / only_me)
+  sectionVisibility: z.record(z.string(), z.enum(['everyone', 'connections', 'only_me'])).optional().default({}),
+
+  // Multi-entry sections
+  featured: z.array(z.object({
+    title: z.string().max(200).default(''),
+    description: z.string().max(1000).default(''),
+    link: z.string().max(500).default(''),
+    type: z.string().max(50).default('project')
+  })).max(20).optional().default([]),
+
+  experiences: z.array(z.object({
+    title: z.string().max(200).default(''),
+    company: z.string().max(200).default(''),
+    location: z.string().max(200).default(''),
+    startDate: z.string().max(50).default(''),
+    endDate: z.string().max(50).default(''),
+    description: z.string().max(3000).default(''),
+    isCurrent: z.boolean().default(false)
+  })).max(30).optional().default([]),
+
+  educationEntries: z.array(z.object({
+    school: z.string().max(200).default(''),
+    degree: z.string().max(200).default(''),
+    field: z.string().max(200).default(''),
+    startYear: z.string().max(10).default(''),
+    endYear: z.string().max(10).default(''),
+    activities: z.string().max(1000).default('')
+  })).max(20).optional().default([]),
+
+  licenses: z.array(z.object({
+    name: z.string().max(200).default(''),
+    issuingOrg: z.string().max(200).default(''),
+    issueDate: z.string().max(50).default(''),
+    expiryDate: z.string().max(50).default(''),
+    credentialId: z.string().max(200).default(''),
+    credentialUrl: z.string().max(500).default('')
+  })).max(30).optional().default([]),
+
+  honorsAwards: z.array(z.object({
+    title: z.string().max(200).default(''),
+    issuer: z.string().max(200).default(''),
+    date: z.string().max(50).default(''),
+    description: z.string().max(1000).default('')
+  })).max(30).optional().default([])
 });
 
 function requireDatabase(db) {
