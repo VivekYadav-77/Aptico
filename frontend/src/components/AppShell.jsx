@@ -8,10 +8,11 @@ import ThemeToggle from './ThemeToggle.jsx';
 import { selectAuth } from '../store/authSlice.js';
 
 const NAV_ITEMS = [
-  { to: '/home', label: 'Home', icon: 'home', description: 'Your career network feed' },
+  { to: '/squads', label: 'Squad', icon: 'groups', description: 'Anonymous squad progress and weekly goal' },
   { to: '/people', label: 'People', icon: 'diversity_3', description: 'Find people to connect with' },
   { to: '/dashboard', label: 'Dashboard', icon: 'dashboard', description: 'Your career overview and activity' },
   { to: '/analysis', label: 'Analysis', icon: 'analytics', description: 'Resume and job match analysis' },
+  { to: '/portfolio-generator', label: 'Portfolio', icon: 'code_blocks', description: 'Generate a GitHub README and live Aptico badge' },
   { to: '/jobs', label: 'Job Search', icon: 'work', description: 'Discover and filter roles' },
   { to: '/wins', label: 'Community', icon: 'groups', description: 'Community wins and career stories' },
   { to: '/profile', label: 'Profile', icon: 'person', description: 'Edit your professional profile' },
@@ -19,8 +20,13 @@ const NAV_ITEMS = [
 ];
 
 const SEARCHABLE_INSIGHTS = [
+  { label: 'View squad progress', icon: 'groups', to: '/squads', category: 'Squad' },
+  { label: 'Log job applications', icon: 'send', to: '/squads', category: 'Squad' },
+  { label: 'Ping squadmates', icon: 'campaign', to: '/squads', category: 'Squad' },
   { label: 'Upload resume for analysis', icon: 'upload_file', to: '/analysis', category: 'Analysis' },
   { label: 'Check resume match score', icon: 'analytics', to: '/analysis', category: 'Analysis' },
+  { label: 'Generate GitHub README', icon: 'code_blocks', to: '/portfolio-generator', category: 'Portfolio' },
+  { label: 'Create Aptico badge', icon: 'military_tech', to: '/portfolio-generator', category: 'Portfolio' },
   { label: 'Find remote jobs', icon: 'wifi', to: '/jobs', category: 'Job Search' },
   { label: 'Browse full-time roles', icon: 'work', to: '/jobs', category: 'Job Search' },
   { label: 'Browse internship roles', icon: 'school', to: '/jobs', category: 'Job Search' },

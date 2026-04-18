@@ -19,6 +19,20 @@ const AUTH_TOKEN_TYPES = {
   passwordReset: 'password_reset'
 };
 
+const AUTH_USER_FIELDS = {
+  id: users.id,
+  email: users.email,
+  name: users.name,
+  avatarUrl: users.avatarUrl,
+  authProvider: users.authProvider,
+  passwordHash: users.passwordHash,
+  googleSubject: users.googleSubject,
+  role: users.role,
+  emailVerifiedAt: users.emailVerifiedAt,
+  createdAt: users.createdAt,
+  lastLogin: users.lastLogin
+};
+
 export const REFRESH_COOKIE_NAME = 'aptico_refresh_token';
 
 function createAuthError(message, statusCode, code = null) {
@@ -121,12 +135,12 @@ function signRefreshToken(user) {
 }
 
 async function findUserByEmail(db, email) {
-  const existingUsers = await db.select().from(users).where(eq(users.email, email)).limit(1);
+  const existingUsers = await db.select(AUTH_USER_FIELDS).from(users).where(eq(users.email, email)).limit(1);
   return existingUsers[0] || null;
 }
 
 async function findUserById(db, userId) {
-  const existingUsers = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  const existingUsers = await db.select(AUTH_USER_FIELDS).from(users).where(eq(users.id, userId)).limit(1);
   return existingUsers[0] || null;
 }
 
@@ -158,7 +172,7 @@ async function upsertGoogleUser(db, payload) {
         lastLogin: now
       })
       .where(eq(users.id, existingUser.id))
-      .returning();
+      .returning(AUTH_USER_FIELDS);
 
     return updatedUsers[0];
   }
@@ -175,7 +189,7 @@ async function upsertGoogleUser(db, payload) {
       emailVerifiedAt: now,
       lastLogin: now
     })
-    .returning();
+    .returning(AUTH_USER_FIELDS);
 
   return createdUsers[0];
 }
@@ -190,7 +204,7 @@ async function createPasswordUser(db, { email, password, name }) {
       passwordHash: createPasswordHash(password),
       role: 'user'
     })
-    .returning();
+    .returning(AUTH_USER_FIELDS);
 
   return createdUsers[0];
 }
@@ -203,7 +217,7 @@ async function updatePasswordUser(db, user, password) {
       authProvider: resolveAuthProvider(user, 'password')
     })
     .where(eq(users.id, user.id))
-    .returning();
+    .returning(AUTH_USER_FIELDS);
 
   return updatedUsers[0];
 }
@@ -216,7 +230,7 @@ async function markUserVerified(db, userId) {
       emailVerifiedAt: now
     })
     .where(eq(users.id, userId))
-    .returning();
+    .returning(AUTH_USER_FIELDS);
 
   return updatedUsers[0] || null;
 }
@@ -268,6 +282,7 @@ function normalizeUser(user) {
     avatarUrl: user.avatarUrl,
     authProvider: user.authProvider,
     role: user.role,
+    resilienceXp: user.resilienceXp || 0,
     emailVerified: Boolean(user.emailVerifiedAt)
   };
 }

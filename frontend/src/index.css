@@ -302,6 +302,28 @@ body {
   animation: search-dropdown-in 160ms ease forwards;
 }
 
+@keyframes rejection-confetti-burst {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(0.8) rotate(0deg);
+  }
+
+  12% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(210px) scale(1.05) rotate(220deg);
+  }
+}
+
+.rejection-confetti {
+  animation-name: rejection-confetti-burst;
+  animation-timing-function: cubic-bezier(0.2, 0.9, 0.2, 1);
+  animation-fill-mode: forwards;
+}
+
 kbd {
   font-family: "JetBrains Mono", monospace;
 }

@@ -45,11 +45,21 @@ const authSlice = createSlice({
     },
     setAuthReady(state, action) {
       state.authReady = Boolean(action.payload);
+    },
+    updateAuthUser(state, action) {
+      if (!state.user) {
+        return;
+      }
+
+      state.user = {
+        ...state.user,
+        ...action.payload
+      };
     }
   }
 });
 
-export const { clearAuthSession, enterGuestMode, exitGuestMode, setAuthReady, setAuthSession, updateAccessToken } =
+export const { clearAuthSession, enterGuestMode, exitGuestMode, setAuthReady, setAuthSession, updateAccessToken, updateAuthUser } =
   authSlice.actions;
 
 export const store = configureStore({

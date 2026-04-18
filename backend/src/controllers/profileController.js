@@ -1,6 +1,8 @@
 import { desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { analyses, generatedContent, profileSettings, savedJobs, users } from '../db/schema.js';
+import { analyses, generatedContent, profileSettings, savedJobs, userExperiences, userProfiles, users } from '../db/schema.js';
+import { env } from '../config/env.js';
+import { generatePortfolioReadme } from '../services/geminiService.js';
 
 const profileSettingsSchema = z.object({
   firstName: z.string().trim().max(100),
@@ -55,9 +57,9 @@ const profileSettingsSchema = z.object({
   })).max(20).optional().default([]),
 
   experiences: z.array(z.object({
+    id: z.string().uuid().optional(),
     title: z.string().max(200).default(''),
     company: z.string().max(200).default(''),
-    location: z.string().max(200).default(''),
     startDate: z.string().max(50).default(''),
     endDate: z.string().max(50).default(''),
     description: z.string().max(3000).default(''),
@@ -98,6 +100,185 @@ function requireDatabase(db) {
   }
 }
 
+function isMissingRelationError(error, relationName) {
+  return error?.code === '42P01' && String(error?.message || '').includes(`relation "${relationName}" does not exist`);
+}
+
+const isoDateField = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, 'Dates must use YYYY-MM-DD format.')
+  .optional()
+  .or(z.literal(''))
+  .transform((value) => (value ? value : null));
+
+const userExperienceSchema = z.object({
+  id: z.string().uuid().optional(),
+  title: z.string().trim().max(200),
+  company: z.string().trim().max(200),
+  startDate: isoDateField,
+  endDate: isoDateField,
+  isCurrent: z.boolean().default(false),
+  description: z.string().trim().max(3000).default('')
+});
+
+function formatExperienceRow(row) {
+  return {
+    id: row.id,
+    title: row.role,
+    company: row.company,
+    startDate: row.startDate || '',
+    endDate: row.endDate || '',
+    description: row.description || '',
+    isCurrent: Boolean(row.isCurrent)
+  };
+}
+
+function sanitizeProfileSettings(settings) {
+  if (!settings || typeof settings !== 'object') {
+    return {};
+  }
+
+  const { experiences: _ignoredExperiences, ...rest } = settings;
+  return rest;
+}
+
+function buildAbsoluteAppUrl(pathname) {
+  const baseUrl = env.frontendUrl || 'http://localhost:3000';
+  return new URL(pathname, `${baseUrl}/`).toString();
+}
+
+function normalizeFeaturedProjects(featured) {
+  return Array.isArray(featured)
+    ? featured
+        .map((item) => ({
+          title: String(item?.title || '').trim(),
+          description: String(item?.description || '').trim(),
+          link: String(item?.link || '').trim(),
+          type: String(item?.type || '').trim()
+        }))
+        .filter((item) => item.title || item.description || item.link)
+    : [];
+}
+
+async function getStoredExperiences(db, userId) {
+  try {
+    const rows = await db
+      .select({
+        id: userExperiences.id,
+        company: userExperiences.company,
+        role: userExperiences.role,
+        startDate: userExperiences.startDate,
+        endDate: userExperiences.endDate,
+        isCurrent: userExperiences.isCurrent,
+        description: userExperiences.description,
+        createdAt: userExperiences.createdAt
+      })
+      .from(userExperiences)
+      .where(eq(userExperiences.userId, userId))
+      .orderBy(desc(userExperiences.startDate), desc(userExperiences.createdAt));
+
+    return rows.map(formatExperienceRow);
+  } catch (error) {
+    if (isMissingRelationError(error, 'user_experiences')) {
+      return [];
+    }
+
+    throw error;
+  }
+}
+
+async function getStoredProfilePayload(db, userId) {
+  const [settings, experiences] = await Promise.all([
+    getStoredProfileSettings(db, userId),
+    getStoredExperiences(db, userId)
+  ]);
+
+  const mergedSettings = {
+    ...(settings || {})
+  };
+
+  if (experiences.length) {
+    mergedSettings.experiences = experiences;
+  } else if (Array.isArray(settings?.experiences)) {
+    mergedSettings.experiences = settings.experiences;
+  } else {
+    mergedSettings.experiences = [];
+  }
+
+  return mergedSettings;
+}
+
+async function getPortfolioReadmePayload(db, userId) {
+  const [userRows, publicProfileRows, settings, experiences] = await Promise.all([
+    db
+      .select({
+        id: users.id,
+        name: users.name,
+        email: users.email,
+        resilienceXp: users.resilienceXp
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1),
+    db
+      .select({
+        username: userProfiles.username,
+        headline: userProfiles.headline,
+        location: userProfiles.location,
+        skills: userProfiles.skills,
+        isPublic: userProfiles.isPublic
+      })
+      .from(userProfiles)
+      .where(eq(userProfiles.userId, userId))
+      .limit(1),
+    getStoredProfileSettings(db, userId),
+    getStoredExperiences(db, userId)
+  ]);
+
+  const user = userRows[0];
+
+  if (!user) {
+    const error = new Error('User not found.');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const publicProfile = publicProfileRows[0] || null;
+  const username = publicProfile?.username || '';
+  const badgeUrl = username ? buildAbsoluteAppUrl(`/api/badge/${username}.svg`) : '';
+  const shadowResumeUrl = username ? buildAbsoluteAppUrl(`/hire/${username}`) : '';
+  const settingsJson = settings || {};
+
+  return {
+    profile: {
+      name: user.name || username || 'Aptico builder',
+      email: user.email,
+      username,
+      headline: publicProfile?.headline || settingsJson.headline || '',
+      location: publicProfile?.location || settingsJson.location || '',
+      resilienceXp: user.resilienceXp || 0,
+      isPublic: Boolean(publicProfile?.isPublic),
+      bio: settingsJson.bio || '',
+      currentTitle: settingsJson.currentTitle || '',
+      currentCompany: settingsJson.currentCompany || '',
+      targetRole: settingsJson.targetRole || '',
+      industry: settingsJson.industry || '',
+      topSkills: Array.isArray(settingsJson.topSkills) ? settingsJson.topSkills : [],
+      tools: Array.isArray(settingsJson.tools) ? settingsJson.tools : [],
+      languages: Array.isArray(settingsJson.languages) ? settingsJson.languages : [],
+      achievements: Array.isArray(settingsJson.achievements) ? settingsJson.achievements : [],
+      profileSkills: Array.isArray(publicProfile?.skills) ? publicProfile.skills : []
+    },
+    experiences,
+    projects: normalizeFeaturedProjects(settingsJson.featured),
+    links: {
+      badgeUrl,
+      shadowResumeUrl
+    }
+  };
+}
+
 async function getStoredProfileSettings(db, userId) {
   const rows = await db
     .select({
@@ -114,7 +295,7 @@ export async function getProfileSettingsController(request, reply) {
   try {
     requireDatabase(request.server.db);
 
-    const settings = await getStoredProfileSettings(request.server.db, request.auth.userId);
+    const settings = await getStoredProfilePayload(request.server.db, request.auth.userId);
 
     return reply.send({
       success: true,
@@ -132,6 +313,7 @@ export async function upsertProfileSettingsController(request, reply) {
   try {
     requireDatabase(request.server.db);
     const body = profileSettingsSchema.parse(request.body || {});
+    const sanitizedBody = sanitizeProfileSettings(body);
 
     const existing = await request.server.db
       .select({ id: profileSettings.id })
@@ -143,14 +325,14 @@ export async function upsertProfileSettingsController(request, reply) {
       await request.server.db
         .update(profileSettings)
         .set({
-          settingsJson: body,
+          settingsJson: sanitizedBody,
           updatedAt: new Date()
         })
         .where(eq(profileSettings.id, existing[0].id));
     } else {
       await request.server.db.insert(profileSettings).values({
         userId: request.auth.userId,
-        settingsJson: body
+        settingsJson: sanitizedBody
       });
     }
 
@@ -167,7 +349,10 @@ export async function upsertProfileSettingsController(request, reply) {
 
     return reply.send({
       success: true,
-      data: body
+      data: {
+        ...sanitizedBody,
+        experiences: await getStoredExperiences(request.server.db, request.auth.userId)
+      }
     });
   } catch (error) {
     const statusCode = error.name === 'ZodError' ? 400 : error.statusCode || 500;
@@ -175,6 +360,107 @@ export async function upsertProfileSettingsController(request, reply) {
     return reply.code(statusCode).send({
       success: false,
       error: error.message || 'Could not save profile settings.'
+    });
+  }
+}
+
+export async function upsertExperienceController(request, reply) {
+  try {
+    requireDatabase(request.server.db);
+    const experience = userExperienceSchema.parse(request.body || {});
+    const nextValues = {
+      userId: request.auth.userId,
+      company: experience.company,
+      role: experience.title,
+      startDate: experience.startDate,
+      endDate: experience.isCurrent ? null : experience.endDate,
+      isCurrent: experience.isCurrent,
+      description: experience.description
+    };
+
+    if (experience.id) {
+      const existingRow = await request.server.db
+        .select({ id: userExperiences.id, userId: userExperiences.userId })
+        .from(userExperiences)
+        .where(eq(userExperiences.id, experience.id))
+        .limit(1);
+
+      if (!existingRow[0] || existingRow[0].userId !== request.auth.userId) {
+        return reply.code(404).send({
+          success: false,
+          error: 'Experience not found.'
+        });
+      }
+
+      await request.server.db
+        .update(userExperiences)
+        .set(nextValues)
+        .where(eq(userExperiences.id, experience.id));
+    } else {
+      await request.server.db.insert(userExperiences).values(nextValues);
+    }
+
+    return reply.send({
+      success: true,
+      data: await getStoredExperiences(request.server.db, request.auth.userId)
+    });
+  } catch (error) {
+    if (isMissingRelationError(error, 'user_experiences')) {
+      return reply.code(503).send({
+        success: false,
+        error: 'Experience storage is not available until the database schema is updated.'
+      });
+    }
+
+    const statusCode = error.name === 'ZodError' ? 400 : error.statusCode || 500;
+
+    return reply.code(statusCode).send({
+      success: false,
+      error: error.message || 'Could not save experience.'
+    });
+  }
+}
+
+export async function deleteExperienceController(request, reply) {
+  try {
+    requireDatabase(request.server.db);
+
+    const params = z.object({
+      id: z.string().uuid()
+    }).parse(request.params || {});
+
+    const existingRow = await request.server.db
+      .select({ id: userExperiences.id, userId: userExperiences.userId })
+      .from(userExperiences)
+      .where(eq(userExperiences.id, params.id))
+      .limit(1);
+
+    if (!existingRow[0] || existingRow[0].userId !== request.auth.userId) {
+      return reply.code(404).send({
+        success: false,
+        error: 'Experience not found.'
+      });
+    }
+
+    await request.server.db.delete(userExperiences).where(eq(userExperiences.id, params.id));
+
+    return reply.send({
+      success: true,
+      data: await getStoredExperiences(request.server.db, request.auth.userId)
+    });
+  } catch (error) {
+    if (isMissingRelationError(error, 'user_experiences')) {
+      return reply.code(503).send({
+        success: false,
+        error: 'Experience storage is not available until the database schema is updated.'
+      });
+    }
+
+    const statusCode = error.name === 'ZodError' ? 400 : error.statusCode || 500;
+
+    return reply.code(statusCode).send({
+      success: false,
+      error: error.message || 'Could not delete experience.'
     });
   }
 }
@@ -296,6 +582,48 @@ export async function getDashboardSummaryController(request, reply) {
     return reply.code(error.statusCode || 500).send({
       success: false,
       error: error.message || 'Could not load dashboard summary.'
+    });
+  }
+}
+
+export async function generatePortfolioReadmeController(request, reply) {
+  try {
+    requireDatabase(request.server.db);
+    const payload = await getPortfolioReadmePayload(request.server.db, request.auth.userId);
+
+    if (!payload.profile.username) {
+      return reply.code(400).send({
+        success: false,
+        error: 'Create your public username before generating a GitHub README.'
+      });
+    }
+
+    const generated = await generatePortfolioReadme({
+      profilePayload: payload,
+      logger: request.log
+    });
+
+    const badgeMarkdown = `[![Aptico Profile](${payload.links.badgeUrl})](${payload.links.shadowResumeUrl})`;
+    const markdown = `${badgeMarkdown}\n\n${String(generated.readmeMarkdown || '').trim()}`;
+
+    return reply.send({
+      success: true,
+      data: {
+        markdown,
+        badgeMarkdown,
+        badgeUrl: payload.links.badgeUrl,
+        shadowResumeUrl: payload.links.shadowResumeUrl,
+        username: payload.profile.username,
+        isPublic: payload.profile.isPublic,
+        resilienceXp: payload.profile.resilienceXp,
+        suggestedTitle: generated.suggestedTitle,
+        headline: generated.headline
+      }
+    });
+  } catch (error) {
+    return reply.code(error.statusCode || 500).send({
+      success: false,
+      error: error.message || 'Could not generate portfolio README.'
     });
   }
 }

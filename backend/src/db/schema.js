@@ -23,6 +23,7 @@ export const users = pgTable('users', {
   passwordHash: text('password_hash'),
   googleSubject: text('google_subject'),
   role: text('role').notNull().default('user'),
+  resilienceXp: integer('resilience_xp').notNull().default(0),
   emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   lastLogin: timestamp('last_login', { withTimezone: true })
@@ -124,6 +125,27 @@ export const savedJobs = pgTable(
   })
 );
 
+export const rejectionLogs = pgTable(
+  'rejection_logs',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    companyName: text('company_name').notNull(),
+    roleTitle: text('role_title').notNull(),
+    stageRejected: text('stage_rejected').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    userIdIdx: index('rejection_logs_user_id_idx').on(table.userId),
+    stageCheck: check(
+      'rejection_logs_stage_rejected_check',
+      sql`${table.stageRejected} in ('resume', 'first_round', 'hiring_manager', 'final')`
+    )
+  })
+);
+
 export const profileSettings = pgTable(
   'profile_settings',
   {
@@ -140,6 +162,45 @@ export const profileSettings = pgTable(
   })
 );
 
+export const userExperiences = pgTable(
+  'user_experiences',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    company: text('company').notNull(),
+    role: text('role').notNull(),
+    startDate: date('start_date'),
+    endDate: date('end_date'),
+    isCurrent: boolean('is_current').notNull().default(false),
+    description: text('description').notNull().default(''),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    userIdIdx: index('user_experiences_user_id_idx').on(table.userId),
+    userIdStartDateIdx: index('user_experiences_user_id_start_date_idx').on(table.userId, table.startDate)
+  })
+);
+
+export const userEducations = pgTable(
+  'user_educations',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    institution: text('institution').notNull(),
+    degree: text('degree').notNull(),
+    fieldOfStudy: text('field_of_study').notNull(),
+    graduationYear: integer('graduation_year'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    userIdIdx: index('user_educations_user_id_idx').on(table.userId)
+  })
+);
+
 export const apiUsage = pgTable(
   'api_usage',
   {
@@ -153,57 +214,6 @@ export const apiUsage = pgTable(
     sourceDateIdx: uniqueIndex('api_usage_source_name_date_idx').on(table.sourceName, table.date)
   })
 );
-
-export const usersRelations = relations(users, ({ many }) => ({
-  refreshTokens: many(refreshTokens),
-  authTokens: many(authTokens),
-  analyses: many(analyses),
-  savedJobs: many(savedJobs),
-  profileSettings: many(profileSettings)
-}));
-
-export const refreshTokensRelations = relations(refreshTokens, ({ one }) => ({
-  user: one(users, {
-    fields: [refreshTokens.userId],
-    references: [users.id]
-  })
-}));
-
-export const authTokensRelations = relations(authTokens, ({ one }) => ({
-  user: one(users, {
-    fields: [authTokens.userId],
-    references: [users.id]
-  })
-}));
-
-export const analysesRelations = relations(analyses, ({ many, one }) => ({
-  user: one(users, {
-    fields: [analyses.userId],
-    references: [users.id]
-  }),
-  generatedContent: many(generatedContent)
-}));
-
-export const generatedContentRelations = relations(generatedContent, ({ one }) => ({
-  analysis: one(analyses, {
-    fields: [generatedContent.analysisId],
-    references: [analyses.id]
-  })
-}));
-
-export const savedJobsRelations = relations(savedJobs, ({ one }) => ({
-  user: one(users, {
-    fields: [savedJobs.userId],
-    references: [users.id]
-  })
-}));
-
-export const profileSettingsRelations = relations(profileSettings, ({ one }) => ({
-  user: one(users, {
-    fields: [profileSettings.userId],
-    references: [users.id]
-  })
-}));
 
 export const userProfiles = pgTable(
   'user_profiles',
@@ -385,7 +395,130 @@ export const notifications = pgTable(
     userReadCreatedAtIdx: index('notifications_user_id_is_read_created_at_idx').on(table.userId, table.isRead, table.createdAt),
     typeCheck: check(
       'notifications_type_check',
-      sql`${table.type} in ('new_follower', 'new_connection_request', 'connection_accepted', 'post_like', 'post_comment', 'job_match_alert')`
+      sql`${table.type} in ('new_follower', 'new_connection_request', 'connection_accepted', 'post_like', 'post_comment', 'job_match_alert', 'squad_ping', 'squad_goal_reached')`
     )
   })
 );
+
+export const squads = pgTable('squads', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  squadName: text('squad_name').notNull(),
+  weeklyGoal: integer('weekly_goal').notNull().default(40),
+  weekOf: date('week_of').notNull(),
+  goalRewardedAt: timestamp('goal_rewarded_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+});
+
+export const squadMembers = pgTable(
+  'squad_members',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    squadId: uuid('squad_id')
+      .notNull()
+      .references(() => squads.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    anonymousAlias: text('anonymous_alias').notNull(),
+    appsSentThisWeek: integer('apps_sent_this_week').notNull().default(0),
+    interviewsThisWeek: integer('interviews_this_week').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    squadIdIdx: index('squad_members_squad_id_idx').on(table.squadId),
+    userIdIdx: uniqueIndex('squad_members_user_id_idx').on(table.userId),
+    squadUserIdx: uniqueIndex('squad_members_squad_id_user_id_idx').on(table.squadId, table.userId),
+    squadAliasIdx: uniqueIndex('squad_members_squad_id_alias_idx').on(table.squadId, table.anonymousAlias)
+  })
+);
+
+export const usersRelations = relations(users, ({ many }) => ({
+  refreshTokens: many(refreshTokens),
+  authTokens: many(authTokens),
+  analyses: many(analyses),
+  rejectionLogs: many(rejectionLogs),
+  savedJobs: many(savedJobs),
+  profileSettings: many(profileSettings),
+  userExperiences: many(userExperiences),
+  userEducations: many(userEducations),
+  squadMemberships: many(squadMembers)
+}));
+
+export const refreshTokensRelations = relations(refreshTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [refreshTokens.userId],
+    references: [users.id]
+  })
+}));
+
+export const authTokensRelations = relations(authTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [authTokens.userId],
+    references: [users.id]
+  })
+}));
+
+export const analysesRelations = relations(analyses, ({ many, one }) => ({
+  user: one(users, {
+    fields: [analyses.userId],
+    references: [users.id]
+  }),
+  generatedContent: many(generatedContent)
+}));
+
+export const generatedContentRelations = relations(generatedContent, ({ one }) => ({
+  analysis: one(analyses, {
+    fields: [generatedContent.analysisId],
+    references: [analyses.id]
+  })
+}));
+
+export const savedJobsRelations = relations(savedJobs, ({ one }) => ({
+  user: one(users, {
+    fields: [savedJobs.userId],
+    references: [users.id]
+  })
+}));
+
+export const rejectionLogsRelations = relations(rejectionLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [rejectionLogs.userId],
+    references: [users.id]
+  })
+}));
+
+export const profileSettingsRelations = relations(profileSettings, ({ one }) => ({
+  user: one(users, {
+    fields: [profileSettings.userId],
+    references: [users.id]
+  })
+}));
+
+export const userExperiencesRelations = relations(userExperiences, ({ one }) => ({
+  user: one(users, {
+    fields: [userExperiences.userId],
+    references: [users.id]
+  })
+}));
+
+export const userEducationsRelations = relations(userEducations, ({ one }) => ({
+  user: one(users, {
+    fields: [userEducations.userId],
+    references: [users.id]
+  })
+}));
+
+export const squadsRelations = relations(squads, ({ many }) => ({
+  members: many(squadMembers)
+}));
+
+export const squadMembersRelations = relations(squadMembers, ({ one }) => ({
+  squad: one(squads, {
+    fields: [squadMembers.squadId],
+    references: [squads.id]
+  }),
+  user: one(users, {
+    fields: [squadMembers.userId],
+    references: [users.id]
+  })
+}));

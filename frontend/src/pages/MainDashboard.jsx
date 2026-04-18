@@ -6,6 +6,7 @@ import api from '../api/axios.js';
 import { deleteAllSavedJobs, deleteSavedJob } from '../api/jobsApi.js';
 import { fetchDashboardSummary } from '../api/profileApi.js';
 import AppShell from '../components/AppShell.jsx';
+import RejectionModal from '../components/RejectionModal.jsx';
 import { selectAuth } from '../store/authSlice.js';
 import {
   clearAnalysisHistory,
@@ -78,6 +79,56 @@ function GaugeCard({ score }) {
   );
 }
 
+function ResilienceLevelCard({ xp, flashXp }) {
+  const safeXp = Math.max(0, Number(xp) || 0);
+  const level = Math.floor(safeXp / 1000) + 1;
+  const currentLevelXp = safeXp % 1000;
+  const progressPercent = (currentLevelXp / 1000) * 100;
+  const xpToNextLevel = 1000 - currentLevelXp || 1000;
+
+  return (
+    <article className="app-panel relative overflow-hidden border-[var(--accent)]/20 bg-[linear-gradient(135deg,rgba(78,222,163,0.15),rgba(255,255,255,0.02))]">
+      <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-[var(--accent)]/12 blur-3xl" />
+      <div className="relative">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="app-kicker">Resilience level</p>
+            <h2 className="mt-3 text-3xl font-black tracking-[-0.05em] text-[var(--text)]">Level {level}</h2>
+            <p className="mt-2 text-sm leading-7 text-[var(--muted-strong)]">
+              Every logged setback fuels the next climb. {xpToNextLevel} XP to the next level.
+            </p>
+          </div>
+
+          <div className="rounded-[1.2rem] border border-[var(--accent)]/30 bg-[var(--panel)] px-4 py-3 text-right shadow-[0_12px_24px_rgba(78,222,163,0.12)]">
+            <p className="app-kicker">Total XP</p>
+            <p className="mt-2 mono-text text-2xl font-bold text-[var(--accent-strong)]">{safeXp}</p>
+            {flashXp ? <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)]">+{flashXp} just earned</p> : null}
+          </div>
+        </div>
+
+        <div className="mt-6">
+          <div className="mb-2 flex items-center justify-between text-[11px] uppercase tracking-[0.18em] text-[var(--muted)]">
+            <span>{currentLevelXp} / 1000 XP</span>
+            <span>Level {level + 1}</span>
+          </div>
+          <div className="h-4 overflow-hidden rounded-full border border-[var(--border)] bg-[var(--panel)]">
+            <div
+              className="h-full rounded-full bg-[linear-gradient(90deg,#4edea3,#9bf2cc)] transition-[width] duration-700 ease-out"
+              style={{ width: `${Math.max(6, progressPercent)}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="mt-5 rounded-2xl border border-[var(--accent)]/15 bg-[var(--panel)] px-4 py-3">
+          <p className="text-xs leading-5 text-[var(--muted-strong)]">
+            <span className="font-bold text-[var(--accent-strong)]">{'\u{1F4AA}'} How it works:</span> Every job rejection you log earns XP. The further you got in the process before being rejected, the more XP you earn. Resume screen = 50 XP, First round = 100 XP, Hiring manager = 175 XP, Final round = 250 XP.
+          </p>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function formatRelativeTime(value) {
   if (!value) {
     return 'Recent';
@@ -135,10 +186,13 @@ export default function MainDashboard() {
   const [savedJobsActionError, setSavedJobsActionError] = useState('');
   const [deletingSavedJobId, setDeletingSavedJobId] = useState(null);
   const [clearingSavedJobs, setClearingSavedJobs] = useState(false);
+  const [isRejectionModalOpen, setIsRejectionModalOpen] = useState(false);
+  const [xpFlash, setXpFlash] = useState(0);
 
   const name = auth.user?.name?.split(' ')[0] || (auth.guestMode ? 'Explorer' : 'there');
   const matchedSkills = currentAnalysis?.matchedSkills?.slice(0, 6) || [];
   const score = currentAnalysis?.confidenceScore || 82;
+  const resilienceXp = auth.user?.resilienceXp || 0;
   
   const quickActions = [
     ['Continue last analysis', 'play_circle', '/analysis/latest'],
@@ -317,12 +371,21 @@ export default function MainDashboard() {
     return Array.from(skillsSet);
   }, [currentAnalysis, analysisHistory]);
 
+  function handleRejectionSuccess(payload) {
+    setXpFlash(payload?.xpEarned || 0);
+    window.setTimeout(() => setXpFlash(0), 2200);
+  }
+
   return (
     <AppShell
       title={`Welcome back${auth.user?.name ? `, ${auth.user.name}` : auth.guestMode ? ', guest explorer' : ''}`}
       description="Your main dashboard is now shaped as the premium first screen after login: a stronger welcome, fast next actions, health signals, intelligence recommendations, and momentum tracking in one place."
       actions={
         <>
+          <button type="button" onClick={() => setIsRejectionModalOpen(true)} className="app-button shadow-[0_0_30px_rgba(78,222,163,0.3)]">
+            <span className="material-symbols-outlined text-[18px]">bolt</span>
+            Log a rejection
+          </button>
           <Link to="/analysis" className="app-button">
             Continue analysis
           </Link>
@@ -338,7 +401,11 @@ export default function MainDashboard() {
         </div>
       ) : null}
 
-      <section className="grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
+      <section className="grid gap-6">
+        <ResilienceLevelCard xp={resilienceXp} flashXp={xpFlash} />
+      </section>
+
+      <section className="mt-6 grid gap-6 xl:grid-cols-[1.25fr_0.75fr]">
         <article className="app-panel relative overflow-hidden">
           <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-[var(--accent-soft)] blur-3xl" />
           <div className="relative">
@@ -351,6 +418,17 @@ export default function MainDashboard() {
             </p>
 
             <div className="mt-8 grid gap-3 md:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => setIsRejectionModalOpen(true)}
+                className="group flex items-center justify-between rounded-2xl border border-[var(--accent)]/35 bg-[linear-gradient(135deg,rgba(78,222,163,0.18),rgba(78,222,163,0.04))] p-4 text-left shadow-[0_0_30px_rgba(78,222,163,0.12)] transition hover:-translate-y-0.5 hover:border-[var(--accent)]/60"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="material-symbols-outlined text-[var(--accent-strong)]">military_tech</span>
+                  <span className="mono-text text-[11px] uppercase tracking-[0.18em] text-[var(--text)]">Log a rejection</span>
+                </div>
+                <span className="material-symbols-outlined text-[var(--accent-strong)] transition group-hover:translate-x-0.5">chevron_right</span>
+              </button>
               {quickActions.map(([label, icon, to]) => (
                 <Link
                   key={label}
@@ -636,6 +714,12 @@ export default function MainDashboard() {
         </article>
 
       </section>
+
+      <RejectionModal
+        isOpen={isRejectionModalOpen}
+        onClose={() => setIsRejectionModalOpen(false)}
+        onSuccess={handleRejectionSuccess}
+      />
     </AppShell>
   );
 }

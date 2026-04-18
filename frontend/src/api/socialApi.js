@@ -30,6 +30,11 @@ export async function getPublicProfile(username) {
   return response.data;
 }
 
+export async function chatWithShadowResume(username, message) {
+  const response = await api.post(`/api/shadow-resume/${username}/chat`, { message });
+  return response.data;
+}
+
 export async function getMyProfile() {
   const response = await api.get('/api/social/my-profile');
   return response.data;
