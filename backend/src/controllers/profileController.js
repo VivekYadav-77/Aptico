@@ -44,6 +44,8 @@ const profileSettingsSchema = z.object({
   notificationAnalysisUpdates: z.boolean(),
   notificationOpportunityNudges: z.boolean(),
   notificationSecurityAlerts: z.boolean(),
+  banner_url: z.string().optional(),
+  banner_preference: z.string().optional(),
 
   // Section visibility map (everyone / connections / only_me)
   sectionVisibility: z.record(z.string(), z.enum(['everyone', 'connections', 'only_me'])).optional().default({}),

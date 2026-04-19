@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
 import { z } from 'zod';
 import { env } from '../config/env.js';
-import { createGeminiClient, isRateLimitError, sleep } from '../utils/geminiClient.js';
+import { createGeminiClient, isRateLimitError, sleep, normalizeGeminiError } from '../utils/geminiClient.js';
 
 const CACHE_TTL_SECONDS = 2 * 60 * 60;
 const STAGE_TIMEOUT_MS = 20_000;
@@ -494,7 +494,7 @@ async function callGeminiStage({ apiKey, fallbackKey, model, prompt, config, log
         await sleep(200);
         continue;
       }
-      throw error;
+      throw normalizeGeminiError(error);
     }
   }
 
@@ -764,9 +764,9 @@ export async function generatePortfolioReadme({ profilePayload, logger = console
   const prompt = buildPortfolioReadmePrompt(profilePayload);
 
   const rawText = await callGeminiStage({
-    apiKey: env.geminiKey2 || env.geminiKey1,
+    apiKey: env.geminiPortfolioKey || env.geminiKey2 || env.geminiKey1,
     fallbackKey: env.geminiKeyFallback,
-    model: env.geminiModel2 || env.geminiModel1,
+    model: env.geminiPortfolioModel || env.geminiModel2 || env.geminiModel1,
     prompt,
     config: {
       responseMimeType: 'application/json',
