@@ -350,73 +350,181 @@ export default function ProfilePage() {
               </article>
             </AnimatedSection>
 
-            {/* Education & Achievements */}
+            {/* Experience */}
             <AnimatedSection delay={300}>
-              <article className="app-panel border border-[var(--border)]">
+              <article className="app-panel border border-[var(--border)] hover:border-[var(--muted-strong)] transition-colors duration-300">
                 <div className="flex items-center gap-3 mb-6">
-                  <div className="h-6 w-1.5 rounded-full bg-[var(--success-strong)]"></div>
-                  <h2 className="text-xl font-bold text-[var(--text)] tracking-tight">Background & Highlights</h2>
+                  <div className="h-6 w-1.5 rounded-full bg-[#0ea5e9]"></div>
+                  <h2 className="text-xl font-bold text-[var(--text)] tracking-tight">Experience</h2>
                 </div>
-
-                <div className="grid gap-6 lg:grid-cols-2">
-                  <div className="group rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-6 hover:shadow-lg transition-all duration-300">
-                    <div className="flex items-center gap-4 mb-6">
-                      <div className="p-3 rounded-xl bg-[var(--panel-soft)] border border-[var(--border)] group-hover:bg-[var(--accent-soft)] group-hover:text-[var(--accent)] transition-colors">
-                        <Icons.GraduationCap className="w-5 h-5" />
-                      </div>
-                      <h3 className="text-lg font-bold text-[var(--text)]">Education Activity</h3>
-                    </div>
-                    
-                    <div className="ml-4 pl-6 border-l-2 border-[var(--border)] space-y-5">
-                      <div className="relative">
-                        <div className="absolute w-3 h-3 rounded-full bg-[var(--accent)] -left-[31px] top-1.5 ring-4 ring-[var(--panel)]"></div>
-                        <p className="text-base font-bold text-[var(--text)]">
-                          {[profile.degree, profile.fieldOfStudy].filter(Boolean).join(' in ') || 'Degree not specified'}
-                        </p>
-                        <p className="text-sm text-[var(--accent-strong)] font-semibold mt-1">{profile.school || 'Institution not specified'}</p>
-                        {profile.graduationYear && <p className="text-xs font-medium text-[var(--muted-strong)] mt-2 bg-[var(--panel-soft)] inline-block px-2 py-1 rounded-md">Class of {profile.graduationYear}</p>}
-                      </div>
-                      
-                      {profile.learningFocus && (
-                        <div className="relative pt-2">
-                          <div className="absolute w-2 h-2 rounded-full border-2 border-[var(--muted-strong)] bg-[var(--panel)] -left-[29px] top-4"></div>
-                          <p className="text-sm leading-relaxed text-[var(--text)] opacity-80 italic border-l-2 border-[var(--muted-strong)] pl-3">
-                            "{profile.learningFocus}"
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                
+                {!(profile.experiences && profile.experiences.length) ? (
+                  <div className="p-6 rounded-xl border border-dashed border-[var(--border)] text-center bg-[var(--panel-soft)]/50 text-[var(--muted-strong)]">
+                     No experience listed yet.
                   </div>
-
-                  <div className="group rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-6 hover:shadow-lg transition-all duration-300">
-                    <div className="flex items-center gap-4 mb-6">
-                      <div className="p-3 rounded-xl bg-[var(--panel-soft)] border border-[var(--border)] group-hover:bg-[var(--warning-soft)] group-hover:text-[var(--warning-text)] transition-colors">
-                        <Icons.Star className="w-5 h-5" />
-                      </div>
-                      <h3 className="text-lg font-bold text-[var(--text)]">Key Achievements</h3>
-                    </div>
-
-                    <div className="space-y-3">
-                      {profile.achievements.length ? (
-                        profile.achievements.map((item, i) => (
-                          <div key={i} className="flex gap-3 items-start p-3 rounded-xl hover:bg-[var(--panel-soft)] transition-colors border border-transparent hover:border-[var(--border)]">
-                            <Icons.CheckCircle className="shrink-0 text-[var(--success-strong)] w-5 h-5 mt-0.5" />
-                            <p className="text-sm font-medium leading-relaxed text-[var(--text)] opacity-90">
-                              {item}
-                            </p>
+                ) : (
+                  <div className="relative ml-2 sm:ml-4 border-l-2 border-[var(--border)] pl-6 sm:pl-8 space-y-8 py-2">
+                    {profile.experiences.map((exp, idx) => (
+                      <div key={idx} className="relative group">
+                        <div className="absolute w-4 h-4 rounded-full bg-[#0ea5e9] -left-[33px] sm:-left-[41px] top-1 ring-4 ring-[var(--panel)] transition-all group-hover:scale-125 shadow-sm" />
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                          <div>
+                            <h3 className="text-base sm:text-lg font-black text-[var(--text)] leading-tight">{exp.title || 'Role'}</h3>
+                            <p className="text-sm font-bold text-[var(--accent-strong)] mt-0.5">{exp.company || 'Company'}</p>
                           </div>
-                        ))
-                      ) : (
-                        <div className="p-6 rounded-xl border border-dashed border-[var(--border)] text-center bg-[var(--panel-soft)]/50 text-[var(--muted-strong)] hover:text-[var(--text)] transition-colors">
-                          <p className="font-semibold text-sm mb-1">No achievements listed</p>
-                          <p className="text-xs">Highlight impactful wins and metrics in your settings to strengthen your profile.</p>
+                          <div className="text-xs text-[var(--muted-strong)] font-semibold shrink-0 sm:text-right bg-[var(--panel-soft)]/50 px-2 py-1 rounded-md mb-2 sm:mb-0 w-max">
+                            <p>{[exp.startDate, exp.isCurrent ? 'Present' : exp.endDate].filter(Boolean).join(' — ') || 'Date not specified'}</p>
+                            {exp.location && <p className="mt-0.5 opacity-80">{exp.location}</p>}
+                          </div>
                         </div>
-                      )}
-                    </div>
+                        {exp.description && <p className="mt-3 text-sm text-[var(--text)] opacity-85 leading-relaxed whitespace-pre-wrap">{exp.description}</p>}
+                      </div>
+                    ))}
                   </div>
-                </div>
+                )}
               </article>
             </AnimatedSection>
+
+            {/* Education */}
+            <AnimatedSection delay={350}>
+              <article className="app-panel border border-[var(--border)] hover:border-[var(--muted-strong)] transition-colors duration-300">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="h-6 w-1.5 rounded-full bg-[#10b981]"></div>
+                  <h2 className="text-xl font-bold text-[var(--text)] tracking-tight">Education</h2>
+                </div>
+                
+                {!(profile.educationEntries && profile.educationEntries.length) && !profile.school ? (
+                  <div className="p-6 rounded-xl border border-dashed border-[var(--border)] text-center bg-[var(--panel-soft)]/50 text-[var(--muted-strong)]">
+                     No education listed yet.
+                  </div>
+                ) : (
+                  <div className="relative ml-2 sm:ml-4 border-l-2 border-[var(--border)] pl-6 sm:pl-8 space-y-8 py-2">
+                    {/* Fallback to single legacy format if arrays are empty */}
+                    {!(profile.educationEntries && profile.educationEntries.length) && profile.school ? (
+                        <div className="relative group">
+                          <div className="absolute w-4 h-4 rounded-full bg-[#10b981] -left-[33px] sm:-left-[41px] top-1 ring-4 ring-[var(--panel)] transition-all group-hover:scale-125 shadow-sm" />
+                          <div>
+                            <h3 className="text-base sm:text-lg font-black text-[var(--text)] leading-tight">{profile.school}</h3>
+                            <p className="text-sm font-bold text-[var(--accent-strong)] mt-0.5">{[profile.degree, profile.fieldOfStudy].filter(Boolean).join(' in ') || 'Degree not specified'}</p>
+                            {profile.graduationYear && (
+                              <p className="mt-2 text-xs font-semibold text-[var(--muted-strong)] bg-[var(--panel-soft)]/50 inline-block px-2 py-1 rounded-md">
+                                Class of {profile.graduationYear}
+                              </p>
+                            )}
+                            {profile.learningFocus && <p className="mt-3 text-sm text-[var(--text)] opacity-85 italic leading-relaxed border-l-2 border-[var(--border)] pl-3">"{profile.learningFocus}"</p>}
+                          </div>
+                        </div>
+                    ) : (
+                      (profile.educationEntries || []).map((edu, idx) => (
+                        <div key={idx} className="relative group">
+                          <div className="absolute w-4 h-4 rounded-full bg-[#10b981] -left-[33px] sm:-left-[41px] top-1 ring-4 ring-[var(--panel)] transition-all group-hover:scale-125 shadow-sm" />
+                          <div>
+                            <h3 className="text-base sm:text-lg font-black text-[var(--text)] leading-tight">{edu.school || 'Institution'}</h3>
+                            <p className="text-sm font-bold text-[var(--accent-strong)] mt-0.5">{[edu.degree, edu.field].filter(Boolean).join(' in ') || 'Degree not specified'}</p>
+                            {(edu.startYear || edu.endYear) && (
+                              <p className="mt-2 text-xs font-semibold text-[var(--muted-strong)] bg-[var(--panel-soft)]/50 inline-block px-2 py-1 rounded-md">
+                                {[edu.startYear, edu.endYear].filter(Boolean).join(' — ')}
+                              </p>
+                            )}
+                            {edu.activities && <p className="mt-3 text-sm text-[var(--text)] opacity-85 italic leading-relaxed border-l-2 border-[var(--border)] pl-3">"{edu.activities}"</p>}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </article>
+            </AnimatedSection>
+
+            {/* Licenses & Certifications */}
+            {profile.licenses && profile.licenses.length > 0 && (
+              <AnimatedSection delay={400}>
+                <article className="app-panel border border-[var(--border)] hover:border-[var(--muted-strong)] transition-colors duration-300">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="h-6 w-1.5 rounded-full bg-[#eab308]"></div>
+                    <h2 className="text-xl font-bold text-[var(--text)] tracking-tight">Licenses & Certifications</h2>
+                  </div>
+                  
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {(profile.licenses || []).map((lic, idx) => (
+                      <div key={idx} className="rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)]/40 p-5 hover:border-[#eab308]/50 hover:shadow-md transition-all group relative overflow-hidden">
+                        <div className="relative z-10">
+                          <h3 className="text-base font-bold text-[var(--text)] group-hover:text-[#eab308] transition-colors">{lic.name || 'Certificate'}</h3>
+                          {lic.issuingOrg && <p className="text-sm font-semibold text-[var(--muted-strong)] mt-1">{lic.issuingOrg}</p>}
+                          
+                          <div className="mt-3 space-y-1">
+                            {lic.issueDate && <p className="text-xs font-medium text-[var(--muted)]">Issued {lic.issueDate}{lic.expiryDate ? ` · Expires ${lic.expiryDate}` : ''}</p>}
+                            {lic.credentialId && <p className="text-xs font-medium text-[var(--muted)]">ID: <span className="font-mono text-[var(--text)]">{lic.credentialId}</span></p>}
+                          </div>
+                          
+                          {lic.credentialUrl && (
+                            <a href={lic.credentialUrl.startsWith('http') ? lic.credentialUrl : `https://${lic.credentialUrl}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 mt-4 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--panel)] text-xs font-bold text-[var(--text)] hover:border-[#eab308]/50 hover:text-[#eab308] transition-all shadow-sm">
+                              <Icons.Link className="w-3.5 h-3.5" />
+                              Show Credential
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              </AnimatedSection>
+            )}
+
+            {/* Honors & Awards */}
+            {profile.honorsAwards && profile.honorsAwards.length > 0 && (
+              <AnimatedSection delay={450}>
+                <article className="app-panel border border-[var(--border)] hover:border-[var(--muted-strong)] transition-colors duration-300">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="h-6 w-1.5 rounded-full bg-[#f59e0b]"></div>
+                    <h2 className="text-xl font-bold text-[var(--text)] tracking-tight">Honors & Awards</h2>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    {(profile.honorsAwards || []).map((award, idx) => (
+                      <div key={idx} className="flex gap-4 items-start p-4 rounded-xl bg-[var(--panel-soft)]/40 hover:bg-[var(--panel-soft)] transition-colors border border-transparent hover:border-[var(--border)] group">
+                        <div className="shrink-0 mt-0.5 p-2 rounded-xl bg-amber-500/10 text-amber-600 shadow-inner">
+                          <Icons.Star className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-sm font-black text-[var(--text)] group-hover:text-amber-500 transition-colors">{award.title || 'Award'}</h3>
+                          <div className="flex flex-wrap items-center gap-2 mt-1">
+                            {award.issuer && <span className="text-xs font-bold text-[var(--accent-strong)]">{award.issuer}</span>}
+                            {award.issuer && award.date && <span className="text-[var(--border)]">•</span>}
+                            {award.date && <span className="text-xs font-semibold text-[var(--muted)]">{award.date}</span>}
+                          </div>
+                          {award.description && <p className="text-sm text-[var(--text)] opacity-85 mt-2 leading-relaxed">{award.description}</p>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              </AnimatedSection>
+            )}
+
+            {/* Featured Projects */}
+            {profile.featured && profile.featured.length > 0 && (
+              <AnimatedSection delay={500}>
+                <article className="app-panel border border-[var(--border)] hover:border-[var(--muted-strong)] transition-colors duration-300">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="h-6 w-1.5 rounded-full bg-[#f97316]"></div>
+                    <h2 className="text-xl font-bold text-[var(--text)] tracking-tight">Featured</h2>
+                  </div>
+                  
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    {(profile.featured || []).map((item, idx) => (
+                      <a key={idx} href={item.link || '#'} target={item.link ? '_blank' : undefined} rel="noreferrer" className="flex flex-col rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4 hover:border-[#f97316]/50 hover:shadow-md transition-all group relative overflow-hidden">
+                        <div className="flex items-center gap-2 mb-2 relative z-10">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-[#f97316] bg-[#f97316]/10 px-2 py-0.5 rounded-md">{item.type || 'project'}</span>
+                        </div>
+                        <h3 className="font-bold text-sm text-[var(--text)] group-hover:text-[#f97316] transition-colors leading-tight relative z-10">{item.title || 'Untitled'}</h3>
+                        {item.description && <p className="mt-1.5 text-xs font-medium text-[var(--muted-strong)] line-clamp-2 leading-relaxed relative z-10">{item.description}</p>}
+                      </a>
+                    ))}
+                  </div>
+                </article>
+              </AnimatedSection>
+            )}
 
           </div>
 

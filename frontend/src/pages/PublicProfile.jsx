@@ -14,6 +14,7 @@ import {
 } from '../api/socialApi.js';
 import { saveProfileSettings, fetchProfileSettings } from '../api/profileApi.js';
 import { selectAuth } from '../store/authSlice.js';
+import ResumeTemplate from '../components/ResumeTemplate.jsx';
 
 function initials(name) {
   return String(name || 'A').trim().charAt(0).toUpperCase() || 'A';
@@ -139,6 +140,31 @@ export default function PublicProfile() {
   const [badgePopupOpen, setBadgePopupOpen] = useState(false);
   const [bannerPrefTemp, setBannerPrefTemp] = useState('badge');
   
+  // Visibility Settings State
+  const [visibilitySettingsOpen, setVisibilitySettingsOpen] = useState(false);
+  const [visibilityDraft, setVisibilityDraft] = useState({});
+
+  async function handleVisibilitySave() {
+    try {
+      const fullSettings = await fetchProfileSettings();
+      const updatedBackendSettings = { ...fullSettings, sectionVisibility: visibilityDraft };
+      await saveProfileSettings(updatedBackendSettings);
+      
+      const updatedSettings = { ...(profile.enriched_settings || {}), sectionVisibility: visibilityDraft };
+      setProfile(p => ({ ...p, enriched_settings: updatedSettings }));
+      setVisibilitySettingsOpen(false);
+      setToast('Visibility updated successfully.');
+    } catch (e) {
+      console.error(e);
+      setToast('Failed to save visibility settings.');
+    }
+  }
+
+  function openVisibilitySettings() {
+    setVisibilityDraft(profile.enriched_settings?.sectionVisibility || {});
+    setVisibilitySettingsOpen(true);
+  }
+  
   // Banner Slider Effect
   useEffect(() => {
     if (!profile) return;
@@ -180,24 +206,24 @@ export default function PublicProfile() {
     const file = e.target.files?.[0];
     if(!file) return;
     
-    // Note for Dev: Swap local blob with your Cloudinary implementation here.
-    // e.g., const res = await axios.post("https://api.cloudinary.com/v1_1/YOUR_CLOUD_NAME/image/upload", formData);
-    // const uploadedUrl = res.data.secure_url;
-    
-    const uploadedUrl = URL.createObjectURL(file); // Local view only placeholder
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const uploadedUrl = event.target.result; // Use Base64 data URL so it persists for other users
 
-    try {
-      const fullSettings = await fetchProfileSettings();
-      const updatedBackendSettings = { ...fullSettings, banner_url: uploadedUrl };
-      await saveProfileSettings(updatedBackendSettings);
-      
-      const updatedSettings = { ...(profile.enriched_settings || {}), banner_url: uploadedUrl };
-      setProfile(p => ({ ...p, banner_url: uploadedUrl, enriched_settings: updatedSettings }));
-      setToast('Banner uploaded! (Other users will see this once using real Cloudinary URI).');
-    } catch (error) {
-      console.error(error);
-      setToast('Failed to upload banner.');
-    }
+      try {
+        const fullSettings = await fetchProfileSettings();
+        const updatedBackendSettings = { ...fullSettings, banner_url: uploadedUrl };
+        await saveProfileSettings(updatedBackendSettings);
+        
+        const updatedSettings = { ...(profile.enriched_settings || {}), banner_url: uploadedUrl };
+        setProfile(p => ({ ...p, banner_url: uploadedUrl, enriched_settings: updatedSettings }));
+        setToast('Banner uploaded successfully!');
+      } catch (error) {
+        console.error(error);
+        setToast('Failed to upload banner.');
+      }
+    };
+    reader.readAsDataURL(file);
   }
 
   useEffect(() => {
@@ -327,7 +353,13 @@ export default function PublicProfile() {
   const readiness = Number(profile.latest_analysis?.confidence_score || 0);
   const es = profile.enriched_settings || {};
   const sectionVis = es.sectionVisibility || {};
-  const viewerRel = es.viewerRelationship || 'public';
+  const viewerRel = viewingOwnProfile ? 'self' : (es.viewerRelationship || 'public');
+  const publicLinks = [
+    es.linkedin ? { name: 'LinkedIn', url: es.linkedin, icon: <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0H5a5 5 0 00-5 5v14a5 5 0 005 5h14a5 5 0 005-5V5a5 5 0 00-5-5zM8 19H5V8h3v11zM6.5 6.732c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zM20 19h-3v-5.604c0-3.368-4-3.113-4 0V19h-3V8h3v1.765c1.396-2.586 7-2.777 7 2.476V19z"/></svg> } : null,
+    es.github ? { name: 'GitHub', url: es.github, icon: <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg> } : null,
+    es.portfolio ? { name: 'Portfolio', url: es.portfolio, icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /></svg> } : null,
+    es.website ? { name: 'Website', url: es.website, icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg> } : null
+  ].filter(Boolean);
 
   // Determine if a section is visible
   function isSectionVisible(key) {
@@ -348,7 +380,17 @@ export default function PublicProfile() {
 
   return (
     <main className="min-h-screen bg-[var(--bg)] px-4 py-8">
-      <div className="mx-auto max-w-6xl space-y-6">
+      <style>{`
+        @media screen {
+          .resume-print-only { display: none !important; }
+        }
+        @media print {
+          .public-profile-screen { display: none !important; }
+          .resume-print-only { display: block !important; }
+          body, html { background: white !important; margin: 0; padding: 0; }
+        }
+      `}</style>
+      <div className="public-profile-screen mx-auto max-w-6xl space-y-6">
         
         {/* Top bar */}
         <div className="flex items-center justify-between">
@@ -442,8 +484,13 @@ export default function PublicProfile() {
 
                         {/* Action buttons Desktop aligned */}
                         <div className="flex flex-wrap items-center gap-2.5 relative z-10 shrink-0 sm:pb-3 w-full sm:w-auto mt-2 sm:mt-0">
+                          <button type="button" onClick={() => window.print()} className="app-button-secondary bg-[var(--panel)]/50 backdrop-blur flex-1 sm:flex-none justify-center gap-1.5" title="Export as PDF">
+                            <svg className="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                            <span className="hidden sm:inline">Resume</span>
+                          </button>
                           {viewingOwnProfile ? (
                             <>
+                              <button type="button" onClick={openVisibilitySettings} className="app-button-secondary bg-[var(--panel)]/50 backdrop-blur flex-1 sm:flex-none justify-center">Visibility</button>
                               <Link to="/settings" className="app-button-secondary bg-[var(--panel)]/50 backdrop-blur flex-1 sm:flex-none justify-center">Edit</Link>
                               <button type="button" className="app-button-secondary bg-[var(--panel)]/50 backdrop-blur" onClick={shareProfile}><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg></button>
                               <button type="button" className="app-button shadow-lg shadow-[var(--accent)]/20" onClick={() => setComposerOpen(true)}>Post</button>
@@ -631,6 +678,28 @@ export default function PublicProfile() {
             {/* ═ RIGHT COLUMN (SIDEBAR) ═ */}
             <div className="lg:col-span-4 flex flex-col gap-6">
 
+                {/* ════ DIGITAL FOOTPRINT ════ */}
+                <AnimatedSection delay={330}>
+                   {publicLinks.length > 0 && (
+                     <SectionCard id="footprint" title="Digital Footprint" accentColor="#14b8a6">
+                       <div className="flex flex-col gap-3">
+                         {publicLinks.map((link, idx) => (
+                           <a key={idx} href={link.url.startsWith('http') ? link.url : `https://${link.url}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] hover:border-[#14b8a6]/50 hover:bg-[var(--panel-soft)]/50 hover:shadow-sm transition-all group">
+                             <div className="text-[var(--muted-strong)] group-hover:text-[#14b8a6] transition-colors">
+                               {link.icon}
+                             </div>
+                             <div className="flex-1 min-w-0">
+                               <p className="text-sm font-bold text-[var(--text)] group-hover:text-[#14b8a6] transition-colors truncate">{link.name}</p>
+                               <p className="text-[11px] font-medium text-[var(--muted)] truncate mt-0.5">{link.url.replace(/^https?:\/\/(www\.)?/, '')}</p>
+                             </div>
+                             <svg className="w-4 h-4 text-[var(--muted)] opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                           </a>
+                         ))}
+                       </div>
+                     </SectionCard>
+                   )}
+                </AnimatedSection>
+
                 {/* ════ FEATURED ════ */}
                 <AnimatedSection delay={340}>
                   {isSectionLocked('featured') ? (
@@ -816,6 +885,43 @@ export default function PublicProfile() {
         </div>
       ) : null}
 
+      {/* ════ MODAL: VISIBILITY SETTINGS ════ */}
+      {visibilitySettingsOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4 backdrop-blur-md animate-fade-in">
+           <div className="w-full max-w-md rounded-3xl border border-[var(--border)] bg-[var(--panel)] p-8 shadow-2xl relative overflow-hidden">
+              <h2 className="text-2xl font-black text-[var(--text)] mb-2 text-center tracking-tight">Visibility Settings</h2>
+              <p className="text-sm font-medium text-[var(--muted-strong)] text-center mb-6">Choose who can see different sections of your profile.</p>
+              
+              <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
+                 {['activity', 'skills', 'experience', 'educationEntries', 'licenses', 'honorsAwards'].map(sectionKey => (
+                   <div key={sectionKey} className="flex flex-col gap-2 p-4 rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]">
+                     <p className="text-sm font-bold text-[var(--text)] capitalize">{sectionKey.replace(/([A-Z])/g, ' $1').trim()}</p>
+                     <select 
+                       value={visibilityDraft[sectionKey] || 'everyone'}
+                       onChange={(e) => setVisibilityDraft({...visibilityDraft, [sectionKey]: e.target.value})}
+                       className="app-input text-sm w-full py-2"
+                     >
+                       <option value="everyone">Everyone</option>
+                       <option value="connections">Connections Only</option>
+                       <option value="only_me">Only Me</option>
+                     </select>
+                   </div>
+                 ))}
+                 
+                 <div className="flex flex-col gap-2 p-4 rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] opacity-70">
+                   <p className="text-sm font-bold text-[var(--text)]">Core sections</p>
+                   <p className="text-xs text-[var(--muted-strong)]">Basic Info, Projects and Bio are always public.</p>
+                 </div>
+              </div>
+
+              <div className="flex justify-between items-center mt-6 pt-4 border-t border-[var(--border)]">
+                 <button onClick={() => setVisibilitySettingsOpen(false)} className="app-button-secondary bg-[var(--panel-soft)] px-5">Cancel</button>
+                 <button onClick={handleVisibilitySave} className="app-button shadow-lg shadow-[var(--accent)]/30 px-6">Save</button>
+              </div>
+           </div>
+        </div>
+      )}
+
       {/* ════ MODAL: BANNER SETTINGS ════ */}
       {bannerSettingsOpen && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4 backdrop-blur-md animate-fade-in">
@@ -888,6 +994,22 @@ export default function PublicProfile() {
           </div>
         </div>
       )}
+
+      <div className="resume-print-only bg-white">
+         <ResumeTemplate profile={{
+            ...profile,
+            enriched_settings: {
+               ...(profile?.enriched_settings || {}),
+               experiences: isSectionVisible('experience') ? profile?.enriched_settings?.experiences : [],
+               educationEntries: isSectionVisible('educationEntries') ? profile?.enriched_settings?.educationEntries : [],
+               licenses: isSectionVisible('licenses') ? profile?.enriched_settings?.licenses : [],
+               honorsAwards: isSectionVisible('honorsAwards') ? profile?.enriched_settings?.honorsAwards : [],
+               topSkills: isSectionVisible('skills') ? profile?.enriched_settings?.topSkills : [],
+               tools: isSectionVisible('skills') ? profile?.enriched_settings?.tools : [],
+               languages: isSectionVisible('skills') ? profile?.enriched_settings?.languages : []
+            }
+         }} />
+      </div>
     </main>
   );
 }
