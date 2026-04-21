@@ -462,8 +462,8 @@ export default async function socialRoutes(app) {
         return reply.code(404).send({ success: false, error: 'User not found' });
       }
 
-      const status = await getConnectionStatus(request.server.db, request.auth.userId, target.userId);
-      return reply.send({ status });
+      const connectionData = await getConnectionStatus(request.server.db, request.auth.userId, target.userId);
+      return reply.send(connectionData);
     } catch (error) {
       return sendError(reply, error, 'Could not load connection status.');
     }

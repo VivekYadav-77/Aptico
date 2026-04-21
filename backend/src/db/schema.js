@@ -432,6 +432,30 @@ export const squadMembers = pgTable(
   })
 );
 
+export const squadActivities = pgTable(
+  'squad_activities',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    squadId: uuid('squad_id')
+      .notNull()
+      .references(() => squads.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    activityType: varchar('activity_type', { length: 30 }).notNull(),
+    eventDate: date('event_date').notNull(),
+    quantity: integer('quantity').notNull().default(0),
+    metadata: jsonb('metadata').notNull().default({}),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    squadIdCreatedAtIdx: index('squad_activities_squad_id_created_at_idx').on(table.squadId, table.createdAt),
+    squadUserDateIdx: index('squad_activities_squad_id_user_id_event_date_idx').on(table.squadId, table.userId, table.eventDate),
+    activityTypeCheck: check(
+      'squad_activities_activity_type_check',
+      sql`${table.activityType} in ('member_joined', 'apps_logged', 'squad_ping')`
+    )
+  })
+);
+
 export const usersRelations = relations(users, ({ many }) => ({
   refreshTokens: many(refreshTokens),
   authTokens: many(authTokens),
@@ -441,7 +465,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   profileSettings: many(profileSettings),
   userExperiences: many(userExperiences),
   userEducations: many(userEducations),
-  squadMemberships: many(squadMembers)
+  squadMemberships: many(squadMembers),
+  squadActivities: many(squadActivities)
 }));
 
 export const refreshTokensRelations = relations(refreshTokens, ({ one }) => ({
@@ -509,7 +534,8 @@ export const userEducationsRelations = relations(userEducations, ({ one }) => ({
 }));
 
 export const squadsRelations = relations(squads, ({ many }) => ({
-  members: many(squadMembers)
+  members: many(squadMembers),
+  activities: many(squadActivities)
 }));
 
 export const squadMembersRelations = relations(squadMembers, ({ one }) => ({
@@ -519,6 +545,17 @@ export const squadMembersRelations = relations(squadMembers, ({ one }) => ({
   }),
   user: one(users, {
     fields: [squadMembers.userId],
+    references: [users.id]
+  })
+}));
+
+export const squadActivitiesRelations = relations(squadActivities, ({ one }) => ({
+  squad: one(squads, {
+    fields: [squadActivities.squadId],
+    references: [squads.id]
+  }),
+  user: one(users, {
+    fields: [squadActivities.userId],
     references: [users.id]
   })
 }));

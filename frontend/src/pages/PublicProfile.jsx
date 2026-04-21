@@ -10,6 +10,7 @@ import {
   getPublicFeedPosts,
   getPublicProfile,
   sendConnectionRequest,
+  respondToConnection,
   unfollowProfile
 } from '../api/socialApi.js';
 import { saveProfileSettings, fetchProfileSettings } from '../api/profileApi.js';
@@ -126,6 +127,7 @@ export default function PublicProfile() {
   const [posts, setPosts] = useState([]);
   const [isFollowing, setIsFollowing] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState('not_connected');
+  const [connectionId, setConnectionId] = useState(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [connectOpen, setConnectOpen] = useState(false);
@@ -141,29 +143,7 @@ export default function PublicProfile() {
   const [bannerPrefTemp, setBannerPrefTemp] = useState('badge');
   
   // Visibility Settings State
-  const [visibilitySettingsOpen, setVisibilitySettingsOpen] = useState(false);
-  const [visibilityDraft, setVisibilityDraft] = useState({});
 
-  async function handleVisibilitySave() {
-    try {
-      const fullSettings = await fetchProfileSettings();
-      const updatedBackendSettings = { ...fullSettings, sectionVisibility: visibilityDraft };
-      await saveProfileSettings(updatedBackendSettings);
-      
-      const updatedSettings = { ...(profile.enriched_settings || {}), sectionVisibility: visibilityDraft };
-      setProfile(p => ({ ...p, enriched_settings: updatedSettings }));
-      setVisibilitySettingsOpen(false);
-      setToast('Visibility updated successfully.');
-    } catch (e) {
-      console.error(e);
-      setToast('Failed to save visibility settings.');
-    }
-  }
-
-  function openVisibilitySettings() {
-    setVisibilityDraft(profile.enriched_settings?.sectionVisibility || {});
-    setVisibilitySettingsOpen(true);
-  }
   
   // Banner Slider Effect
   useEffect(() => {
@@ -258,7 +238,10 @@ export default function PublicProfile() {
     if (!auth.isAuthenticated || !username) return;
     getMyProfile().then(setMyProfile).catch(() => null);
     getFollowStatus(username).then(setIsFollowing).catch(() => null);
-    getConnectionStatus(username).then(setConnectionStatus).catch(() => null);
+    getConnectionStatus(username).then(data => {
+      setConnectionStatus(data.status);
+      setConnectionId(data.connectionId);
+    }).catch(() => null);
   }, [auth.isAuthenticated, username]);
 
   async function handleFollowClick() {
@@ -286,6 +269,20 @@ export default function PublicProfile() {
     setConnectOpen(false);
     setConnectNote('');
     setToast('Connection request sent.');
+  }
+
+  async function handleRespondToConnection(action) {
+    if (!connectionId) return;
+    try {
+      await respondToConnection(connectionId, action);
+      setConnectionStatus(action === 'accepted' ? 'connected' : 'not_connected');
+      if (action === 'declined') {
+        setConnectionId(null);
+      }
+      setToast(`Connection request ${action}.`);
+    } catch (e) {
+      setToast(`Failed to ${action} request.`);
+    }
   }
 
   async function shareProfile() {
@@ -490,16 +487,22 @@ export default function PublicProfile() {
                           </button>
                           {viewingOwnProfile ? (
                             <>
-                              <button type="button" onClick={openVisibilitySettings} className="app-button-secondary bg-[var(--panel)]/50 backdrop-blur flex-1 sm:flex-none justify-center">Visibility</button>
                               <Link to="/settings" className="app-button-secondary bg-[var(--panel)]/50 backdrop-blur flex-1 sm:flex-none justify-center">Edit</Link>
                               <button type="button" className="app-button-secondary bg-[var(--panel)]/50 backdrop-blur" onClick={shareProfile}><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg></button>
                               <button type="button" className="app-button shadow-lg shadow-[var(--accent)]/20" onClick={() => setComposerOpen(true)}>Post</button>
                             </>
                           ) : (
                             <>
-                              <button type="button" className={`flex-1 sm:flex-none justify-center ${connectionStatus === 'connected' ? 'app-button shadow-lg shadow-[var(--accent)]/20' : 'app-button-secondary bg-[var(--panel)]/50 backdrop-blur'}`} disabled={['connected', 'pending_sent'].includes(connectionStatus)} onClick={() => auth.isAuthenticated ? setConnectOpen(true) : navigate('/login')}>
-                                {connectionStatus === 'connected' ? '✓ Connected' : connectionStatus === 'pending_sent' ? 'Pending' : connectionStatus === 'pending_received' ? 'Respond' : 'Connect'}
-                              </button>
+                              {connectionStatus === 'pending_received' ? (
+                                <div className="flex gap-2 flex-1 sm:flex-none">
+                                  <button type="button" onClick={() => handleRespondToConnection('accepted')} className="app-button shadow-lg shadow-[var(--accent)]/20 flex-1 sm:flex-none justify-center">Accept</button>
+                                  <button type="button" onClick={() => handleRespondToConnection('declined')} className="app-button-secondary bg-[var(--panel)]/50 backdrop-blur flex-1 sm:flex-none justify-center">Decline</button>
+                                </div>
+                              ) : (
+                                <button type="button" className={`flex-1 sm:flex-none justify-center ${connectionStatus === 'connected' ? 'app-button shadow-lg shadow-[var(--accent)]/20' : 'app-button-secondary bg-[var(--panel)]/50 backdrop-blur'}`} disabled={['connected', 'pending_sent'].includes(connectionStatus)} onClick={() => auth.isAuthenticated ? setConnectOpen(true) : navigate('/login')}>
+                                  {connectionStatus === 'connected' ? '✓ Connected' : connectionStatus === 'pending_sent' ? 'Pending' : 'Connect'}
+                                </button>
+                              )}
                               <button type="button" onClick={handleFollowClick} className="app-button-secondary bg-[var(--panel)]/50 backdrop-blur flex-1 sm:flex-none justify-center">{auth.isAuthenticated && isFollowing ? 'Unfollow' : 'Follow'}</button>
                             </>
                           )}
@@ -680,24 +683,43 @@ export default function PublicProfile() {
 
                 {/* ════ DIGITAL FOOTPRINT ════ */}
                 <AnimatedSection delay={330}>
-                   {publicLinks.length > 0 && (
-                     <SectionCard id="footprint" title="Digital Footprint" accentColor="#14b8a6">
-                       <div className="flex flex-col gap-3">
-                         {publicLinks.map((link, idx) => (
-                           <a key={idx} href={link.url.startsWith('http') ? link.url : `https://${link.url}`} target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] hover:border-[#14b8a6]/50 hover:bg-[var(--panel-soft)]/50 hover:shadow-sm transition-all group">
-                             <div className="text-[var(--muted-strong)] group-hover:text-[#14b8a6] transition-colors">
-                               {link.icon}
-                             </div>
-                             <div className="flex-1 min-w-0">
-                               <p className="text-sm font-bold text-[var(--text)] group-hover:text-[#14b8a6] transition-colors truncate">{link.name}</p>
-                               <p className="text-[11px] font-medium text-[var(--muted)] truncate mt-0.5">{link.url.replace(/^https?:\/\/(www\.)?/, '')}</p>
-                             </div>
-                             <svg className="w-4 h-4 text-[var(--muted)] opacity-0 -translate-x-2 group-hover:opacity-100 group-hover:translate-x-0 transition-all" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                           </a>
-                         ))}
-                       </div>
-                     </SectionCard>
-                   )}
+                  {isSectionLocked('digitalFootprint') ? (
+                    <div className="app-panel border border-[var(--border)] p-6 shadow-sm flex flex-col items-center justify-center text-center opacity-70">
+                      <svg className="w-8 h-8 opacity-40 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                      <h3 className="text-sm font-bold opacity-80">Connect to see digital footprint</h3>
+                    </div>
+                  ) : isSectionVisible('digitalFootprint') ? (
+                    <article className="app-panel border border-[var(--border)] p-6 shadow-sm">
+                      <h3 className="text-xs font-black uppercase tracking-widest text-[var(--muted-strong)] mb-5">Digital Footprint</h3>
+                      <div className="space-y-3">
+                        {publicLinks.length ? (
+                          publicLinks.map((link, idx) => {
+                            let domain = link.name;
+                            return (
+                              <a
+                                key={idx}
+                                href={link.url.startsWith('http') ? link.url : `https://${link.url}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="group flex flex-col gap-1 p-4 rounded-xl border border-[var(--border)] bg-[var(--panel)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] transition-all shadow-sm hover:shadow-md"
+                              >
+                                <div className="flex items-center gap-2 text-[var(--text)] group-hover:text-[var(--accent-strong)]">
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                                  <span className="font-bold text-sm">{domain}</span>
+                                </div>
+                                <span className="text-xs font-medium text-[var(--muted-strong)] truncate ml-6 opacity-80 group-hover:opacity-100">{link.url}</span>
+                              </a>
+                            );
+                          })
+                        ) : (
+                           <div className="p-5 rounded-xl border border-dashed border-[var(--border)] text-center text-sm text-[var(--muted-strong)] bg-[var(--panel-soft)]">
+                             <svg className="w-5 h-5 mx-auto mb-2 opacity-50 text-[var(--muted-strong)]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /></svg>
+                             <p className="font-medium">Connect your portfolio, GitHub, or LinkedIn to increase visibility.</p>
+                           </div>
+                        )}
+                      </div>
+                    </article>
+                  ) : null}
                 </AnimatedSection>
 
                 {/* ════ FEATURED ════ */}
@@ -885,42 +907,7 @@ export default function PublicProfile() {
         </div>
       ) : null}
 
-      {/* ════ MODAL: VISIBILITY SETTINGS ════ */}
-      {visibilitySettingsOpen && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4 backdrop-blur-md animate-fade-in">
-           <div className="w-full max-w-md rounded-3xl border border-[var(--border)] bg-[var(--panel)] p-8 shadow-2xl relative overflow-hidden">
-              <h2 className="text-2xl font-black text-[var(--text)] mb-2 text-center tracking-tight">Visibility Settings</h2>
-              <p className="text-sm font-medium text-[var(--muted-strong)] text-center mb-6">Choose who can see different sections of your profile.</p>
-              
-              <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
-                 {['activity', 'skills', 'experience', 'educationEntries', 'licenses', 'honorsAwards'].map(sectionKey => (
-                   <div key={sectionKey} className="flex flex-col gap-2 p-4 rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]">
-                     <p className="text-sm font-bold text-[var(--text)] capitalize">{sectionKey.replace(/([A-Z])/g, ' $1').trim()}</p>
-                     <select 
-                       value={visibilityDraft[sectionKey] || 'everyone'}
-                       onChange={(e) => setVisibilityDraft({...visibilityDraft, [sectionKey]: e.target.value})}
-                       className="app-input text-sm w-full py-2"
-                     >
-                       <option value="everyone">Everyone</option>
-                       <option value="connections">Connections Only</option>
-                       <option value="only_me">Only Me</option>
-                     </select>
-                   </div>
-                 ))}
-                 
-                 <div className="flex flex-col gap-2 p-4 rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] opacity-70">
-                   <p className="text-sm font-bold text-[var(--text)]">Core sections</p>
-                   <p className="text-xs text-[var(--muted-strong)]">Basic Info, Projects and Bio are always public.</p>
-                 </div>
-              </div>
 
-              <div className="flex justify-between items-center mt-6 pt-4 border-t border-[var(--border)]">
-                 <button onClick={() => setVisibilitySettingsOpen(false)} className="app-button-secondary bg-[var(--panel-soft)] px-5">Cancel</button>
-                 <button onClick={handleVisibilitySave} className="app-button shadow-lg shadow-[var(--accent)]/30 px-6">Save</button>
-              </div>
-           </div>
-        </div>
-      )}
 
       {/* ════ MODAL: BANNER SETTINGS ════ */}
       {bannerSettingsOpen && (

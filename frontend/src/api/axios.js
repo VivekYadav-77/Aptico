@@ -15,13 +15,23 @@ api.interceptors.response.use(
   (error) => {
     if (error.response && error.response.data) {
       const data = error.response.data;
-      let isHighDemand = error.response.status === 503;
-      
-      // Check for Google GenAI specific error structure or message
+      const requestUrl = String(error.config?.url || '').toLowerCase();
       const errorStr = JSON.stringify(data).toLowerCase();
-      if (errorStr.includes('experiencing high demand') || errorStr.includes('unavailable') || errorStr.includes('503')) {
-        isHighDemand = true;
-      }
+      const isAiRoute =
+        requestUrl.includes('/analysis') ||
+        requestUrl.includes('/resume') ||
+        requestUrl.includes('/portfolio') ||
+        requestUrl.includes('/generate') ||
+        requestUrl.includes('/genai') ||
+        requestUrl.includes('/ai');
+      const hasAiSignal =
+        errorStr.includes('google') ||
+        errorStr.includes('gemini') ||
+        errorStr.includes('genai') ||
+        errorStr.includes('ai systems') ||
+        errorStr.includes('experiencing high demand') ||
+        errorStr.includes('model overloaded');
+      const isHighDemand = error.response.status === 503 && (isAiRoute || hasAiSignal);
 
       if (isHighDemand) {
         const msg = 'Our AI systems are currently handling exceptionally high traffic. Please try again in a few moments.';

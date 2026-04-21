@@ -122,7 +122,7 @@ export async function getPendingConnections() {
 
 export async function getConnectionStatus(username) {
   const response = await api.get(`/api/social/connections/status/${username}`);
-  return response.data.status;
+  return response.data;
 }
 
 export async function getNotifications(params = {}) {
