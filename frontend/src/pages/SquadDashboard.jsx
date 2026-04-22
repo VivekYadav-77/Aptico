@@ -96,7 +96,10 @@ export default function SquadDashboard() {
   const [pinging, setPinging] = useState(false);
   const [toast, setToast] = useState('');
   const [error, setError] = useState('');
-  const [appCount, setAppCount] = useState(1);
+  const [applicationForm, setApplicationForm] = useState({
+    companyName: '',
+    roleTitle: ''
+  });
   const [showExplainer, setShowExplainer] = useState(() => localStorage.getItem(SQUAD_EXPLAINER_KEY) !== 'true');
 
   const laggingCount = useMemo(
@@ -143,16 +146,28 @@ export default function SquadDashboard() {
   }
 
   async function handleLogApps() {
+    const companyName = applicationForm.companyName.trim();
+    const roleTitle = applicationForm.roleTitle.trim();
+
+    if (companyName.length < 3 || roleTitle.length < 3) {
+      setError('Enter both a company name and a role title with at least 3 characters.');
+      return;
+    }
+
     setLoggingApps(true);
     setError('');
 
     try {
-      const response = await logSquadApplications(appCount);
+      const response = await logSquadApplications({ companyName, roleTitle });
       setSquadData(response.data || null);
+      setApplicationForm({
+        companyName: '',
+        roleTitle: ''
+      });
       setToast(
         response.goalRewardGranted
           ? 'Weekly goal reached. Squad XP has been granted.'
-          : `${appCount} application${appCount > 1 ? 's' : ''} logged. Squad total is now ${response.data?.squad?.totalApps || 0}.`
+          : `${roleTitle} at ${companyName} logged. Squad total is now ${response.data?.squad?.totalApps || 0}.`
       );
     } catch (apiError) {
       setError(apiError.response?.data?.error || 'Could not log applications.');
@@ -448,23 +463,45 @@ export default function SquadDashboard() {
                 ))}
               </div>
 
-              <div className="mt-8 rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] p-4">
-                <p className="app-kicker">Log output</p>
-                <div className="mt-3 flex flex-col gap-3 sm:flex-row">
-                  <label className="flex-1">
-                    <span className="mb-2 block text-sm font-semibold text-[var(--text)]">Applications to add</span>
+                <div className="mt-8 rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] p-4">
+                  <p className="app-kicker">Log output</p>
+                <div className="mt-3 grid gap-3">
+                  <label>
+                    <span className="mb-2 block text-sm font-semibold text-[var(--text)]">Company Name</span>
                     <input
-                      type="number"
-                      min="1"
-                      max="25"
-                      value={appCount}
-                      onChange={(event) => setAppCount(Math.max(1, Math.min(25, Number(event.target.value) || 1)))}
+                      type="text"
+                      value={applicationForm.companyName}
+                      onChange={(event) =>
+                        setApplicationForm((current) => ({
+                          ...current,
+                          companyName: event.target.value
+                        }))
+                      }
+                      placeholder="Acme Labs"
                       className="app-input"
                     />
                   </label>
-                  <button type="button" onClick={handleLogApps} className="app-button sm:self-end" disabled={loggingApps}>
+                  <label>
+                    <span className="mb-2 block text-sm font-semibold text-[var(--text)]">Role Title</span>
+                    <input
+                      type="text"
+                      value={applicationForm.roleTitle}
+                      onChange={(event) =>
+                        setApplicationForm((current) => ({
+                          ...current,
+                          roleTitle: event.target.value
+                        }))
+                      }
+                      placeholder="Frontend Engineer"
+                      className="app-input"
+                    />
+                  </label>
+                  <button type="button" onClick={handleLogApps} className="app-button sm:self-start" disabled={loggingApps}>
                     {loggingApps ? 'Updating...' : 'Submit'}
                   </button>
+                </div>
+                <div className="mt-4 rounded-2xl border border-[var(--warning-border)] bg-[var(--warning-soft)] px-4 py-3 text-sm font-semibold text-[var(--warning-text)]">
+                  These entries are permanently visible to recruiters on your public profile. Ensure your data is accurate.
                 </div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
                   <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3">

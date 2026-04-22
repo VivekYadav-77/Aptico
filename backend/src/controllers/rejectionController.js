@@ -1,19 +1,13 @@
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { rejectionLogs, users } from '../db/schema.js';
+import { applyXpDecayIfNeeded, calculateRejectionXp, grantXp, shouldShadowban } from '../services/xpEngine.js';
 
 const rejectionSchema = z.object({
   companyName: z.string().trim().min(1).max(160),
   roleTitle: z.string().trim().min(1).max(160),
   stageRejected: z.enum(['resume', 'first_round', 'hiring_manager', 'final'])
 });
-
-const STAGE_XP = {
-  resume: 50,
-  first_round: 100,
-  hiring_manager: 175,
-  final: 250
-};
 
 function requireDatabase(db) {
   if (!db) {
@@ -28,23 +22,38 @@ export async function createRejectionController(request, reply) {
     requireDatabase(request.server.db);
 
     const body = rejectionSchema.parse(request.body || {});
-    const xpEarned = STAGE_XP[body.stageRejected];
+    const xpEarned = calculateRejectionXp(body.stageRejected);
+    const shadowbanDecision = await shouldShadowban(
+      request.server.db,
+      request.auth.userId,
+      body.companyName,
+      body.roleTitle,
+      { kind: 'rejection' }
+    );
 
     await request.server.db.insert(rejectionLogs).values({
       userId: request.auth.userId,
       companyName: body.companyName,
       roleTitle: body.roleTitle,
-      stageRejected: body.stageRejected
+      stageRejected: body.stageRejected,
+      isShadowbanned: shadowbanDecision.shadowbanned
     });
 
-    await request.server.db
-      .update(users)
-      .set({
-        resilienceXp: sql`${users.resilienceXp} + ${xpEarned}`
-      })
-      .where(eq(users.id, request.auth.userId));
+    if (!shadowbanDecision.shadowbanned) {
+      await applyXpDecayIfNeeded(request.server.db, request.auth.userId);
+      const resilienceXp = await grantXp(request.server.db, request.auth.userId, xpEarned);
 
-    const [updatedUser] = await request.server.db
+      return reply.code(201).send({
+        success: true,
+        data: {
+          xpEarned,
+          resilienceXp,
+          level: Math.floor(resilienceXp / 1000) + 1
+        }
+      });
+    }
+
+    const [currentUser] = await request.server.db
       .select({
         resilienceXp: users.resilienceXp
       })
@@ -56,8 +65,8 @@ export async function createRejectionController(request, reply) {
       success: true,
       data: {
         xpEarned,
-        resilienceXp: updatedUser?.resilienceXp || 0,
-        level: Math.floor((updatedUser?.resilienceXp || 0) / 1000) + 1
+        resilienceXp: Number(currentUser?.resilienceXp || 0),
+        level: Math.floor(Number(currentUser?.resilienceXp || 0) / 1000) + 1
       }
     });
   } catch (error) {

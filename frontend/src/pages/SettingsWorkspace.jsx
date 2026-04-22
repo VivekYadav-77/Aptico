@@ -635,7 +635,8 @@ export default function SettingsWorkspace() {
                             { key: 'education', label: 'Education' },
                             { key: 'licenses', label: 'Licenses & Certifications' },
                             { key: 'skills', label: 'Skills' },
-                            { key: 'honorsAwards', label: 'Honors & Awards' }, { key: 'digitalFootprint', label: 'Digital Footprint' }
+                            { key: 'honorsAwards', label: 'Honors & Awards' }, { key: 'digitalFootprint', label: 'Digital Footprint' },
+                            { key: 'resiliencePortfolio', label: 'Proof of Resilience' }
                           ].map(({ key, label }) => {
                             const currentValue = draft.sectionVisibility?.[key] || 'everyone';
                             return (

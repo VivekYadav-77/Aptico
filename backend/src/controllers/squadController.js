@@ -1,13 +1,15 @@
 import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { notifications, squadActivities, squadMembers, squads, users } from '../db/schema.js';
+import { applicationLogs, notifications, squadActivities, squadMembers, squads, users } from '../db/schema.js';
+import { applyXpDecayIfNeeded, calculateApplicationXp, getTodayIntegrityCounts, grantXp, shouldShadowban } from '../services/xpEngine.js';
 
 const joinSquadSchema = z.object({
   weeklyGoal: z.coerce.number().int().min(4).max(500).optional()
 });
 
 const logAppSchema = z.object({
-  count: z.coerce.number().int().min(1).max(25).default(1)
+  companyName: z.string().trim().min(3).max(160),
+  roleTitle: z.string().trim().min(3).max(160)
 });
 
 const pingSchema = z.object({
@@ -121,6 +123,17 @@ function buildWeekTimeline(weekOf) {
 
 function buildActivityMessage(activity, actorAlias) {
   if (activity.activityType === 'apps_logged') {
+    const companyName = String(activity.metadata?.companyName || '').trim();
+    const roleTitle = String(activity.metadata?.roleTitle || '').trim();
+
+    if (companyName && roleTitle) {
+      return `${actorAlias || 'A squadmate'} logged ${roleTitle} at ${companyName}.`;
+    }
+
+    if (companyName) {
+      return `${actorAlias || 'A squadmate'} logged an application to ${companyName}.`;
+    }
+
     return `${actorAlias || 'A squadmate'} logged ${activity.quantity} application${activity.quantity === 1 ? '' : 's'}.`;
   }
 
@@ -701,23 +714,53 @@ export async function logSquadAppController(request, reply) {
       });
     }
 
-    await request.server.db
-      .update(squadMembers)
-      .set({
-        appsSentThisWeek: sql`${squadMembers.appsSentThisWeek} + ${body.count}`
-      })
-      .where(eq(squadMembers.userId, request.auth.userId));
+    const shadowbanDecision = await shouldShadowban(
+      request.server.db,
+      request.auth.userId,
+      body.companyName,
+      body.roleTitle
+    );
 
-    await createSquadActivity(request.server.db, {
-      squadId: membership.squadId,
+    await request.server.db.insert(applicationLogs).values({
       userId: request.auth.userId,
-      activityType: 'apps_logged',
-      eventDate: getCurrentDateKey(),
-      quantity: body.count,
-      metadata: {}
+      squadId: membership.squadId,
+      companyName: body.companyName,
+      roleTitle: body.roleTitle,
+      isShadowbanned: shadowbanDecision.shadowbanned
     });
 
-    const goalRewardGranted = await grantGoalRewardIfNeeded(request.server.db, membership.squadId, request.auth.userId);
+    let goalRewardGranted = false;
+
+    if (!shadowbanDecision.shadowbanned) {
+      await applyXpDecayIfNeeded(request.server.db, request.auth.userId);
+      const counts = await getTodayIntegrityCounts(request.server.db, request.auth.userId);
+      const xpEarned = calculateApplicationXp(counts.applicationsToday);
+
+      await grantXp(request.server.db, request.auth.userId, xpEarned);
+
+      await request.server.db
+        .update(squadMembers)
+        .set({
+          appsSentThisWeek: sql`${squadMembers.appsSentThisWeek} + 1`
+        })
+        .where(eq(squadMembers.userId, request.auth.userId));
+
+      await createSquadActivity(request.server.db, {
+        squadId: membership.squadId,
+        userId: request.auth.userId,
+        activityType: 'apps_logged',
+        eventDate: getCurrentDateKey(),
+        quantity: 1,
+        metadata: {
+          companyName: body.companyName,
+          roleTitle: body.roleTitle,
+          xpEarned
+        }
+      });
+
+      goalRewardGranted = await grantGoalRewardIfNeeded(request.server.db, membership.squadId, request.auth.userId);
+    }
+
     const snapshot = await getSquadSnapshot(request.server.db, request.auth.userId, currentWeek);
 
     return reply.send({

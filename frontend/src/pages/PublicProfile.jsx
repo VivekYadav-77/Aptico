@@ -118,6 +118,62 @@ function MiniPost({ post }) {
   );
 }
 
+function heatmapCellClass(intensity) {
+  switch (intensity) {
+    case 'strong':
+      return 'bg-emerald-500';
+    case 'medium':
+      return 'bg-emerald-400/80';
+    case 'light':
+      return 'bg-emerald-300/65';
+    default:
+      return 'bg-[var(--panel)] border border-[var(--border)]';
+  }
+}
+
+function ResilienceHeatmap({ heatmap = [] }) {
+  return (
+    <div className="grid grid-cols-6 gap-2 sm:grid-cols-10">
+      {heatmap.map((day) => (
+        <div key={day.date} className="flex flex-col items-center gap-1.5">
+          <div
+            title={`${day.date}: ${day.count} application${day.count === 1 ? '' : 's'}`}
+            className={`h-8 w-full rounded-lg ${heatmapCellClass(day.intensity)}`}
+          />
+          <span className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--muted)]">
+            {day.date.slice(5)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ResilienceFeed({ items = [], renderMeta, emptyLabel }) {
+  if (!items.length) {
+    return (
+      <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--panel-soft)]/50 px-4 py-5 text-sm text-[var(--muted-strong)]">
+        {emptyLabel}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {items.map((item, index) => (
+        <div key={`${item.companyName}-${item.roleTitle}-${item.createdAt}-${index}`} className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 px-4 py-3">
+          <p className="text-sm font-bold text-[var(--text)]">
+            {item.companyName} <span className="text-[var(--muted)]">·</span> {item.roleTitle}
+          </p>
+          <p className="mt-1 text-xs uppercase tracking-[0.18em] text-[var(--muted)]">
+            {renderMeta(item)}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function PublicProfile() {
   const { username } = useParams();
   const auth = useSelector(selectAuth);
@@ -349,6 +405,7 @@ export default function PublicProfile() {
   const canSeeConnections = viewingOwnProfile || connectionStatus === 'connected';
   const readiness = Number(profile.latest_analysis?.confidence_score || 0);
   const es = profile.enriched_settings || {};
+  const resiliencePortfolio = profile.resilience_portfolio || null;
   const sectionVis = es.sectionVisibility || {};
   const viewerRel = viewingOwnProfile ? 'self' : (es.viewerRelationship || 'public');
   const publicLinks = [
@@ -722,6 +779,74 @@ export default function PublicProfile() {
                   ) : null}
                 </AnimatedSection>
 
+                <AnimatedSection delay={335}>
+                  {isSectionLocked('resiliencePortfolio') ? (
+                    <SectionCard
+                      id="resilience-portfolio"
+                      title="Proof of Resilience"
+                      accentColor="#10b981"
+                      locked
+                      lockedMessage="Connect to see proof of resilience"
+                    />
+                  ) : isSectionVisible('resiliencePortfolio') ? (
+                    <SectionCard
+                      id="resilience-portfolio"
+                      title="Proof of Resilience"
+                      accentColor="#10b981"
+                      isEmpty={!resiliencePortfolio}
+                      emptyMessage="No resilience activity has been shared yet."
+                    >
+                      {resiliencePortfolio ? (
+                        <div className="space-y-5">
+                          <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4">
+                            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Daily Application Streak</p>
+                            <div className="mt-4">
+                              <ResilienceHeatmap heatmap={resiliencePortfolio.heatmap || []} />
+                            </div>
+                          </div>
+
+                          <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4">
+                              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Total Applications</p>
+                              <p className="mt-2 text-2xl font-black text-[var(--text)]">{resiliencePortfolio.stats?.totalApplications || 0}</p>
+                            </div>
+                            <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4">
+                              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Total Rejections</p>
+                              <p className="mt-2 text-2xl font-black text-[var(--text)]">{resiliencePortfolio.stats?.totalRejections || 0}</p>
+                            </div>
+                            <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4">
+                              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">7-Day Daily Average</p>
+                              <p className="mt-2 text-2xl font-black text-[var(--text)]">{resiliencePortfolio.stats?.currentDailyAverage || 0}</p>
+                            </div>
+                            <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4">
+                              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Longest Streak</p>
+                              <p className="mt-2 text-2xl font-black text-[var(--text)]">{resiliencePortfolio.stats?.longestStreak || 0} days</p>
+                            </div>
+                          </div>
+
+                          <div>
+                            <p className="mb-3 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Application History</p>
+                            <ResilienceFeed
+                              items={resiliencePortfolio.applicationHistory || []}
+                              renderMeta={(item) => item.dateLabel}
+                              emptyLabel="No public application history yet."
+                            />
+                          </div>
+
+                          <div>
+                            <p className="mb-3 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Rejection Journey</p>
+                            <ResilienceFeed
+                              items={resiliencePortfolio.rejectionJourney || []}
+                              renderMeta={(item) => `${item.stageLabel} · ${item.dateLabel}`}
+                              emptyLabel="No public rejection journey yet."
+                            />
+                          </div>
+                        </div>
+                      ) : null}
+                    </SectionCard>
+                  ) : null}
+                </AnimatedSection>
+
                 {/* ════ FEATURED ════ */}
                 <AnimatedSection delay={340}>
                   {isSectionLocked('featured') ? (
@@ -988,7 +1113,7 @@ export default function PublicProfile() {
             enriched_settings: {
                ...(profile?.enriched_settings || {}),
                experiences: isSectionVisible('experience') ? profile?.enriched_settings?.experiences : [],
-               educationEntries: isSectionVisible('educationEntries') ? profile?.enriched_settings?.educationEntries : [],
+               educationEntries: isSectionVisible('education') ? profile?.enriched_settings?.educationEntries : [],
                licenses: isSectionVisible('licenses') ? profile?.enriched_settings?.licenses : [],
                honorsAwards: isSectionVisible('honorsAwards') ? profile?.enriched_settings?.honorsAwards : [],
                topSkills: isSectionVisible('skills') ? profile?.enriched_settings?.topSkills : [],

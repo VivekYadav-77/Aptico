@@ -10,8 +10,8 @@ export async function getMySquad() {
   return response.data;
 }
 
-export async function logSquadApplications(count = 1) {
-  const response = await api.post('/api/squads/log-app', { count });
+export async function logSquadApplications(payload) {
+  const response = await api.post('/api/squads/log-app', payload);
   return response.data;
 }
 

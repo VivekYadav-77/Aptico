@@ -24,6 +24,7 @@ export const users = pgTable('users', {
   googleSubject: text('google_subject'),
   role: text('role').notNull().default('user'),
   resilienceXp: integer('resilience_xp').notNull().default(0),
+  lastXpDecayAt: timestamp('last_xp_decay_at', { withTimezone: true }),
   emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   lastLogin: timestamp('last_login', { withTimezone: true })
@@ -135,6 +136,7 @@ export const rejectionLogs = pgTable(
     companyName: text('company_name').notNull(),
     roleTitle: text('role_title').notNull(),
     stageRejected: text('stage_rejected').notNull(),
+    isShadowbanned: boolean('is_shadowbanned').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
   },
   (table) => ({
@@ -456,6 +458,26 @@ export const squadActivities = pgTable(
   })
 );
 
+export const applicationLogs = pgTable(
+  'application_logs',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    squadId: uuid('squad_id').references(() => squads.id, { onDelete: 'set null' }),
+    companyName: text('company_name').notNull(),
+    roleTitle: text('role_title').notNull(),
+    isShadowbanned: boolean('is_shadowbanned').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    userIdIdx: index('application_logs_user_id_idx').on(table.userId),
+    userIdCreatedAtIdx: index('application_logs_user_id_created_at_idx').on(table.userId, table.createdAt),
+    squadIdIdx: index('application_logs_squad_id_idx').on(table.squadId)
+  })
+);
+
 export const usersRelations = relations(users, ({ many }) => ({
   refreshTokens: many(refreshTokens),
   authTokens: many(authTokens),
@@ -466,7 +488,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   userExperiences: many(userExperiences),
   userEducations: many(userEducations),
   squadMemberships: many(squadMembers),
-  squadActivities: many(squadActivities)
+  squadActivities: many(squadActivities),
+  applicationLogs: many(applicationLogs)
 }));
 
 export const refreshTokensRelations = relations(refreshTokens, ({ one }) => ({
@@ -509,6 +532,17 @@ export const rejectionLogsRelations = relations(rejectionLogs, ({ one }) => ({
   user: one(users, {
     fields: [rejectionLogs.userId],
     references: [users.id]
+  })
+}));
+
+export const applicationLogsRelations = relations(applicationLogs, ({ one }) => ({
+  user: one(users, {
+    fields: [applicationLogs.userId],
+    references: [users.id]
+  }),
+  squad: one(squads, {
+    fields: [applicationLogs.squadId],
+    references: [squads.id]
   })
 }));
 

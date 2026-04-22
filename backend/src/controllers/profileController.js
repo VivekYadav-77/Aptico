@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { analyses, generatedContent, profileSettings, savedJobs, userExperiences, userProfiles, users } from '../db/schema.js';
 import { env } from '../config/env.js';
 import { generatePortfolioReadme } from '../services/geminiService.js';
+import { ensureUserProfile } from '../services/profileService.js';
 
 const profileSettingsSchema = z.object({
   firstName: z.string().trim().max(100),
@@ -347,6 +348,39 @@ export async function upsertProfileSettingsController(request, reply) {
         .update(users)
         .set({ name: fullName })
         .where(eq(users.id, request.auth.userId));
+    }
+
+    const userRows = await request.server.db
+      .select({
+        id: users.id,
+        email: users.email,
+        name: users.name
+      })
+      .from(users)
+      .where(eq(users.id, request.auth.userId))
+      .limit(1);
+
+    const currentUser = userRows[0];
+
+    if (currentUser) {
+      await ensureUserProfile(request.server.db, currentUser);
+
+      const updatedProfiles = await request.server.db
+        .update(userProfiles)
+        .set({
+          headline: body.headline || null,
+          location: body.location || null,
+          skills: Array.isArray(body.topSkills) && body.topSkills.length ? body.topSkills : null,
+          isPublic: body.publicProfile,
+          updatedAt: new Date()
+        })
+        .where(eq(userProfiles.userId, request.auth.userId))
+        .returning({ username: userProfiles.username });
+
+      const username = updatedProfiles[0]?.username;
+      if (username) {
+        await request.server.services?.redis?.del(`profile:username:${username}`);
+      }
     }
 
     return reply.send({

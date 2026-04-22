@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
-import { and, desc, eq, inArray, ne, or, sql } from 'drizzle-orm';
-import { analyses, connections, follows, profileSettings, userProfiles, users } from '../db/schema.js';
+import { and, asc, desc, eq, gte, inArray, ne, or, sql } from 'drizzle-orm';
+import { analyses, applicationLogs, connections, follows, profileSettings, rejectionLogs, userProfiles, users } from '../db/schema.js';
 import { createNotification } from '../utils/notificationHelper.js';
 
 const USERNAME_PATTERN = /^[a-z0-9_-]{3,30}$/;
@@ -94,6 +94,163 @@ function normalizeProfileData(data) {
   };
 }
 
+function startOfUtcDay(date) {
+  const next = new Date(date);
+  next.setUTCHours(0, 0, 0, 0);
+  return next;
+}
+
+function toDateKey(date) {
+  return startOfUtcDay(date).toISOString().slice(0, 10);
+}
+
+function addUtcDays(date, days) {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+function formatDisplayDate(value) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  });
+}
+
+function calculateLongestStreak(dateKeys) {
+  if (!dateKeys.length) {
+    return 0;
+  }
+
+  let longest = 0;
+  let current = 0;
+  let previous = null;
+
+  for (const key of dateKeys) {
+    const currentDate = new Date(`${key}T00:00:00Z`);
+
+    if (!previous) {
+      current = 1;
+    } else {
+      const dayDiff = Math.round((currentDate.getTime() - previous.getTime()) / 86400000);
+      current = dayDiff === 1 ? current + 1 : 1;
+    }
+
+    longest = Math.max(longest, current);
+    previous = currentDate;
+  }
+
+  return longest;
+}
+
+async function buildResiliencePortfolio(db, profileOwnerId) {
+  const now = new Date();
+  const today = startOfUtcDay(now);
+  const applicationsSince = addUtcDays(today, -89);
+  const heatmapSince = addUtcDays(today, -29);
+  const averageSince = addUtcDays(today, -6);
+
+  const [recentApplications, recentRejections, totalApplicationsRows, totalRejectionsRows, streakRows] = await Promise.all([
+    db
+      .select({
+        companyName: applicationLogs.companyName,
+        roleTitle: applicationLogs.roleTitle,
+        createdAt: applicationLogs.createdAt
+      })
+      .from(applicationLogs)
+      .where(
+        and(
+          eq(applicationLogs.userId, profileOwnerId),
+          eq(applicationLogs.isShadowbanned, false),
+          gte(applicationLogs.createdAt, applicationsSince)
+        )
+      )
+      .orderBy(desc(applicationLogs.createdAt)),
+    db
+      .select({
+        companyName: rejectionLogs.companyName,
+        roleTitle: rejectionLogs.roleTitle,
+        stageRejected: rejectionLogs.stageRejected,
+        createdAt: rejectionLogs.createdAt
+      })
+      .from(rejectionLogs)
+      .where(
+        and(
+          eq(rejectionLogs.userId, profileOwnerId),
+          eq(rejectionLogs.isShadowbanned, false),
+          gte(rejectionLogs.createdAt, applicationsSince)
+        )
+      )
+      .orderBy(desc(rejectionLogs.createdAt)),
+    db
+      .select({ total: sql`count(*)::int` })
+      .from(applicationLogs)
+      .where(and(eq(applicationLogs.userId, profileOwnerId), eq(applicationLogs.isShadowbanned, false))),
+    db
+      .select({ total: sql`count(*)::int` })
+      .from(rejectionLogs)
+      .where(and(eq(rejectionLogs.userId, profileOwnerId), eq(rejectionLogs.isShadowbanned, false))),
+    db
+      .select({
+        createdAt: applicationLogs.createdAt
+      })
+      .from(applicationLogs)
+      .where(and(eq(applicationLogs.userId, profileOwnerId), eq(applicationLogs.isShadowbanned, false)))
+      .orderBy(asc(applicationLogs.createdAt))
+  ]);
+
+  const dailyCounts = new Map();
+
+  for (let index = 0; index < 30; index += 1) {
+    const date = addUtcDays(heatmapSince, index);
+    dailyCounts.set(toDateKey(date), 0);
+  }
+
+  for (const row of recentApplications) {
+    const key = toDateKey(row.createdAt);
+    if (dailyCounts.has(key)) {
+      dailyCounts.set(key, Number(dailyCounts.get(key) || 0) + 1);
+    }
+  }
+
+  const applicationDateKeys = [...new Set(streakRows.map((row) => toDateKey(row.createdAt)))];
+  const averageWindowCount = recentApplications.filter((row) => row.createdAt && new Date(row.createdAt).getTime() >= averageSince.getTime()).length;
+
+  return {
+    heatmap: Array.from(dailyCounts.entries()).map(([date, count]) => ({
+      date,
+      count,
+      intensity: count >= 5 ? 'strong' : count >= 3 ? 'medium' : count >= 1 ? 'light' : 'empty'
+    })),
+    applicationHistory: recentApplications.slice(0, 10).map((row) => ({
+      companyName: row.companyName,
+      roleTitle: row.roleTitle,
+      createdAt: row.createdAt,
+      dateLabel: formatDisplayDate(row.createdAt)
+    })),
+    rejectionJourney: recentRejections.slice(0, 10).map((row) => ({
+      companyName: row.companyName,
+      roleTitle: row.roleTitle,
+      stageRejected: row.stageRejected,
+      stageLabel: String(row.stageRejected || '').replace(/_/g, ' '),
+      createdAt: row.createdAt,
+      dateLabel: formatDisplayDate(row.createdAt)
+    })),
+    stats: {
+      totalApplications: Number(totalApplicationsRows[0]?.total || 0),
+      totalRejections: Number(totalRejectionsRows[0]?.total || 0),
+      currentDailyAverage: Number((averageWindowCount / 7).toFixed(1)),
+      longestStreak: calculateLongestStreak(applicationDateKeys)
+    }
+  };
+}
+
 export async function createOrUpdateProfile(db, userId, data) {
   const profile = normalizeProfileData(data);
 
@@ -139,9 +296,11 @@ export async function createOrUpdateProfile(db, userId, data) {
 }
 
 export async function getPublicProfile(db, username, viewerId = null) {
+  const normalizedUsername = String(username || '').trim().toLowerCase();
   const rows = await db
     .select({
       user_id: userProfiles.userId,
+      is_public: userProfiles.isPublic,
       username: userProfiles.username,
       headline: userProfiles.headline,
       location: userProfiles.location,
@@ -154,7 +313,7 @@ export async function getPublicProfile(db, username, viewerId = null) {
     })
     .from(userProfiles)
     .innerJoin(users, eq(userProfiles.userId, users.id))
-    .where(and(eq(userProfiles.username, username), eq(userProfiles.isPublic, true)))
+    .where(eq(userProfiles.username, normalizedUsername))
     .limit(1);
 
   if (!rows[0]) {
@@ -175,6 +334,13 @@ export async function getPublicProfile(db, username, viewerId = null) {
   // Determine viewer relationship
   const isSelf = viewerId && viewerId === profileOwnerId;
   let isConnected = false;
+  const effectiveIsPublic = typeof rawSettings.publicProfile === 'boolean'
+    ? rawSettings.publicProfile
+    : rows[0].is_public !== false;
+
+  if (!effectiveIsPublic && !isSelf) {
+    throw serviceError('Profile not found', 404);
+  }
 
   if (viewerId && !isSelf) {
     const connRows = await db
@@ -286,6 +452,10 @@ export async function getPublicProfile(db, username, viewerId = null) {
     }
   }
 
+  const resiliencePortfolio = canViewSection('resiliencePortfolio')
+    ? await buildResiliencePortfolio(db, profileOwnerId)
+    : null;
+
   // Fetch analysis, connections as before
   const latestAnalysisRows = await db
     .select({
@@ -322,6 +492,7 @@ export async function getPublicProfile(db, username, viewerId = null) {
   return {
     ...rows[0],
     enriched_settings: enrichedSettings,
+    resilience_portfolio: resiliencePortfolio,
     connection_count: connectionRows.length,
     connections_preview: connectionPreview,
     latest_analysis: latestAnalysis

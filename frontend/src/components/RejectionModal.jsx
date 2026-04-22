@@ -211,6 +211,10 @@ export default function RejectionModal({ isOpen, onClose, onSuccess }) {
               </div>
             </div>
 
+            <div className="rounded-2xl border border-[var(--warning-border)] bg-[var(--warning-soft)] px-4 py-3 text-sm font-semibold text-[var(--warning-text)]">
+              These entries are permanently visible to recruiters on your public profile. Ensure your data is accurate.
+            </div>
+
             {error ? (
               <div className="rounded-2xl border border-[var(--warning-border)] bg-[var(--warning-soft)] px-4 py-3 text-sm text-[var(--warning-text)]">
                 {error}
