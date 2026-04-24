@@ -135,6 +135,7 @@ export const rejectionLogs = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     companyName: text('company_name').notNull(),
     roleTitle: text('role_title').notNull(),
+    jobUrl: text('job_url'),
     stageRejected: text('stage_rejected').notNull(),
     isShadowbanned: boolean('is_shadowbanned').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
@@ -468,6 +469,7 @@ export const applicationLogs = pgTable(
     squadId: uuid('squad_id').references(() => squads.id, { onDelete: 'set null' }),
     companyName: text('company_name').notNull(),
     roleTitle: text('role_title').notNull(),
+    jobUrl: text('job_url'),
     isShadowbanned: boolean('is_shadowbanned').notNull().default(false),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
   },

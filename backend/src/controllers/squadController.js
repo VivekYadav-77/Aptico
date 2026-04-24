@@ -9,7 +9,11 @@ const joinSquadSchema = z.object({
 
 const logAppSchema = z.object({
   companyName: z.string().trim().min(3).max(160),
-  roleTitle: z.string().trim().min(3).max(160)
+  roleTitle: z.string().trim().min(3).max(160),
+  jobUrl: z.preprocess(
+    (value) => (typeof value === 'string' && !value.trim() ? undefined : value),
+    z.string().trim().url().max(500).optional()
+  )
 });
 
 const pingSchema = z.object({
@@ -51,8 +55,13 @@ function isMissingSquadSchemaError(error) {
   return error?.code === '42P01' && (
     String(error?.message || '').includes('relation "squad_members" does not exist') ||
     String(error?.message || '').includes('relation "squads" does not exist') ||
-    String(error?.message || '').includes('relation "squad_activities" does not exist')
+    String(error?.message || '').includes('relation "squad_activities" does not exist') ||
+    String(error?.message || '').includes('relation "application_logs" does not exist')
   );
+}
+
+function isMissingJobUrlColumnError(error) {
+  return error?.code === '42703' && String(error?.message || '').includes('job_url');
 }
 
 function getWeekStart(date = new Date()) {
@@ -197,6 +206,19 @@ async function createSquadActivity(db, values) {
     quantity: values.quantity || 0,
     metadata: values.metadata || {}
   });
+}
+
+async function insertApplicationLog(db, values) {
+  try {
+    await db.insert(applicationLogs).values(values);
+  } catch (error) {
+    if (!isMissingJobUrlColumnError(error)) {
+      throw error;
+    }
+
+    const { jobUrl: _jobUrl, ...fallbackValues } = values;
+    await db.insert(applicationLogs).values(fallbackValues);
+  }
 }
 
 async function ensureCurrentSquadWeek(db, squadId, currentWeek) {
@@ -721,11 +743,12 @@ export async function logSquadAppController(request, reply) {
       body.roleTitle
     );
 
-    await request.server.db.insert(applicationLogs).values({
+    await insertApplicationLog(request.server.db, {
       userId: request.auth.userId,
       squadId: membership.squadId,
       companyName: body.companyName,
       roleTitle: body.roleTitle,
+      jobUrl: body.jobUrl || null,
       isShadowbanned: shadowbanDecision.shadowbanned
     });
 
@@ -754,6 +777,7 @@ export async function logSquadAppController(request, reply) {
         metadata: {
           companyName: body.companyName,
           roleTitle: body.roleTitle,
+          jobUrl: body.jobUrl || null,
           xpEarned
         }
       });

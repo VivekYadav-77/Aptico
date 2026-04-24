@@ -36,6 +36,14 @@ const SHADOWBAN_STRINGS = new Set([
   '1234'
 ]);
 
+function isMissingRelationError(error, relationName) {
+  return error?.code === '42P01' && String(error?.message || '').includes(`relation "${relationName}" does not exist`);
+}
+
+function isMissingColumnError(error, columnName) {
+  return error?.code === '42703' && String(error?.message || '').includes(columnName);
+}
+
 function getUtcDayRange(now = new Date()) {
   const start = new Date(now);
   start.setUTCHours(0, 0, 0, 0);
@@ -82,8 +90,10 @@ function isPlausibleText(value) {
 export async function getTodayIntegrityCounts(db, userId, now = new Date()) {
   const { start, end } = getUtcDayRange(now);
 
-  const [appRows, rejectionRows] = await Promise.all([
-    db
+  let appRows = [{ count: 0 }];
+
+  try {
+    appRows = await db
       .select({ count: sql`count(*)::int` })
       .from(applicationLogs)
       .where(
@@ -93,8 +103,28 @@ export async function getTodayIntegrityCounts(db, userId, now = new Date()) {
           gte(applicationLogs.createdAt, start),
           lt(applicationLogs.createdAt, end)
         )
-      ),
-    db
+      );
+  } catch (error) {
+    if (isMissingColumnError(error, 'is_shadowbanned')) {
+      appRows = await db
+        .select({ count: sql`count(*)::int` })
+        .from(applicationLogs)
+        .where(
+          and(
+            eq(applicationLogs.userId, userId),
+            gte(applicationLogs.createdAt, start),
+            lt(applicationLogs.createdAt, end)
+          )
+        );
+    } else if (!isMissingRelationError(error, 'application_logs')) {
+      throw error;
+    }
+  }
+
+  let rejectionRows = [{ count: 0 }];
+
+  try {
+    rejectionRows = await db
       .select({ count: sql`count(*)::int` })
       .from(rejectionLogs)
       .where(
@@ -104,8 +134,23 @@ export async function getTodayIntegrityCounts(db, userId, now = new Date()) {
           gte(rejectionLogs.createdAt, start),
           lt(rejectionLogs.createdAt, end)
         )
-      )
-  ]);
+      );
+  } catch (error) {
+    if (!isMissingColumnError(error, 'is_shadowbanned')) {
+      throw error;
+    }
+
+    rejectionRows = await db
+      .select({ count: sql`count(*)::int` })
+      .from(rejectionLogs)
+      .where(
+        and(
+          eq(rejectionLogs.userId, userId),
+          gte(rejectionLogs.createdAt, start),
+          lt(rejectionLogs.createdAt, end)
+        )
+      );
+  }
 
   return {
     applicationsToday: Number(appRows[0]?.count || 0),

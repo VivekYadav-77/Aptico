@@ -84,6 +84,14 @@ function serviceError(message, statusCode) {
   return error;
 }
 
+function isMissingRelationError(error, relationName) {
+  return error?.code === '42P01' && String(error?.message || '').includes(`relation "${relationName}" does not exist`);
+}
+
+function isMissingColumnError(error, columnName) {
+  return error?.code === '42703' && String(error?.message || '').includes(columnName);
+}
+
 function normalizeProfileData(data) {
   return {
     username: String(data.username || '').trim(),
@@ -155,55 +163,130 @@ async function buildResiliencePortfolio(db, profileOwnerId) {
   const applicationsSince = addUtcDays(today, -89);
   const heatmapSince = addUtcDays(today, -29);
   const averageSince = addUtcDays(today, -6);
+  let recentApplications = [];
+  let totalApplicationsRows = [{ total: 0 }];
+  let streakRows = [];
 
-  const [recentApplications, recentRejections, totalApplicationsRows, totalRejectionsRows, streakRows] = await Promise.all([
-    db
-      .select({
-        companyName: applicationLogs.companyName,
-        roleTitle: applicationLogs.roleTitle,
-        createdAt: applicationLogs.createdAt
-      })
-      .from(applicationLogs)
-      .where(
-        and(
-          eq(applicationLogs.userId, profileOwnerId),
-          eq(applicationLogs.isShadowbanned, false),
-          gte(applicationLogs.createdAt, applicationsSince)
+  try {
+    [recentApplications, totalApplicationsRows, streakRows] = await Promise.all([
+      db
+        .select({
+          companyName: applicationLogs.companyName,
+          roleTitle: applicationLogs.roleTitle,
+          jobUrl: applicationLogs.jobUrl,
+          createdAt: applicationLogs.createdAt
+        })
+        .from(applicationLogs)
+        .where(
+          and(
+            eq(applicationLogs.userId, profileOwnerId),
+            eq(applicationLogs.isShadowbanned, false),
+            gte(applicationLogs.createdAt, applicationsSince)
+          )
         )
-      )
-      .orderBy(desc(applicationLogs.createdAt)),
-    db
-      .select({
-        companyName: rejectionLogs.companyName,
-        roleTitle: rejectionLogs.roleTitle,
-        stageRejected: rejectionLogs.stageRejected,
-        createdAt: rejectionLogs.createdAt
-      })
-      .from(rejectionLogs)
-      .where(
-        and(
-          eq(rejectionLogs.userId, profileOwnerId),
-          eq(rejectionLogs.isShadowbanned, false),
-          gte(rejectionLogs.createdAt, applicationsSince)
+        .orderBy(desc(applicationLogs.createdAt)),
+      db
+        .select({ total: sql`count(*)::int` })
+        .from(applicationLogs)
+        .where(and(eq(applicationLogs.userId, profileOwnerId), eq(applicationLogs.isShadowbanned, false))),
+      db
+        .select({
+          createdAt: applicationLogs.createdAt
+        })
+        .from(applicationLogs)
+        .where(and(eq(applicationLogs.userId, profileOwnerId), eq(applicationLogs.isShadowbanned, false)))
+        .orderBy(asc(applicationLogs.createdAt))
+    ]);
+  } catch (error) {
+    if (isMissingColumnError(error, 'job_url')) {
+      [recentApplications, totalApplicationsRows, streakRows] = await Promise.all([
+        db
+          .select({
+            companyName: applicationLogs.companyName,
+            roleTitle: applicationLogs.roleTitle,
+            createdAt: applicationLogs.createdAt
+          })
+          .from(applicationLogs)
+          .where(
+            and(
+              eq(applicationLogs.userId, profileOwnerId),
+              eq(applicationLogs.isShadowbanned, false),
+              gte(applicationLogs.createdAt, applicationsSince)
+            )
+          )
+          .orderBy(desc(applicationLogs.createdAt)),
+        db
+          .select({ total: sql`count(*)::int` })
+          .from(applicationLogs)
+          .where(and(eq(applicationLogs.userId, profileOwnerId), eq(applicationLogs.isShadowbanned, false))),
+        db
+          .select({
+            createdAt: applicationLogs.createdAt
+          })
+          .from(applicationLogs)
+          .where(and(eq(applicationLogs.userId, profileOwnerId), eq(applicationLogs.isShadowbanned, false)))
+          .orderBy(asc(applicationLogs.createdAt))
+      ]);
+    } else if (!isMissingRelationError(error, 'application_logs')) {
+      throw error;
+    }
+  }
+
+  let recentRejections = [];
+  let totalRejectionsRows = [{ total: 0 }];
+
+  try {
+    [recentRejections, totalRejectionsRows] = await Promise.all([
+      db
+        .select({
+          companyName: rejectionLogs.companyName,
+          roleTitle: rejectionLogs.roleTitle,
+          jobUrl: rejectionLogs.jobUrl,
+          stageRejected: rejectionLogs.stageRejected,
+          createdAt: rejectionLogs.createdAt
+        })
+        .from(rejectionLogs)
+        .where(
+          and(
+            eq(rejectionLogs.userId, profileOwnerId),
+            eq(rejectionLogs.isShadowbanned, false),
+            gte(rejectionLogs.createdAt, applicationsSince)
+          )
         )
-      )
-      .orderBy(desc(rejectionLogs.createdAt)),
-    db
-      .select({ total: sql`count(*)::int` })
-      .from(applicationLogs)
-      .where(and(eq(applicationLogs.userId, profileOwnerId), eq(applicationLogs.isShadowbanned, false))),
-    db
-      .select({ total: sql`count(*)::int` })
-      .from(rejectionLogs)
-      .where(and(eq(rejectionLogs.userId, profileOwnerId), eq(rejectionLogs.isShadowbanned, false))),
-    db
-      .select({
-        createdAt: applicationLogs.createdAt
-      })
-      .from(applicationLogs)
-      .where(and(eq(applicationLogs.userId, profileOwnerId), eq(applicationLogs.isShadowbanned, false)))
-      .orderBy(asc(applicationLogs.createdAt))
-  ]);
+        .orderBy(desc(rejectionLogs.createdAt)),
+      db
+        .select({ total: sql`count(*)::int` })
+        .from(rejectionLogs)
+        .where(and(eq(rejectionLogs.userId, profileOwnerId), eq(rejectionLogs.isShadowbanned, false)))
+    ]);
+  } catch (error) {
+    if (!isMissingColumnError(error, 'job_url')) {
+      throw error;
+    }
+
+    [recentRejections, totalRejectionsRows] = await Promise.all([
+      db
+        .select({
+          companyName: rejectionLogs.companyName,
+          roleTitle: rejectionLogs.roleTitle,
+          stageRejected: rejectionLogs.stageRejected,
+          createdAt: rejectionLogs.createdAt
+        })
+        .from(rejectionLogs)
+        .where(
+          and(
+            eq(rejectionLogs.userId, profileOwnerId),
+            eq(rejectionLogs.isShadowbanned, false),
+            gte(rejectionLogs.createdAt, applicationsSince)
+          )
+        )
+        .orderBy(desc(rejectionLogs.createdAt)),
+      db
+        .select({ total: sql`count(*)::int` })
+        .from(rejectionLogs)
+        .where(and(eq(rejectionLogs.userId, profileOwnerId), eq(rejectionLogs.isShadowbanned, false)))
+    ]);
+  }
 
   const dailyCounts = new Map();
 
@@ -231,12 +314,14 @@ async function buildResiliencePortfolio(db, profileOwnerId) {
     applicationHistory: recentApplications.slice(0, 10).map((row) => ({
       companyName: row.companyName,
       roleTitle: row.roleTitle,
+      jobUrl: row.jobUrl,
       createdAt: row.createdAt,
       dateLabel: formatDisplayDate(row.createdAt)
     })),
     rejectionJourney: recentRejections.slice(0, 10).map((row) => ({
       companyName: row.companyName,
       roleTitle: row.roleTitle,
+      jobUrl: row.jobUrl,
       stageRejected: row.stageRejected,
       stageLabel: String(row.stageRejected || '').replace(/_/g, ' '),
       createdAt: row.createdAt,
