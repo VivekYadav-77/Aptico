@@ -480,6 +480,14 @@ export async function getPublicProfile(db, username, viewerId = null) {
     enrichedSettings.featured = Array.isArray(rawSettings.featured) ? rawSettings.featured : [];
   }
 
+  // Digital footprint / public links
+  if (canViewSection('digitalFootprint')) {
+    enrichedSettings.linkedin = rawSettings.linkedin || null;
+    enrichedSettings.github = rawSettings.github || null;
+    enrichedSettings.portfolio = rawSettings.portfolio || null;
+    enrichedSettings.website = rawSettings.website || null;
+  }
+
   // Experience section
   if (canViewSection('experience')) {
     enrichedSettings.experiences = Array.isArray(rawSettings.experiences) ? rawSettings.experiences : [];
