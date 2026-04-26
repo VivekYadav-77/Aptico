@@ -151,6 +151,21 @@ function buildActivityMessage(activity, actorAlias) {
     return `${actorAlias || 'A squadmate'} sent an anonymous nudge${targetCount ? ` to ${targetCount} teammate${targetCount === 1 ? '' : 's'}` : ''}.`;
   }
 
+  if (activity.activityType === 'rejection_logged') {
+    const companyName = String(activity.metadata?.companyName || '').trim();
+    const roleTitle = String(activity.metadata?.roleTitle || '').trim();
+
+    if (companyName && roleTitle) {
+      return `${actorAlias || 'A squadmate'} turned a rejection for ${roleTitle} at ${companyName} into fuel.`;
+    }
+
+    if (companyName) {
+      return `${actorAlias || 'A squadmate'} turned a rejection from ${companyName} into fuel.`;
+    }
+
+    return `${actorAlias || 'A squadmate'} logged a rejection and kept pushing.`;
+  }
+
   return `${actorAlias || 'A new squadmate'} joined the squad.`;
 }
 
@@ -412,7 +427,7 @@ async function getSquadSnapshot(db, userId, currentWeek) {
   const dailyAppsByUser = new Map(memberRows.map((member) => [member.userId, new Map(timeline.map((day) => [day.dateKey, 0]))]));
 
   for (const activity of activityRows) {
-    if (activity.activityType !== 'apps_logged') {
+    if (activity.activityType !== 'apps_logged' && activity.activityType !== 'rejection_logged') {
       continue;
     }
 
@@ -786,10 +801,16 @@ export async function logSquadAppController(request, reply) {
     }
 
     const snapshot = await getSquadSnapshot(request.server.db, request.auth.userId, currentWeek);
+    const [user] = await request.server.db
+      .select({ resilienceXp: users.resilienceXp })
+      .from(users)
+      .where(eq(users.id, request.auth.userId))
+      .limit(1);
 
     return reply.send({
       success: true,
       goalRewardGranted,
+      resilienceXp: Number(user?.resilienceXp || 0),
       data: snapshot
     });
   } catch (error) {

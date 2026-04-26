@@ -454,7 +454,7 @@ export const squadActivities = pgTable(
     squadUserDateIdx: index('squad_activities_squad_id_user_id_event_date_idx').on(table.squadId, table.userId, table.eventDate),
     activityTypeCheck: check(
       'squad_activities_activity_type_check',
-      sql`${table.activityType} in ('member_joined', 'apps_logged', 'squad_ping')`
+      sql`${table.activityType} in ('member_joined', 'apps_logged', 'squad_ping', 'rejection_logged')`
     )
   })
 );

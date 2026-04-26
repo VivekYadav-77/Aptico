@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useDispatch } from 'react-redux';
 import AppShell from '../components/AppShell.jsx';
 import { getMySquad, joinSquad, logSquadApplications, pingSquad } from '../api/squadApi.js';
+import { updateAuthUser } from '../store/authSlice.js';
 
 const SQUAD_EXPLAINER_KEY = 'aptico-squad-explainer-dismissed';
 
@@ -89,6 +91,7 @@ function formatDateTime(value) {
 }
 
 export default function SquadDashboard() {
+  const dispatch = useDispatch();
   const [squadData, setSquadData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
@@ -162,6 +165,11 @@ export default function SquadDashboard() {
     try {
       const response = await logSquadApplications({ companyName, roleTitle, jobUrl });
       setSquadData(response.data || null);
+
+      if (response.resilienceXp !== undefined) {
+        dispatch(updateAuthUser({ resilienceXp: response.resilienceXp }));
+      }
+
       setApplicationForm({
         companyName: '',
         roleTitle: '',

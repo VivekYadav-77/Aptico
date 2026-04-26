@@ -959,53 +959,98 @@ export default function ProfilePage() {
                 isEmpty={!resiliencePortfolio}
                 emptyMessage="No resilience activity has been shared yet."
               >
-                {resiliencePortfolio ? (
-                  <div className="space-y-5">
-                    <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Daily Application Streak</p>
-                      <div className="mt-4">
-                        <ResilienceHeatmap heatmap={resiliencePortfolio.heatmap || []} />
-                      </div>
-                    </div>
+                {resiliencePortfolio ? (() => {
+                  const now = new Date();
+                  const currentMonth = now.getUTCMonth();
+                  const currentYear = now.getUTCFullYear();
+                  const currentMonthHeatmap = (resiliencePortfolio.heatmap || []).filter((day) => {
+                    const d = new Date(day.date + 'T00:00:00Z');
+                    return d.getUTCMonth() === currentMonth && d.getUTCFullYear() === currentYear;
+                  });
+                  const topApps = (resiliencePortfolio.applicationHistory || []).slice(0, 3);
+                  const topRejections = (resiliencePortfolio.rejectionJourney || []).slice(0, 3);
+                  const resilienceLink = username ? `/u/${username}/resilience` : '#';
 
-                    <div className="grid gap-3 sm:grid-cols-2">
+                  return (
+                    <div className="space-y-5">
                       <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Total Applications</p>
-                        <p className="mt-2 text-2xl font-black text-[var(--text)]">{resiliencePortfolio.stats?.totalApplications || 0}</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">
+                            Daily Streak — {now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                          </p>
+                          <Link
+                            to={resilienceLink}
+                            state={{ activeTab: 'applications' }}
+                            className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--accent-strong)] transition-colors hover:text-[var(--text)]"
+                          >
+                            See Full Year
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                          </Link>
+                        </div>
+                        <Link to={resilienceLink} state={{ activeTab: 'applications' }} className="mt-4 block transition-opacity hover:opacity-80">
+                          <ResilienceHeatmap heatmap={currentMonthHeatmap} />
+                        </Link>
                       </div>
-                      <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Total Rejections</p>
-                        <p className="mt-2 text-2xl font-black text-[var(--text)]">{resiliencePortfolio.stats?.totalRejections || 0}</p>
-                      </div>
-                      <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">7-Day Daily Average</p>
-                        <p className="mt-2 text-2xl font-black text-[var(--text)]">{resiliencePortfolio.stats?.currentDailyAverage || 0}</p>
-                      </div>
-                      <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4">
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Longest Streak</p>
-                        <p className="mt-2 text-2xl font-black text-[var(--text)]">{resiliencePortfolio.stats?.longestStreak || 0} days</p>
-                      </div>
-                    </div>
 
-                    <div>
-                      <p className="mb-3 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Application History</p>
-                      <ResilienceFeed
-                        items={resiliencePortfolio.applicationHistory || []}
-                        renderMeta={(item) => item.dateLabel}
-                        emptyLabel="No application history yet."
-                      />
-                    </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4">
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Total Applications</p>
+                          <p className="mt-2 text-2xl font-black text-[var(--text)]">{resiliencePortfolio.stats?.totalApplications || 0}</p>
+                        </div>
+                        <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4">
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Total Rejections</p>
+                          <p className="mt-2 text-2xl font-black text-[var(--text)]">{resiliencePortfolio.stats?.totalRejections || 0}</p>
+                        </div>
+                        <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4">
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">7-Day Daily Average</p>
+                          <p className="mt-2 text-2xl font-black text-[var(--text)]">{resiliencePortfolio.stats?.currentDailyAverage || 0}</p>
+                        </div>
+                        <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4">
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Longest Streak</p>
+                          <p className="mt-2 text-2xl font-black text-[var(--text)]">{resiliencePortfolio.stats?.longestStreak || 0} days</p>
+                        </div>
+                      </div>
 
-                    <div>
-                      <p className="mb-3 text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Rejection Journey</p>
-                      <ResilienceFeed
-                        items={resiliencePortfolio.rejectionJourney || []}
-                        renderMeta={(item) => item.dateLabel}
-                        emptyLabel="No rejection journey yet."
-                      />
+                      <div>
+                        <div className="mb-3 flex items-center justify-between">
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Application History</p>
+                          {(resiliencePortfolio.applicationHistory || []).length > 3 ? (
+                            <Link to={resilienceLink} state={{ activeTab: 'applications' }} className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--accent-strong)] transition-colors hover:text-[var(--text)]">
+                              See All
+                              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                            </Link>
+                          ) : null}
+                        </div>
+                        <Link to={resilienceLink} state={{ activeTab: 'applications' }} className="block transition-opacity hover:opacity-80">
+                          <ResilienceFeed
+                            items={topApps}
+                            renderMeta={(item) => item.dateLabel}
+                            emptyLabel="No application history yet."
+                          />
+                        </Link>
+                      </div>
+
+                      <div>
+                        <div className="mb-3 flex items-center justify-between">
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Rejection Journey</p>
+                          {(resiliencePortfolio.rejectionJourney || []).length > 3 ? (
+                            <Link to={resilienceLink} state={{ activeTab: 'rejections' }} className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--accent-strong)] transition-colors hover:text-[var(--text)]">
+                              See All
+                              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                            </Link>
+                          ) : null}
+                        </div>
+                        <Link to={resilienceLink} state={{ activeTab: 'rejections' }} className="block transition-opacity hover:opacity-80">
+                          <ResilienceFeed
+                            items={topRejections}
+                            renderMeta={(item) => item.dateLabel}
+                            emptyLabel="No rejection journey yet."
+                          />
+                        </Link>
+                      </div>
                     </div>
-                  </div>
-                ) : null}
+                  );
+                })() : null}
               </SectionCard>
             </AnimatedSection>
           </div>

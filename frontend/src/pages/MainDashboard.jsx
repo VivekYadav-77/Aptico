@@ -373,6 +373,9 @@ export default function MainDashboard() {
 
   function handleRejectionSuccess(payload) {
     setXpFlash(payload?.xpEarned || 0);
+    if (payload?.resilienceXp !== undefined) {
+      dispatch(updateAuthUser({ resilienceXp: payload.resilienceXp }));
+    }
     window.setTimeout(() => setXpFlash(0), 2200);
   }
 

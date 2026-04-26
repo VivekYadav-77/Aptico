@@ -30,7 +30,8 @@ const AUTH_USER_FIELDS = {
   role: users.role,
   emailVerifiedAt: users.emailVerifiedAt,
   createdAt: users.createdAt,
-  lastLogin: users.lastLogin
+  lastLogin: users.lastLogin,
+  resilienceXp: users.resilienceXp
 };
 
 export const REFRESH_COOKIE_NAME = 'aptico_refresh_token';

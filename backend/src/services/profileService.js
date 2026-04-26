@@ -302,8 +302,19 @@ async function buildResiliencePortfolio(db, profileOwnerId) {
     }
   }
 
-  const applicationDateKeys = [...new Set(streakRows.map((row) => toDateKey(row.createdAt)))];
-  const averageWindowCount = recentApplications.filter((row) => row.createdAt && new Date(row.createdAt).getTime() >= averageSince.getTime()).length;
+  // Count rejections toward the daily heatmap as well
+  for (const row of recentRejections) {
+    const key = toDateKey(row.createdAt);
+    if (dailyCounts.has(key)) {
+      dailyCounts.set(key, Number(dailyCounts.get(key) || 0) + 1);
+    }
+  }
+
+  // Combine application + rejection dates for streak calculation
+  const rejectionDateKeys = recentRejections.map((row) => toDateKey(row.createdAt));
+  const combinedDateKeys = [...new Set([...streakRows.map((row) => toDateKey(row.createdAt)), ...rejectionDateKeys])].sort();
+  const averageWindowCount = recentApplications.filter((row) => row.createdAt && new Date(row.createdAt).getTime() >= averageSince.getTime()).length
+    + recentRejections.filter((row) => row.createdAt && new Date(row.createdAt).getTime() >= averageSince.getTime()).length;
 
   return {
     heatmap: Array.from(dailyCounts.entries()).map(([date, count]) => ({
@@ -331,7 +342,193 @@ async function buildResiliencePortfolio(db, profileOwnerId) {
       totalApplications: Number(totalApplicationsRows[0]?.total || 0),
       totalRejections: Number(totalRejectionsRows[0]?.total || 0),
       currentDailyAverage: Number((averageWindowCount / 7).toFixed(1)),
-      longestStreak: calculateLongestStreak(applicationDateKeys)
+      longestStreak: calculateLongestStreak(combinedDateKeys)
+    }
+  };
+}
+
+/**
+ * Full resilience history for the dedicated details page.
+ * Returns 365 days of heatmap data and ALL application/rejection logs.
+ */
+export async function getResilienceFullHistory(db, profileOwnerId) {
+  const now = new Date();
+  const today = startOfUtcDay(now);
+  const historySince = addUtcDays(today, -364);
+  const averageSince = addUtcDays(today, -6);
+
+  let allApplications = [];
+  let totalApplicationsRows = [{ total: 0 }];
+  let streakRows = [];
+
+  try {
+    [allApplications, totalApplicationsRows, streakRows] = await Promise.all([
+      db
+        .select({
+          companyName: applicationLogs.companyName,
+          roleTitle: applicationLogs.roleTitle,
+          jobUrl: applicationLogs.jobUrl,
+          createdAt: applicationLogs.createdAt
+        })
+        .from(applicationLogs)
+        .where(
+          and(
+            eq(applicationLogs.userId, profileOwnerId),
+            eq(applicationLogs.isShadowbanned, false)
+          )
+        )
+        .orderBy(desc(applicationLogs.createdAt)),
+      db
+        .select({ total: sql`count(*)::int` })
+        .from(applicationLogs)
+        .where(and(eq(applicationLogs.userId, profileOwnerId), eq(applicationLogs.isShadowbanned, false))),
+      db
+        .select({ createdAt: applicationLogs.createdAt })
+        .from(applicationLogs)
+        .where(and(eq(applicationLogs.userId, profileOwnerId), eq(applicationLogs.isShadowbanned, false)))
+        .orderBy(asc(applicationLogs.createdAt))
+    ]);
+  } catch (error) {
+    if (isMissingColumnError(error, 'job_url')) {
+      [allApplications, totalApplicationsRows, streakRows] = await Promise.all([
+        db
+          .select({
+            companyName: applicationLogs.companyName,
+            roleTitle: applicationLogs.roleTitle,
+            createdAt: applicationLogs.createdAt
+          })
+          .from(applicationLogs)
+          .where(
+            and(
+              eq(applicationLogs.userId, profileOwnerId),
+              eq(applicationLogs.isShadowbanned, false)
+            )
+          )
+          .orderBy(desc(applicationLogs.createdAt)),
+        db
+          .select({ total: sql`count(*)::int` })
+          .from(applicationLogs)
+          .where(and(eq(applicationLogs.userId, profileOwnerId), eq(applicationLogs.isShadowbanned, false))),
+        db
+          .select({ createdAt: applicationLogs.createdAt })
+          .from(applicationLogs)
+          .where(and(eq(applicationLogs.userId, profileOwnerId), eq(applicationLogs.isShadowbanned, false)))
+          .orderBy(asc(applicationLogs.createdAt))
+      ]);
+    } else if (!isMissingRelationError(error, 'application_logs')) {
+      throw error;
+    }
+  }
+
+  let allRejections = [];
+  let totalRejectionsRows = [{ total: 0 }];
+
+  try {
+    [allRejections, totalRejectionsRows] = await Promise.all([
+      db
+        .select({
+          companyName: rejectionLogs.companyName,
+          roleTitle: rejectionLogs.roleTitle,
+          jobUrl: rejectionLogs.jobUrl,
+          stageRejected: rejectionLogs.stageRejected,
+          createdAt: rejectionLogs.createdAt
+        })
+        .from(rejectionLogs)
+        .where(
+          and(
+            eq(rejectionLogs.userId, profileOwnerId),
+            eq(rejectionLogs.isShadowbanned, false)
+          )
+        )
+        .orderBy(desc(rejectionLogs.createdAt)),
+      db
+        .select({ total: sql`count(*)::int` })
+        .from(rejectionLogs)
+        .where(and(eq(rejectionLogs.userId, profileOwnerId), eq(rejectionLogs.isShadowbanned, false)))
+    ]);
+  } catch (error) {
+    if (!isMissingColumnError(error, 'job_url')) {
+      throw error;
+    }
+
+    [allRejections, totalRejectionsRows] = await Promise.all([
+      db
+        .select({
+          companyName: rejectionLogs.companyName,
+          roleTitle: rejectionLogs.roleTitle,
+          stageRejected: rejectionLogs.stageRejected,
+          createdAt: rejectionLogs.createdAt
+        })
+        .from(rejectionLogs)
+        .where(
+          and(
+            eq(rejectionLogs.userId, profileOwnerId),
+            eq(rejectionLogs.isShadowbanned, false)
+          )
+        )
+        .orderBy(desc(rejectionLogs.createdAt)),
+      db
+        .select({ total: sql`count(*)::int` })
+        .from(rejectionLogs)
+        .where(and(eq(rejectionLogs.userId, profileOwnerId), eq(rejectionLogs.isShadowbanned, false)))
+    ]);
+  }
+
+  // Build 365-day heatmap
+  const dailyCounts = new Map();
+  for (let index = 0; index < 365; index += 1) {
+    const date = addUtcDays(historySince, index);
+    dailyCounts.set(toDateKey(date), 0);
+  }
+
+  for (const row of allApplications) {
+    const key = toDateKey(row.createdAt);
+    if (dailyCounts.has(key)) {
+      dailyCounts.set(key, Number(dailyCounts.get(key) || 0) + 1);
+    }
+  }
+
+  for (const row of allRejections) {
+    const key = toDateKey(row.createdAt);
+    if (dailyCounts.has(key)) {
+      dailyCounts.set(key, Number(dailyCounts.get(key) || 0) + 1);
+    }
+  }
+
+  const rejectionDateKeys = allRejections.map((row) => toDateKey(row.createdAt));
+  const combinedDateKeys = [...new Set([...streakRows.map((row) => toDateKey(row.createdAt)), ...rejectionDateKeys])].sort();
+
+  const recentApps = allApplications.filter((row) => row.createdAt && new Date(row.createdAt).getTime() >= averageSince.getTime());
+  const recentRejs = allRejections.filter((row) => row.createdAt && new Date(row.createdAt).getTime() >= averageSince.getTime());
+  const averageWindowCount = recentApps.length + recentRejs.length;
+
+  return {
+    heatmap: Array.from(dailyCounts.entries()).map(([date, count]) => ({
+      date,
+      count,
+      intensity: count >= 5 ? 'strong' : count >= 3 ? 'medium' : count >= 1 ? 'light' : 'empty'
+    })),
+    applicationHistory: allApplications.map((row) => ({
+      companyName: row.companyName,
+      roleTitle: row.roleTitle,
+      jobUrl: row.jobUrl,
+      createdAt: row.createdAt,
+      dateLabel: formatDisplayDate(row.createdAt)
+    })),
+    rejectionJourney: allRejections.map((row) => ({
+      companyName: row.companyName,
+      roleTitle: row.roleTitle,
+      jobUrl: row.jobUrl,
+      stageRejected: row.stageRejected,
+      stageLabel: String(row.stageRejected || '').replace(/_/g, ' '),
+      createdAt: row.createdAt,
+      dateLabel: formatDisplayDate(row.createdAt)
+    })),
+    stats: {
+      totalApplications: Number(totalApplicationsRows[0]?.total || 0),
+      totalRejections: Number(totalRejectionsRows[0]?.total || 0),
+      currentDailyAverage: Number((averageWindowCount / 7).toFixed(1)),
+      longestStreak: calculateLongestStreak(combinedDateKeys)
     }
   };
 }

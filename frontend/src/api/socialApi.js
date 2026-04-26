@@ -35,6 +35,11 @@ export async function getPublicResilienceProfile(username) {
   return response.data?.resilience_portfolio || null;
 }
 
+export async function getResilienceDetails(username) {
+  const response = await api.get(`/api/social/profile/${username}/resilience-details`);
+  return response.data;
+}
+
 export async function chatWithShadowResume(username, message) {
   const response = await api.post(`/api/shadow-resume/${username}/chat`, { message });
   return response.data;

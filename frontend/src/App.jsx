@@ -21,6 +21,7 @@ import PeopleDiscovery from './pages/PeopleDiscovery.jsx';
 import PortfolioGenerator from './pages/PortfolioGenerator.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import PublicProfile from './pages/PublicProfile.jsx';
+import ResilienceDetailsPage from './pages/ResilienceDetailsPage.jsx';
 import SavedJobsPage from './pages/SavedJobsPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import ShadowResume from './pages/ShadowResume.jsx';
@@ -70,6 +71,7 @@ export default function App() {
         <Route path="/signup" element={<AuthPermanent />} />
         <Route path="/guest" element={<GuestDashboard />} />
         <Route path="/u/:username" element={<PublicProfile />} />
+        <Route path="/u/:username/resilience" element={<ResilienceDetailsPage />} />
         <Route path="/hire/:username" element={<ShadowResume />} />
         <Route path="/wins" element={<CommunityWins />} />
         <Route
