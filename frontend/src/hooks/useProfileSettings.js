@@ -83,12 +83,15 @@ function createDefaults(auth, analysis) {
     sectionVisibility: {
       about: 'everyone',
       featured: 'everyone',
+      digitalFootprint: 'everyone',
       activity: 'everyone',
+      dashboard: 'everyone',
       experience: 'everyone',
       education: 'everyone',
       licenses: 'everyone',
       skills: 'everyone',
-      honorsAwards: 'everyone'
+      honorsAwards: 'everyone',
+      resiliencePortfolio: 'everyone'
     },
     // Multi-entry sections
     featured: [],

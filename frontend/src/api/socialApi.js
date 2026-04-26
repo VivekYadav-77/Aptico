@@ -149,3 +149,18 @@ export async function searchPeople(params = {}) {
   const response = await api.get('/api/social/people/search', { params });
   return response.data.people || [];
 }
+
+export async function getProfileFollowers(username) {
+  const response = await api.get(`/api/social/profile/${username}/followers`);
+  return response.data.followers || [];
+}
+
+export async function getProfileFollowing(username) {
+  const response = await api.get(`/api/social/profile/${username}/following`);
+  return response.data.following || [];
+}
+
+export async function getProfileConnections(username) {
+  const response = await api.get(`/api/social/profile/${username}/connections`);
+  return response.data.connections || [];
+}

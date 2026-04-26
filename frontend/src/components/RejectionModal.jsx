@@ -52,6 +52,7 @@ export default function RejectionModal({ isOpen, onClose, onSuccess }) {
   const [form, setForm] = useState({
     companyName: '',
     roleTitle: '',
+    jobUrl: '',
     stageRejected: 'resume'
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -120,6 +121,7 @@ export default function RejectionModal({ isOpen, onClose, onSuccess }) {
       setForm({
         companyName: '',
         roleTitle: '',
+        jobUrl: '',
         stageRejected: 'resume'
       });
 
@@ -183,6 +185,18 @@ export default function RejectionModal({ isOpen, onClose, onSuccess }) {
                 placeholder="Frontend Engineer"
                 maxLength={160}
                 required
+              />
+            </label>
+
+            <label className="block">
+              <span className="app-field-label">Job link <span className="text-[var(--muted)]">(optional)</span></span>
+              <input
+                type="url"
+                className="app-input mt-2"
+                value={form.jobUrl}
+                onChange={(event) => setForm((current) => ({ ...current, jobUrl: event.target.value }))}
+                placeholder="https://company.com/careers/job-id"
+                maxLength={500}
               />
             </label>
 

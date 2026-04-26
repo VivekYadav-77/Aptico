@@ -7,7 +7,10 @@ import {
   followUser,
   getPublicProfile,
   isFollowing,
-  unfollowUser
+  unfollowUser,
+  getFollowers,
+  getFollowing,
+  getPublicConnections
 } from '../services/profileService.js';
 import {
   getConnections,
@@ -168,6 +171,33 @@ export default async function socialRoutes(app) {
       return reply.send({ isFollowing: following });
     } catch (error) {
       return sendError(reply, error, 'Could not check follow status.');
+    }
+  });
+
+  app.get('/profile/:username/followers', { preHandler: optionalAuthenticateRequest }, async (request, reply) => {
+    try {
+      const followers = await getFollowers(request.server.db, request.params.username);
+      return reply.send({ followers });
+    } catch (error) {
+      return sendError(reply, error, 'Could not fetch followers.');
+    }
+  });
+
+  app.get('/profile/:username/following', { preHandler: optionalAuthenticateRequest }, async (request, reply) => {
+    try {
+      const following = await getFollowing(request.server.db, request.params.username);
+      return reply.send({ following });
+    } catch (error) {
+      return sendError(reply, error, 'Could not fetch following.');
+    }
+  });
+
+  app.get('/profile/:username/connections', { preHandler: optionalAuthenticateRequest }, async (request, reply) => {
+    try {
+      const userConnections = await getPublicConnections(request.server.db, request.params.username);
+      return reply.send({ connections: userConnections });
+    } catch (error) {
+      return sendError(reply, error, 'Could not fetch connections.');
     }
   });
 

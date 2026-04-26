@@ -703,3 +703,101 @@ export async function isFollowing(db, followerId, targetUserId) {
 
   return Boolean(rows[0]);
 }
+
+export async function getFollowers(db, username) {
+  // Find the target user first
+  const targetProfiles = await db
+    .select({ userId: userProfiles.userId })
+    .from(userProfiles)
+    .where(eq(userProfiles.username, username))
+    .limit(1);
+
+  if (!targetProfiles[0]) return [];
+  const targetUserId = targetProfiles[0].userId;
+
+  const result = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      avatarUrl: users.avatarUrl,
+      username: userProfiles.username,
+      headline: userProfiles.headline
+    })
+    .from(follows)
+    .innerJoin(users, eq(follows.followerId, users.id))
+    .innerJoin(userProfiles, eq(users.id, userProfiles.userId))
+    .where(eq(follows.followingId, targetUserId))
+    .orderBy(desc(follows.createdAt))
+    .limit(50);
+
+  return result;
+}
+
+export async function getFollowing(db, username) {
+  // Find the target user first
+  const targetProfiles = await db
+    .select({ userId: userProfiles.userId })
+    .from(userProfiles)
+    .where(eq(userProfiles.username, username))
+    .limit(1);
+
+  if (!targetProfiles[0]) return [];
+  const targetUserId = targetProfiles[0].userId;
+
+  const result = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      avatarUrl: users.avatarUrl,
+      username: userProfiles.username,
+      headline: userProfiles.headline
+    })
+    .from(follows)
+    .innerJoin(users, eq(follows.followingId, users.id))
+    .innerJoin(userProfiles, eq(users.id, userProfiles.userId))
+    .where(eq(follows.followerId, targetUserId))
+    .orderBy(desc(follows.createdAt))
+    .limit(50);
+
+  return result;
+}
+
+export async function getPublicConnections(db, username) {
+  // Find the target user first
+  const targetProfiles = await db
+    .select({ userId: userProfiles.userId })
+    .from(userProfiles)
+    .where(eq(userProfiles.username, username))
+    .limit(1);
+
+  if (!targetProfiles[0]) return [];
+  const targetUserId = targetProfiles[0].userId;
+
+  const result = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      avatarUrl: users.avatarUrl,
+      username: userProfiles.username,
+      headline: userProfiles.headline
+    })
+    .from(connections)
+    .innerJoin(
+      users,
+      or(
+        and(eq(connections.requesterId, targetUserId), eq(users.id, connections.recipientId)),
+        and(eq(connections.recipientId, targetUserId), eq(users.id, connections.requesterId))
+      )
+    )
+    .innerJoin(userProfiles, eq(users.id, userProfiles.userId))
+    .where(
+      and(
+        or(eq(connections.requesterId, targetUserId), eq(connections.recipientId, targetUserId)),
+        eq(connections.status, 'accepted')
+      )
+    )
+    .orderBy(desc(connections.updatedAt))
+    .limit(50);
+
+  return result;
+}

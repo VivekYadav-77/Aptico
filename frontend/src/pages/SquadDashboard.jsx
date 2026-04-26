@@ -98,7 +98,8 @@ export default function SquadDashboard() {
   const [error, setError] = useState('');
   const [applicationForm, setApplicationForm] = useState({
     companyName: '',
-    roleTitle: ''
+    roleTitle: '',
+    jobUrl: ''
   });
   const [showExplainer, setShowExplainer] = useState(() => localStorage.getItem(SQUAD_EXPLAINER_KEY) !== 'true');
 
@@ -148,6 +149,7 @@ export default function SquadDashboard() {
   async function handleLogApps() {
     const companyName = applicationForm.companyName.trim();
     const roleTitle = applicationForm.roleTitle.trim();
+    const jobUrl = applicationForm.jobUrl.trim();
 
     if (companyName.length < 3 || roleTitle.length < 3) {
       setError('Enter both a company name and a role title with at least 3 characters.');
@@ -158,11 +160,12 @@ export default function SquadDashboard() {
     setError('');
 
     try {
-      const response = await logSquadApplications({ companyName, roleTitle });
+      const response = await logSquadApplications({ companyName, roleTitle, jobUrl });
       setSquadData(response.data || null);
       setApplicationForm({
         companyName: '',
-        roleTitle: ''
+        roleTitle: '',
+        jobUrl: ''
       });
       setToast(
         response.goalRewardGranted
@@ -493,6 +496,21 @@ export default function SquadDashboard() {
                         }))
                       }
                       placeholder="Frontend Engineer"
+                      className="app-input"
+                    />
+                  </label>
+                  <label>
+                    <span className="mb-2 block text-sm font-semibold text-[var(--text)]">Job Link <span className="text-[var(--muted)]">(optional)</span></span>
+                    <input
+                      type="url"
+                      value={applicationForm.jobUrl}
+                      onChange={(event) =>
+                        setApplicationForm((current) => ({
+                          ...current,
+                          jobUrl: event.target.value
+                        }))
+                      }
+                      placeholder="https://company.com/careers/job-id"
                       className="app-input"
                     />
                   </label>

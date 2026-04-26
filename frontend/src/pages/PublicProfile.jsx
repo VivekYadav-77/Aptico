@@ -11,8 +11,12 @@ import {
   getPublicProfile,
   sendConnectionRequest,
   respondToConnection,
-  unfollowProfile
+  unfollowProfile,
+  getProfileFollowers,
+  getProfileFollowing,
+  getProfileConnections
 } from '../api/socialApi.js';
+import UserListModal from '../components/UserListModal.jsx';
 import { saveProfileSettings, fetchProfileSettings } from '../api/profileApi.js';
 import { selectAuth } from '../store/authSlice.js';
 import ResumeTemplate from '../components/ResumeTemplate.jsx';
@@ -197,6 +201,7 @@ export default function PublicProfile() {
   const [bannerSettingsOpen, setBannerSettingsOpen] = useState(false);
   const [badgePopupOpen, setBadgePopupOpen] = useState(false);
   const [bannerPrefTemp, setBannerPrefTemp] = useState('badge');
+  const [listModalState, setListModalState] = useState({ isOpen: false, type: null, title: '', fetchFn: null });
   
   // Visibility Settings State
 
@@ -409,10 +414,10 @@ export default function PublicProfile() {
   const sectionVis = es.sectionVisibility || {};
   const viewerRel = viewingOwnProfile ? 'self' : (es.viewerRelationship || 'public');
   const publicLinks = [
-    es.linkedin ? { name: 'LinkedIn', url: es.linkedin, icon: <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0H5a5 5 0 00-5 5v14a5 5 0 005 5h14a5 5 0 005-5V5a5 5 0 00-5-5zM8 19H5V8h3v11zM6.5 6.732c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zM20 19h-3v-5.604c0-3.368-4-3.113-4 0V19h-3V8h3v1.765c1.396-2.586 7-2.777 7 2.476V19z"/></svg> } : null,
-    es.github ? { name: 'GitHub', url: es.github, icon: <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg> } : null,
-    es.portfolio ? { name: 'Portfolio', url: es.portfolio, icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /></svg> } : null,
-    es.website ? { name: 'Website', url: es.website, icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg> } : null
+    (es.linkedin || profile.linkedin) ? { name: 'LinkedIn', url: es.linkedin || profile.linkedin, icon: <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0H5a5 5 0 00-5 5v14a5 5 0 005 5h14a5 5 0 005-5V5a5 5 0 00-5-5zM8 19H5V8h3v11zM6.5 6.732c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zM20 19h-3v-5.604c0-3.368-4-3.113-4 0V19h-3V8h3v1.765c1.396-2.586 7-2.777 7 2.476V19z"/></svg> } : null,
+    (es.github || profile.github) ? { name: 'GitHub', url: es.github || profile.github, icon: <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg> } : null,
+    (es.portfolio || profile.portfolio) ? { name: 'Portfolio', url: es.portfolio || profile.portfolio, icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101" /></svg> } : null,
+    (es.website || profile.website) ? { name: 'Website', url: es.website || profile.website, icon: <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" /></svg> } : null
   ].filter(Boolean);
 
   // Determine if a section is visible
@@ -568,18 +573,36 @@ export default function PublicProfile() {
                       
                       {/* Stats footer in header */}
                       <div className="mt-8 flex gap-6 sm:gap-8 border-t border-[var(--border)] pt-5">
-                        <div className="flex flex-col hover:-translate-y-0.5 transition-transform cursor-default">
+                        <button 
+                          type="button"
+                          onClick={() => setListModalState({ isOpen: true, type: 'followers', title: 'Followers', fetchFn: () => getProfileFollowers(username) })}
+                          disabled={!isSectionVisible('socialNetwork')}
+                          className={`flex flex-col items-start transition-transform ${isSectionVisible('socialNetwork') ? 'cursor-pointer hover:-translate-y-0.5 hover:opacity-80' : 'cursor-default opacity-80'}`}
+                          title={!isSectionVisible('socialNetwork') ? 'Followers list is private' : ''}
+                        >
                           <span className="text-xl font-black text-[var(--text)]">{profile.follower_count || 0}</span>
                           <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-strong)]">Followers</span>
-                        </div>
-                        <div className="flex flex-col hover:-translate-y-0.5 transition-transform cursor-default">
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => setListModalState({ isOpen: true, type: 'following', title: 'Following', fetchFn: () => getProfileFollowing(username) })}
+                          disabled={!isSectionVisible('socialNetwork')}
+                          className={`flex flex-col items-start transition-transform ${isSectionVisible('socialNetwork') ? 'cursor-pointer hover:-translate-y-0.5 hover:opacity-80' : 'cursor-default opacity-80'}`}
+                          title={!isSectionVisible('socialNetwork') ? 'Following list is private' : ''}
+                        >
                           <span className="text-xl font-black text-[var(--text)]">{profile.following_count || 0}</span>
                           <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-strong)]">Following</span>
-                        </div>
-                        <div className="flex flex-col hover:-translate-y-0.5 transition-transform cursor-default">
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => setListModalState({ isOpen: true, type: 'connections', title: 'Connections', fetchFn: () => getProfileConnections(username) })}
+                          disabled={!isSectionVisible('socialNetwork')}
+                          className={`flex flex-col items-start transition-transform ${isSectionVisible('socialNetwork') ? 'cursor-pointer hover:-translate-y-0.5 hover:opacity-80' : 'cursor-default opacity-80'}`}
+                          title={!isSectionVisible('socialNetwork') ? 'Connections list is private' : ''}
+                        >
                           <span className="text-xl font-black text-[var(--text)]">{profile.connection_count || 0}</span>
                           <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--muted-strong)]">Connections</span>
-                        </div>
+                        </button>
                       </div>
                     </div>
                   </section>
@@ -737,6 +760,69 @@ export default function PublicProfile() {
 
             {/* ═ RIGHT COLUMN (SIDEBAR) ═ */}
             <div className="lg:col-span-4 flex flex-col gap-6">
+
+                <AnimatedSection delay={320}>
+                  {isSectionLocked('dashboard') ? (
+                    <SectionCard
+                      id="dashboard"
+                      title="Career Dashboard"
+                      accentColor="#0f766e"
+                      locked
+                      lockedMessage="Connect to see career dashboard insights"
+                    />
+                  ) : isSectionVisible('dashboard') ? (
+                    <SectionCard
+                      id="dashboard"
+                      title="Career Dashboard"
+                      accentColor="#0f766e"
+                      isEmpty={
+                        !es.profileStrengthNotes &&
+                        !profile.latest_analysis?.confidence_score &&
+                        !profile.latest_analysis?.target_role &&
+                        !(es.preferredWorkModes || []).length
+                      }
+                      emptyMessage="No dashboard insights have been shared yet."
+                    >
+                      <div className="space-y-5">
+                        <div className="rounded-xl border border-[var(--accent)]/20 bg-gradient-to-br from-[var(--accent-soft)] to-[var(--panel)] p-5">
+                          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent-strong)]">Discovery Strength</p>
+                          <p className="mt-3 text-sm font-semibold leading-relaxed text-[var(--text)]">
+                            {es.profileStrengthNotes || 'Profile strength insights are not available yet.'}
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-5">
+                          <div className="flex items-end justify-between gap-3">
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Match Score</p>
+                              <p className="mt-2 text-4xl font-black tracking-tight text-[var(--text)]">
+                                {profile.latest_analysis?.confidence_score ? `${profile.latest_analysis.confidence_score}%` : 'Pending'}
+                              </p>
+                            </div>
+                            <span className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted-strong)]">
+                              Latest Analysis
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3 border-t border-[var(--border)] pt-4">
+                          <div className="flex items-start justify-between gap-3 text-sm">
+                            <span className="font-medium text-[var(--muted-strong)]">Target Role</span>
+                            <span className="max-w-[160px] text-right font-bold text-[var(--text)]">
+                              {profile.latest_analysis?.target_role || es.targetRole || 'Not set'}
+                            </span>
+                          </div>
+                          <div className="flex items-start justify-between gap-3 text-sm">
+                            <span className="font-medium text-[var(--muted-strong)]">Work Modes</span>
+                            <span className="max-w-[160px] text-right font-bold text-[var(--text)]">
+                              {(es.preferredWorkModes || []).length ? es.preferredWorkModes.join(', ') : 'Any'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </SectionCard>
+                  ) : null}
+                </AnimatedSection>
 
                 {/* ════ DIGITAL FOOTPRINT ════ */}
                 <AnimatedSection delay={330}>
@@ -1122,6 +1208,14 @@ export default function PublicProfile() {
             }
          }} />
       </div>
+      
+      <UserListModal 
+        isOpen={listModalState.isOpen}
+        onClose={() => setListModalState(s => ({ ...s, isOpen: false }))}
+        title={listModalState.title}
+        fetchData={listModalState.fetchFn}
+        emptyMessage={`No ${listModalState.title?.toLowerCase() || 'users'} found.`}
+      />
     </main>
   );
 }

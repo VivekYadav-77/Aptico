@@ -631,12 +631,14 @@ export default function SettingsWorkspace() {
                             { key: 'about', label: 'About' },
                             { key: 'featured', label: 'Featured' },
                             { key: 'activity', label: 'Activity' },
+                            { key: 'dashboard', label: 'Career Dashboard' },
                             { key: 'experience', label: 'Experience' },
                             { key: 'education', label: 'Education' },
                             { key: 'licenses', label: 'Licenses & Certifications' },
                             { key: 'skills', label: 'Skills' },
                             { key: 'honorsAwards', label: 'Honors & Awards' }, { key: 'digitalFootprint', label: 'Digital Footprint' },
-                            { key: 'resiliencePortfolio', label: 'Proof of Resilience' }
+                            { key: 'resiliencePortfolio', label: 'Proof of Resilience' },
+                            { key: 'socialNetwork', label: 'Social Network (Followers & Connections)' }
                           ].map(({ key, label }) => {
                             const currentValue = draft.sectionVisibility?.[key] || 'everyone';
                             return (
