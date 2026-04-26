@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link, useParams, useLocation } from 'react-router-dom';
 import { getResilienceDetails } from '../api/socialApi.js';
 
@@ -165,10 +165,19 @@ function StatCard({ label, value, icon }) {
   );
 }
 
-function ApplicationCard({ item }) {
+function ApplicationCard({ item, isSelected, innerRef }) {
   return (
-    <div className="group flex items-start gap-4 rounded-xl border border-[var(--border)] bg-[var(--panel)]/70 px-5 py-4 backdrop-blur-sm transition-all duration-200 hover:border-emerald-500/30 hover:shadow-sm">
-      <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 transition-colors group-hover:bg-emerald-500/20">
+    <div 
+      ref={innerRef}
+      className={`group flex items-start gap-4 rounded-xl border px-5 py-4 backdrop-blur-sm transition-all duration-300 ${
+        isSelected 
+          ? 'border-emerald-500 bg-emerald-500/10 ring-4 ring-emerald-500/20' 
+          : 'border-[var(--border)] bg-[var(--panel)]/70 hover:border-emerald-500/30 hover:shadow-sm'
+      }`}
+    >
+      <div className={`mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-colors ${
+        isSelected ? 'bg-emerald-500 text-white' : 'bg-emerald-500/10 text-emerald-600 group-hover:bg-emerald-500/20'
+      }`}>
         <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
         </svg>
@@ -200,7 +209,7 @@ function ApplicationCard({ item }) {
   );
 }
 
-function RejectionCard({ item, isLast }) {
+function RejectionCard({ item, isLast, isSelected, innerRef }) {
   const stageColors = {
     resume: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400',
     first_round: 'border-orange-500/30 bg-orange-500/10 text-orange-700 dark:text-orange-400',
@@ -210,21 +219,27 @@ function RejectionCard({ item, isLast }) {
   const stageStyle = stageColors[item.stageRejected] || stageColors.resume;
 
   return (
-    <div className="relative flex items-stretch gap-4 pl-4 sm:pl-8">
+    <div ref={innerRef} className="relative flex items-stretch gap-4 pl-4 sm:pl-8">
       {/* Vertical timeline line */}
       {!isLast && (
         <div className="absolute left-[35px] top-10 bottom-[-16px] w-[2px] bg-dashed-line border-l-2 border-dashed border-[var(--border)] sm:left-[51px]" />
       )}
       
       {/* Node/Icon */}
-      <div className="relative z-10 mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-[3px] border-[var(--bg)] bg-rose-500/10 text-rose-500 shadow-sm transition-colors group-hover:bg-rose-500/20">
+      <div className={`relative z-10 mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-[3px] border-[var(--bg)] shadow-sm transition-all ${
+        isSelected ? 'bg-rose-500 text-white scale-110' : 'bg-rose-500/10 text-rose-500 group-hover:bg-rose-500/20'
+      }`}>
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
         </svg>
       </div>
 
       {/* Card Content */}
-      <div className="group min-w-0 flex-1 rounded-xl border border-[var(--border)] bg-[var(--panel)]/70 px-5 py-4 backdrop-blur-sm transition-all duration-200 hover:border-rose-500/30 hover:shadow-sm mb-4">
+      <div className={`group min-w-0 flex-1 rounded-xl border px-5 py-4 backdrop-blur-sm transition-all duration-300 mb-4 ${
+        isSelected 
+          ? 'border-rose-500 bg-rose-500/10 ring-4 ring-rose-500/20 shadow-lg' 
+          : 'border-[var(--border)] bg-[var(--panel)]/70 hover:border-rose-500/30 hover:shadow-sm'
+      }`}>
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <p className="text-sm font-black text-[var(--text)]">{item.companyName}</p>
           <span className="text-[var(--muted)]">·</span>
@@ -264,6 +279,29 @@ export default function ResilienceDetailsPage() {
   const initialTab = location.state?.activeTab || 'applications';
   const [activeTab, setActiveTab] = useState(initialTab);
   const [selectedDate, setSelectedDate] = useState(null);
+  const itemRefs = useRef({});
+
+  const selectedItemKey = location.state?.selectedItemKey;
+
+  // Sync tab with location state (e.g. when navigating from Profile)
+  useEffect(() => {
+    if (location.state?.activeTab) {
+      setActiveTab(location.state.activeTab);
+    }
+  }, [location.state]);
+
+  // Handle auto-scroll to selected item
+  useEffect(() => {
+    if (selectedItemKey && data) {
+      const timer = setTimeout(() => {
+        const element = itemRefs.current[selectedItemKey];
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 600); // Wait for entrance animations to finish
+      return () => clearTimeout(timer);
+    }
+  }, [selectedItemKey, data, activeTab]);
 
   useEffect(() => {
     if (!username) return;
@@ -438,11 +476,18 @@ export default function ResilienceDetailsPage() {
             {activeTab === 'applications' ? (
               <div className="space-y-3">
                 {filteredApps.length ? (
-                  filteredApps.map((item, idx) => (
-                    <AnimatedSection key={`${item.companyName}-${item.createdAt}-${idx}`} delay={idx * 50}>
-                      <ApplicationCard item={item} />
-                    </AnimatedSection>
-                  ))
+                  filteredApps.map((item, idx) => {
+                      const key = `${item.companyName}-${item.dateLabel}`;
+                      return (
+                        <AnimatedSection key={`${key}-${idx}`} delay={idx * 80}>
+                          <ApplicationCard 
+                            item={item} 
+                            isSelected={selectedItemKey === key}
+                            innerRef={el => itemRefs.current[key] = el}
+                          />
+                        </AnimatedSection>
+                      );
+                    })
                 ) : (
                   <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--panel-soft)]/50 py-12 text-center text-sm font-medium text-[var(--muted-strong)]">
                     {selectedDate ? "No applications on this date." : "No applications logged yet. Start logging on your dashboard!"}
@@ -452,11 +497,19 @@ export default function ResilienceDetailsPage() {
             ) : (
               <div className="py-2">
                 {filteredRejections.length ? (
-                  filteredRejections.map((item, idx) => (
-                    <AnimatedSection key={`${item.companyName}-${item.createdAt}-${idx}`} delay={idx * 50}>
-                      <RejectionCard item={item} isLast={idx === filteredRejections.length - 1} />
-                    </AnimatedSection>
-                  ))
+                  filteredRejections.map((item, idx) => {
+                      const key = `${item.companyName}-${item.dateLabel}`;
+                      return (
+                        <AnimatedSection key={`${key}-${idx}`} delay={idx * 80}>
+                          <RejectionCard 
+                            item={item} 
+                            isLast={idx === filteredRejections.length - 1} 
+                            isSelected={selectedItemKey === key}
+                            innerRef={el => itemRefs.current[key] = el}
+                          />
+                        </AnimatedSection>
+                      );
+                    })
                 ) : (
                   <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--panel-soft)]/50 py-12 text-center text-sm font-medium text-[var(--muted-strong)]">
                     {selectedDate ? "No rejections on this date." : "No rejections logged yet. Every rejection fuels your level!"}

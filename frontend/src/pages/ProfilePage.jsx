@@ -142,7 +142,7 @@ function ResilienceHeatmap({ heatmap = [] }) {
   );
 }
 
-function ResilienceFeed({ items = [], renderMeta, emptyLabel }) {
+function ResilienceFeed({ items = [], renderMeta, emptyLabel, baseLink, activeTab }) {
   if (!items.length) {
     return (
       <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--panel-soft)]/50 px-4 py-5 text-sm text-[var(--muted-strong)]">
@@ -153,17 +153,32 @@ function ResilienceFeed({ items = [], renderMeta, emptyLabel }) {
 
   return (
     <div className="space-y-3">
-      {items.map((item, index) => (
-        <div
-          key={`${item.companyName}-${item.roleTitle}-${item.createdAt}-${index}`}
-          className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 px-4 py-3"
-        >
-          <p className="text-sm font-bold text-[var(--text)]">
-            {item.companyName} <span className="text-[var(--muted)]">·</span> {item.roleTitle}
-          </p>
-          <p className="mt-1 text-xs uppercase tracking-[0.18em] text-[var(--muted)]">{renderMeta(item)}</p>
-        </div>
-      ))}
+      {items.map((item, index) => {
+        const itemKey = `${item.companyName}-${item.dateLabel}`;
+        const content = (
+          <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 px-4 py-3 transition-all hover:border-[var(--muted-strong)] group-hover:bg-[var(--panel-soft)]">
+            <p className="text-sm font-bold text-[var(--text)]">
+              {item.companyName} <span className="text-[var(--muted)]">·</span> {item.roleTitle}
+            </p>
+            <p className="mt-1 text-xs uppercase tracking-[0.18em] text-[var(--muted)]">{renderMeta(item)}</p>
+          </div>
+        );
+
+        if (baseLink) {
+          return (
+            <Link 
+              key={`${itemKey}-${index}`} 
+              to={baseLink} 
+              state={{ activeTab, selectedItemKey: itemKey }}
+              className="block group"
+            >
+              {content}
+            </Link>
+          );
+        }
+
+        return <div key={`${itemKey}-${index}`}>{content}</div>;
+      })}
     </div>
   );
 }
@@ -973,24 +988,20 @@ export default function ProfilePage() {
 
                   return (
                     <div className="space-y-5">
-                      <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4">
+                      <Link to={resilienceLink} state={{ activeTab: 'applications' }} className="group block rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4 transition-all hover:border-[var(--accent)]/40 hover:bg-[var(--panel-soft)]">
                         <div className="flex items-center justify-between">
                           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">
                             Daily Streak — {now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                           </p>
-                          <Link
-                            to={resilienceLink}
-                            state={{ activeTab: 'applications' }}
-                            className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--accent-strong)] transition-colors hover:text-[var(--text)]"
-                          >
+                          <div className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--accent-strong)] transition-colors group-hover:text-[var(--text)]">
                             See Full Year
                             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                          </Link>
+                          </div>
                         </div>
-                        <Link to={resilienceLink} state={{ activeTab: 'applications' }} className="mt-4 block transition-opacity hover:opacity-80">
+                        <div className="mt-4">
                           <ResilienceHeatmap heatmap={currentMonthHeatmap} />
-                        </Link>
-                      </div>
+                        </div>
+                      </Link>
 
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4">
@@ -1011,42 +1022,42 @@ export default function ProfilePage() {
                         </div>
                       </div>
 
-                      <div>
-                        <div className="mb-3 flex items-center justify-between">
+                      <div className="group block space-y-3 rounded-xl border border-transparent p-2">
+                        <div className="flex items-center justify-between">
                           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Application History</p>
-                          {(resiliencePortfolio.applicationHistory || []).length > 3 ? (
-                            <Link to={resilienceLink} state={{ activeTab: 'applications' }} className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--accent-strong)] transition-colors hover:text-[var(--text)]">
+                          {(resiliencePortfolio.applicationHistory || []).length > 3 && (
+                            <Link to={resilienceLink} state={{ activeTab: 'applications' }} className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--accent-strong)] transition-colors group-hover:text-[var(--text)]">
                               See All
                               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                             </Link>
-                          ) : null}
+                          )}
                         </div>
-                        <Link to={resilienceLink} state={{ activeTab: 'applications' }} className="block transition-opacity hover:opacity-80">
-                          <ResilienceFeed
-                            items={topApps}
-                            renderMeta={(item) => item.dateLabel}
-                            emptyLabel="No application history yet."
-                          />
-                        </Link>
+                        <ResilienceFeed
+                          items={topApps}
+                          renderMeta={(item) => item.dateLabel}
+                          emptyLabel="No application history yet."
+                          baseLink={resilienceLink}
+                          activeTab="applications"
+                        />
                       </div>
 
-                      <div>
-                        <div className="mb-3 flex items-center justify-between">
+                      <div className="group block space-y-3 rounded-xl border border-transparent p-2">
+                        <div className="flex items-center justify-between">
                           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Rejection Journey</p>
-                          {(resiliencePortfolio.rejectionJourney || []).length > 3 ? (
-                            <Link to={resilienceLink} state={{ activeTab: 'rejections' }} className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--accent-strong)] transition-colors hover:text-[var(--text)]">
+                          {(resiliencePortfolio.rejectionJourney || []).length > 3 && (
+                            <Link to={resilienceLink} state={{ activeTab: 'rejections' }} className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--accent-strong)] transition-colors group-hover:text-[var(--text)]">
                               See All
                               <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                             </Link>
-                          ) : null}
+                          )}
                         </div>
-                        <Link to={resilienceLink} state={{ activeTab: 'rejections' }} className="block transition-opacity hover:opacity-80">
-                          <ResilienceFeed
-                            items={topRejections}
-                            renderMeta={(item) => item.dateLabel}
-                            emptyLabel="No rejection journey yet."
-                          />
-                        </Link>
+                        <ResilienceFeed
+                          items={topRejections}
+                          renderMeta={(item) => item.dateLabel}
+                          emptyLabel="No rejection journey yet."
+                          baseLink={resilienceLink}
+                          activeTab="rejections"
+                        />
                       </div>
                     </div>
                   );
