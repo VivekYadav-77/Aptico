@@ -22,6 +22,7 @@ import PortfolioGenerator from './pages/PortfolioGenerator.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import PublicProfile from './pages/PublicProfile.jsx';
 import ResilienceDetailsPage from './pages/ResilienceDetailsPage.jsx';
+import RewardsPage from './pages/RewardsPage.jsx';
 import SavedJobsPage from './pages/SavedJobsPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import ShadowResume from './pages/ShadowResume.jsx';
@@ -183,6 +184,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/rewards"
+          element={
+            <ProtectedRoute>
+              <RewardsPage />
             </ProtectedRoute>
           }
         />

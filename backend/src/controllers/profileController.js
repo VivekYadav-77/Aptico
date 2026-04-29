@@ -1,6 +1,6 @@
-import { desc, eq } from 'drizzle-orm';
+import { and, desc, eq, gte, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { analyses, generatedContent, profileSettings, savedJobs, userExperiences, userProfiles, users } from '../db/schema.js';
+import { analyses, applicationLogs, connections, follows, generatedContent, profileSettings, rejectionLogs, savedJobs, squads, squadMembers, userExperiences, userProfiles, users } from '../db/schema.js';
 import { env } from '../config/env.js';
 import { generatePortfolioReadme } from '../services/geminiService.js';
 import { ensureUserProfile } from '../services/profileService.js';
@@ -661,5 +661,267 @@ export async function generatePortfolioReadmeController(request, reply) {
       success: false,
       error: error.message || 'Could not generate portfolio README.'
     });
+  }
+}
+
+// ═══════════════════════════════════════════════════════
+//  STICKER SYSTEM CONTROLLERS
+// ═══════════════════════════════════════════════════════
+
+// ── Sticker registry (server-side mirror of requirement types) ──
+const VALID_STICKER_IDS = new Set([
+  'xp_50','xp_100','xp_250','xp_500','xp_1000','xp_2500','xp_5000','xp_7500','xp_10000','xp_20000','xp_50000','streak_3','streak_7','streak_14','streak_30','streak_60','streak_100','streak_365','apps_25','apps_100','apps_250','apps_500','apps_1000','rejections_10','rejections_50','rejections_100','rejections_250','rejections_500','social_followers_1','social_followers_10','social_followers_50','social_followers_100','social_followers_500','social_followers_1000','social_connections_10','social_connections_50','social_connections_100','social_connections_250','social_connections_500','secret_night_owl','secret_early_bird','secret_weekend_warrior','secret_speed_demon','event_pioneer','event_squad_champion','event_beta_tester'
+]);
+
+const STICKER_REQUIREMENTS = {
+  'xp_50': { type: 'xp', value: 50 },
+  'xp_100': { type: 'xp', value: 100 },
+  'xp_250': { type: 'xp', value: 250 },
+  'xp_500': { type: 'xp', value: 500 },
+  'xp_1000': { type: 'xp', value: 1000 },
+  'xp_2500': { type: 'xp', value: 2500 },
+  'xp_5000': { type: 'xp', value: 5000 },
+  'xp_7500': { type: 'xp', value: 7500 },
+  'xp_10000': { type: 'xp', value: 10000 },
+  'xp_20000': { type: 'xp', value: 20000 },
+  'xp_50000': { type: 'xp', value: 50000 },
+  'streak_3': { type: 'streak', value: 3 },
+  'streak_7': { type: 'streak', value: 7 },
+  'streak_14': { type: 'streak', value: 14 },
+  'streak_30': { type: 'streak', value: 30 },
+  'streak_60': { type: 'streak', value: 60 },
+  'streak_100': { type: 'streak', value: 100 },
+  'streak_365': { type: 'streak', value: 365 },
+  'apps_25': { type: 'total_applications', value: 25 },
+  'apps_100': { type: 'total_applications', value: 100 },
+  'apps_250': { type: 'total_applications', value: 250 },
+  'apps_500': { type: 'total_applications', value: 500 },
+  'apps_1000': { type: 'total_applications', value: 1000 },
+  'rejections_10': { type: 'total_rejections', value: 10 },
+  'rejections_50': { type: 'total_rejections', value: 50 },
+  'rejections_100': { type: 'total_rejections', value: 100 },
+  'rejections_250': { type: 'total_rejections', value: 250 },
+  'rejections_500': { type: 'total_rejections', value: 500 },
+  'social_followers_1': { type: 'followers', value: 1 },
+  'social_followers_10': { type: 'followers', value: 10 },
+  'social_followers_50': { type: 'followers', value: 50 },
+  'social_followers_100': { type: 'followers', value: 100 },
+  'social_followers_500': { type: 'followers', value: 500 },
+  'social_followers_1000': { type: 'followers', value: 1000 },
+  'social_connections_10': { type: 'connections', value: 10 },
+  'social_connections_50': { type: 'connections', value: 50 },
+  'social_connections_100': { type: 'connections', value: 100 },
+  'social_connections_250': { type: 'connections', value: 250 },
+  'social_connections_500': { type: 'connections', value: 500 },
+  'secret_night_owl': { type: 'night_owl', value: 1 },
+  'secret_early_bird': { type: 'early_bird', value: 1 },
+  'secret_weekend_warrior': { type: 'weekend_warrior', value: 1 },
+  'secret_speed_demon': { type: 'speed_demon', value: 1 },
+  'event_pioneer': { type: 'join_before', value: '2027-01-01' },
+  'event_squad_champion': { type: 'squad_goal', value: 1 },
+  'event_beta_tester': { type: 'beta_tester', value: 1 },
+};
+
+const MAX_EQUIPPED = 4;
+
+async function getUserStats(db, userId) {
+  const stats = {};
+
+  // XP
+  const [userRow] = await db.select({ resilienceXp: users.resilienceXp, createdAt: users.createdAt }).from(users).where(eq(users.id, userId)).limit(1);
+  stats.xp = Number(userRow?.resilienceXp || 0);
+  stats.joinDate = userRow?.createdAt ? new Date(userRow.createdAt) : new Date();
+
+  // Total applications
+  try {
+    const [appCount] = await db.select({ count: sql`count(*)::int` }).from(applicationLogs).where(and(eq(applicationLogs.userId, userId), eq(applicationLogs.isShadowbanned, false)));
+    stats.totalApplications = Number(appCount?.count || 0);
+  } catch { stats.totalApplications = 0; }
+
+  // Total rejections
+  try {
+    const [rejCount] = await db.select({ count: sql`count(*)::int` }).from(rejectionLogs).where(and(eq(rejectionLogs.userId, userId), eq(rejectionLogs.isShadowbanned, false)));
+    stats.totalRejections = Number(rejCount?.count || 0);
+  } catch { stats.totalRejections = 0; }
+
+  // Followers
+  try {
+    const [fCount] = await db.select({ count: sql`count(*)::int` }).from(follows).where(eq(follows.followingId, userId));
+    stats.followers = Number(fCount?.count || 0);
+  } catch { stats.followers = 0; }
+
+  // Connections
+  try {
+    const [cCount] = await db.select({ count: sql`count(*)::int` }).from(connections).where(and(eq(connections.status, 'accepted'), sql`(${connections.requesterId} = ${userId} OR ${connections.recipientId} = ${userId})`));
+    stats.connections = Number(cCount?.count || 0);
+  } catch { stats.connections = 0; }
+
+  // Streak (consecutive days with at least 1 non-shadowbanned app)
+  try {
+    const rows = await db.select({ day: sql`date_trunc('day', ${applicationLogs.createdAt} AT TIME ZONE 'UTC')::date as day` }).from(applicationLogs).where(and(eq(applicationLogs.userId, userId), eq(applicationLogs.isShadowbanned, false))).groupBy(sql`day`).orderBy(sql`day DESC`);
+    let streak = 0;
+    const today = new Date(); today.setUTCHours(0,0,0,0);
+    let expected = new Date(today);
+    for (const row of rows) {
+      const d = new Date(row.day); d.setUTCHours(0,0,0,0);
+      if (d.getTime() === expected.getTime()) {
+        streak++;
+        expected.setUTCDate(expected.getUTCDate() - 1);
+      } else if (d.getTime() === expected.getTime() + 86400000) {
+        // same as expected + 1 day (today might not have an entry yet)
+        continue;
+      } else {
+        break;
+      }
+    }
+    stats.streak = streak;
+  } catch { stats.streak = 0; }
+
+  // Squad goal reached
+  try {
+    const [smRow] = await db.select({ squadId: squadMembers.squadId }).from(squadMembers).where(eq(squadMembers.userId, userId)).limit(1);
+    if (smRow?.squadId) {
+      const [squadRow] = await db.select({ goalRewardedAt: squads.goalRewardedAt }).from(squads).where(eq(squads.id, smRow.squadId)).limit(1);
+      stats.squadGoalReached = squadRow?.goalRewardedAt ? 1 : 0;
+    } else {
+      stats.squadGoalReached = 0;
+    }
+  } catch { stats.squadGoalReached = 0; }
+
+  // Night owl / Early bird (check if any app was logged between midnight–4am or 4am–6am)
+  try {
+    const [nightRow] = await db.select({ count: sql`count(*)::int` }).from(applicationLogs).where(and(eq(applicationLogs.userId, userId), sql`extract(hour from ${applicationLogs.createdAt} AT TIME ZONE 'UTC') >= 0 AND extract(hour from ${applicationLogs.createdAt} AT TIME ZONE 'UTC') < 4`));
+    stats.nightOwl = Number(nightRow?.count || 0) > 0 ? 1 : 0;
+  } catch { stats.nightOwl = 0; }
+
+  try {
+    const [earlyRow] = await db.select({ count: sql`count(*)::int` }).from(applicationLogs).where(and(eq(applicationLogs.userId, userId), sql`extract(hour from ${applicationLogs.createdAt} AT TIME ZONE 'UTC') >= 4 AND extract(hour from ${applicationLogs.createdAt} AT TIME ZONE 'UTC') < 6`));
+    stats.earlyBird = Number(earlyRow?.count || 0) > 0 ? 1 : 0;
+  } catch { stats.earlyBird = 0; }
+
+  return stats;
+}
+
+function meetsRequirement(req, stats) {
+  switch (req.type) {
+    case 'xp':                 return stats.xp >= req.value;
+    case 'streak':             return stats.streak >= req.value;
+    case 'total_applications': return stats.totalApplications >= req.value;
+    case 'total_rejections':   return stats.totalRejections >= req.value;
+    case 'followers':          return stats.followers >= req.value;
+    case 'connections':        return stats.connections >= req.value;
+    case 'night_owl':          return stats.nightOwl >= req.value;
+    case 'early_bird':         return stats.earlyBird >= req.value;
+    case 'join_before':        return stats.joinDate < new Date(req.value);
+    case 'squad_goal':         return stats.squadGoalReached >= req.value;
+    case 'weekend_warrior':    return (stats.weekendWarrior || 0) >= req.value;
+    case 'speed_demon':        return (stats.speedDemon || 0) >= req.value;
+    case 'beta_tester':        return (stats.betaTester || 0) >= req.value;
+    default:                   return false;
+  }
+}
+
+export async function unlockStickerController(request, reply) {
+  try {
+    requireDatabase(request.server.db);
+    const { stickerId } = z.object({ stickerId: z.string().min(1) }).parse(request.body || {});
+
+    if (!VALID_STICKER_IDS.has(stickerId)) {
+      return reply.code(400).send({ success: false, error: 'Unknown sticker.' });
+    }
+
+    // Fetch current settings
+    const existing = await getStoredProfileSettings(request.server.db, request.auth.userId);
+    const settings = existing || {};
+    const unlocked = Array.isArray(settings.unlockedStickers) ? [...settings.unlockedStickers] : [];
+
+    if (unlocked.includes(stickerId)) {
+      return reply.send({ success: true, data: { alreadyUnlocked: true, unlockedStickers: unlocked } });
+    }
+
+    // Validate requirement
+    const req = STICKER_REQUIREMENTS[stickerId];
+    const stats = await getUserStats(request.server.db, request.auth.userId);
+
+    if (!meetsRequirement(req, stats)) {
+      return reply.code(403).send({ success: false, error: 'You have not met the requirements for this sticker yet.' });
+    }
+
+    unlocked.push(stickerId);
+    const updatedSettings = { ...settings, unlockedStickers: unlocked };
+
+    const existingRow = await request.server.db.select({ id: profileSettings.id }).from(profileSettings).where(eq(profileSettings.userId, request.auth.userId)).limit(1);
+
+    if (existingRow[0]) {
+      await request.server.db.update(profileSettings).set({ settingsJson: updatedSettings, updatedAt: new Date() }).where(eq(profileSettings.id, existingRow[0].id));
+    } else {
+      await request.server.db.insert(profileSettings).values({ userId: request.auth.userId, settingsJson: updatedSettings });
+    }
+
+    return reply.send({ success: true, data: { unlockedStickers: unlocked, newSticker: stickerId } });
+  } catch (error) {
+    return reply.code(error.statusCode || 500).send({ success: false, error: error.message || 'Could not unlock sticker.' });
+  }
+}
+
+export async function equipStickersController(request, reply) {
+  try {
+    requireDatabase(request.server.db);
+    const { equippedStickers } = z.object({
+      equippedStickers: z.array(z.string()).max(MAX_EQUIPPED)
+    }).parse(request.body || {});
+
+    const existing = await getStoredProfileSettings(request.server.db, request.auth.userId);
+    const settings = existing || {};
+    const unlocked = Array.isArray(settings.unlockedStickers) ? settings.unlockedStickers : [];
+
+    // Validate all equipped stickers are actually unlocked
+    for (const sid of equippedStickers) {
+      if (!unlocked.includes(sid)) {
+        return reply.code(400).send({ success: false, error: `Sticker "${sid}" is not unlocked yet.` });
+      }
+    }
+
+    const uniqueEquipped = [...new Set(equippedStickers)];
+    const updatedSettings = { ...settings, equippedStickers: uniqueEquipped };
+
+    const existingRow = await request.server.db.select({ id: profileSettings.id }).from(profileSettings).where(eq(profileSettings.userId, request.auth.userId)).limit(1);
+
+    if (existingRow[0]) {
+      await request.server.db.update(profileSettings).set({ settingsJson: updatedSettings, updatedAt: new Date() }).where(eq(profileSettings.id, existingRow[0].id));
+    } else {
+      await request.server.db.insert(profileSettings).values({ userId: request.auth.userId, settingsJson: updatedSettings });
+    }
+
+    // Invalidate cache
+    const profileRows = await request.server.db.select({ username: userProfiles.username }).from(userProfiles).where(eq(userProfiles.userId, request.auth.userId)).limit(1);
+    const username = profileRows[0]?.username;
+    if (username) {
+      await request.server.services?.redis?.del(`profile:username:${username}`);
+    }
+
+    return reply.send({ success: true, data: { equippedStickers } });
+  } catch (error) {
+    return reply.code(error.statusCode || 500).send({ success: false, error: error.message || 'Could not equip stickers.' });
+  }
+}
+
+export async function getStickerStatsController(request, reply) {
+  try {
+    requireDatabase(request.server.db);
+    const stats = await getUserStats(request.server.db, request.auth.userId);
+    const existing = await getStoredProfileSettings(request.server.db, request.auth.userId);
+    const settings = existing || {};
+
+    return reply.send({
+      success: true,
+      data: {
+        stats,
+        unlockedStickers: Array.isArray(settings.unlockedStickers) ? settings.unlockedStickers : [],
+        equippedStickers: Array.isArray(settings.equippedStickers) ? settings.equippedStickers : []
+      }
+    });
+  } catch (error) {
+    return reply.code(error.statusCode || 500).send({ success: false, error: error.message || 'Could not fetch sticker stats.' });
   }
 }

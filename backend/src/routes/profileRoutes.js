@@ -4,7 +4,10 @@ import {
   getProfileSettingsController,
   generatePortfolioReadmeController,
   upsertExperienceController,
-  upsertProfileSettingsController
+  upsertProfileSettingsController,
+  unlockStickerController,
+  equipStickersController,
+  getStickerStatsController
 } from '../controllers/profileController.js';
 import { authenticateRequest } from '../middlewares/authMiddleware.js';
 
@@ -15,4 +18,9 @@ export default async function profileRoutes(app) {
   app.delete('/settings/experience/:id', { preHandler: authenticateRequest }, deleteExperienceController);
   app.get('/dashboard', { preHandler: authenticateRequest }, getDashboardSummaryController);
   app.post('/portfolio/readme', { preHandler: authenticateRequest }, generatePortfolioReadmeController);
+
+  // Sticker system
+  app.get('/stickers', { preHandler: authenticateRequest }, getStickerStatsController);
+  app.post('/stickers/unlock', { preHandler: authenticateRequest }, unlockStickerController);
+  app.put('/stickers/equip', { preHandler: authenticateRequest }, equipStickersController);
 }

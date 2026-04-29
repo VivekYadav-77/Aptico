@@ -49,3 +49,20 @@ export async function generatePortfolioReadme(forceRefresh = false) {
   } catch (e) {}
   return response.data.data;
 }
+
+// ── Sticker System ───────────────────────────────────
+export async function fetchStickerStats() {
+  const response = await api.get('/api/stickers');
+  return response.data.data;
+}
+
+export async function unlockSticker(stickerId) {
+  const response = await api.post('/api/stickers/unlock', { stickerId });
+  return response.data.data;
+}
+
+export async function equipStickers(equippedStickers) {
+  const response = await api.put('/api/stickers/equip', { equippedStickers });
+  return response.data.data;
+}
+

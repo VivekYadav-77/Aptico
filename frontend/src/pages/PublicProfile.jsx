@@ -20,6 +20,7 @@ import UserListModal from '../components/UserListModal.jsx';
 import { saveProfileSettings, fetchProfileSettings } from '../api/profileApi.js';
 import { selectAuth } from '../store/authSlice.js';
 import ResumeTemplate from '../components/ResumeTemplate.jsx';
+import StickerShowcase from '../components/StickerShowcase.jsx';
 
 function initials(name) {
   return String(name || 'A').trim().charAt(0).toUpperCase() || 'A';
@@ -556,6 +557,11 @@ export default function PublicProfile() {
                             <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-[var(--text)] truncate">{profile.name || profile.username}</h1>
                             <p className="mt-1 text-base sm:text-lg font-bold text-[var(--accent-strong)] leading-snug">{profile.headline || 'Career builder'}</p>
                             {profile.location && <p className="mt-2 text-sm font-medium text-[var(--muted-strong)] flex items-center gap-1.5"><svg className="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.243-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>{profile.location}</p>}
+                            {profile.enriched_settings?.equippedStickers?.length > 0 && (
+                              <div className="mt-5">
+                                <StickerShowcase equippedStickers={profile.enriched_settings.equippedStickers} />
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -769,6 +775,107 @@ export default function PublicProfile() {
                             </div>
                           </div>
                         ))}
+                      </div>
+                    </SectionCard>
+                  ) : null}
+                </AnimatedSection>
+
+                {/* ════ FEATURED ════ */}
+                <AnimatedSection delay={340}>
+                  {isSectionLocked('featured') ? (
+                    <SectionCard id="featured" title="Featured" accentColor="#f97316" locked lockedMessage={`Connect to see featured`} />
+                  ) : isSectionVisible('featured') && (es.featured?.length > 0) ? (
+                    <SectionCard id="featured" title="Featured" accentColor="#f97316">
+                      <div className="flex flex-col gap-3">
+                        {es.featured.map((item, idx) => (
+                          <a key={idx} href={item.link || '#'} target={item.link ? '_blank' : undefined} rel="noreferrer" className="flex flex-col rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4 hover:border-[#f97316]/50 hover:shadow-md transition-all group relative overflow-hidden">
+                            <div className="absolute -right-4 -bottom-4 opacity-[0.03] group-hover:opacity-[0.06] transition-opacity">
+                               <svg className="w-24 h-24 text-[#f97316]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 22h20L12 2z"/></svg>
+                            </div>
+                            <div className="flex items-center gap-2 mb-2 relative z-10">
+                              <span className="text-[10px] font-black uppercase tracking-wider text-[#f97316] bg-[#f97316]/10 px-2 py-0.5 rounded-md">{item.type || 'project'}</span>
+                            </div>
+                            <h3 className="font-bold text-sm text-[var(--text)] group-hover:text-[#f97316] transition-colors leading-tight relative z-10">{item.title || 'Untitled'}</h3>
+                            {item.description && <p className="mt-1.5 text-xs font-medium text-[var(--muted-strong)] line-clamp-2 leading-relaxed relative z-10">{item.description}</p>}
+                          </a>
+                        ))}
+                      </div>
+                    </SectionCard>
+                  ) : null}
+                </AnimatedSection>
+
+                {/* ════ SKILLS ════ */}
+                <AnimatedSection delay={420}>
+                  {isSectionLocked('skills') ? (
+                    <SectionCard id="skills" title="Skills" accentColor="#ec4899" locked lockedMessage="Connect to see skills" />
+                  ) : isSectionVisible('skills') ? (
+                    <SectionCard id="skills" title="Skills" accentColor="#ec4899" isEmpty={!es.topSkills?.length && !profile.skills?.length} emptyMessage="No skills listed yet.">
+                      
+                      {/* Top Skills with precise lines */}
+                      {(es.topSkills?.length > 0) && (
+                        <div className="space-y-4 mb-6">
+                          {es.topSkills.map((skill, idx) => {
+                            const level = Math.max(55, 100 - (idx * 15));
+                            return (
+                              <div key={skill} className="group/skill">
+                                <div className="flex justify-between items-baseline mb-1">
+                                  <span className="text-sm font-bold text-[var(--text)] group-hover/skill:text-[#ec4899] transition-colors">{skill}</span>
+                                </div>
+                                <div className="h-1 w-full bg-[var(--border)] rounded-full overflow-hidden">
+                                  <div className="h-full bg-gradient-to-r from-[#fbcfe8] to-[#ec4899] rounded-full transition-all duration-1000 ease-out" style={{ width: `${level}%` }} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* All skills as pills */}
+                      {profile.skills?.length > 0 && (
+                        <div>
+                          {es.topSkills?.length > 0 && <p className="text-[10px] font-black uppercase tracking-wider text-[var(--muted-strong)] mb-2.5">Other Skills</p>}
+                          <div className="flex flex-wrap gap-1.5">
+                            {profile.skills.map((skill) => (
+                              <span key={skill} className="rounded-lg border border-[var(--border)] bg-[var(--panel-soft)]/50 px-2.5 py-1 text-xs font-semibold text-[var(--text)] hover:border-[#ec4899]/50 hover:text-[#ec4899] transition-all cursor-default backdrop-blur-sm">{skill}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Tools & Languages */}
+                      {(es.tools?.length > 0 || es.languages?.length > 0) && (
+                        <div className="mt-6 pt-5 border-t border-[var(--border)] space-y-4">
+                          {es.tools?.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-wider text-[var(--muted-strong)] mb-2">Tools & Tech Stack</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {es.tools.map((t) => <span key={t} className="rounded border border-indigo-500/20 bg-indigo-500/5 px-2 py-0.5 text-[11px] font-bold text-indigo-700 dark:text-indigo-400">{t}</span>)}
+                              </div>
+                            </div>
+                          )}
+                          {es.languages?.length > 0 && (
+                            <div>
+                              <p className="text-[10px] font-black uppercase tracking-wider text-[var(--muted-strong)] mb-2">Languages</p>
+                              <div className="flex flex-wrap gap-1.5">
+                                {es.languages.map((l) => <span key={l} className="rounded border border-emerald-500/20 bg-emerald-500/5 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">{l}</span>)}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </SectionCard>
+                  ) : null}
+                </AnimatedSection>
+
+                {/* ════ ACTIVITY ════ */}
+                <AnimatedSection delay={460}>
+                  {isSectionLocked('activity') ? (
+                    <SectionCard id="activity" title="Activity" accentColor="#8b5cf6" locked lockedMessage="Connect to see activity" />
+                  ) : isSectionVisible('activity') ? (
+                    <SectionCard id="activity" title="Activity" accentColor="#8b5cf6" isEmpty={!posts.length} emptyMessage="No recent activity.">
+                      <div className="space-y-3">
+                        {posts.map((post) => <MiniPost key={post.id} post={post} />)}
+                        {posts.length >= 5 && <Link to="/home" className="block text-center text-xs font-black uppercase tracking-widest text-[#8b5cf6] hover:text-[var(--text)] transition-colors mt-4 py-2 border border-[#8b5cf6]/20 bg-[#8b5cf6]/5 rounded-xl">View all activity</Link>}
                       </div>
                     </SectionCard>
                   ) : null}
@@ -992,30 +1099,6 @@ export default function PublicProfile() {
                   ) : null}
                 </AnimatedSection>
 
-                {/* ════ FEATURED ════ */}
-                <AnimatedSection delay={340}>
-                  {isSectionLocked('featured') ? (
-                    <SectionCard id="featured" title="Featured" accentColor="#f97316" locked lockedMessage={`Connect to see featured`} />
-                  ) : isSectionVisible('featured') && (es.featured?.length > 0) ? (
-                    <SectionCard id="featured" title="Featured" accentColor="#f97316">
-                      <div className="flex flex-col gap-3">
-                        {es.featured.map((item, idx) => (
-                          <a key={idx} href={item.link || '#'} target={item.link ? '_blank' : undefined} rel="noreferrer" className="flex flex-col rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4 hover:border-[#f97316]/50 hover:shadow-md transition-all group relative overflow-hidden">
-                            <div className="absolute -right-4 -bottom-4 opacity-[0.03] group-hover:opacity-[0.06] transition-opacity">
-                               <svg className="w-24 h-24 text-[#f97316]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 22h20L12 2z"/></svg>
-                            </div>
-                            <div className="flex items-center gap-2 mb-2 relative z-10">
-                              <span className="text-[10px] font-black uppercase tracking-wider text-[#f97316] bg-[#f97316]/10 px-2 py-0.5 rounded-md">{item.type || 'project'}</span>
-                            </div>
-                            <h3 className="font-bold text-sm text-[var(--text)] group-hover:text-[#f97316] transition-colors leading-tight relative z-10">{item.title || 'Untitled'}</h3>
-                            {item.description && <p className="mt-1.5 text-xs font-medium text-[var(--muted-strong)] line-clamp-2 leading-relaxed relative z-10">{item.description}</p>}
-                          </a>
-                        ))}
-                      </div>
-                    </SectionCard>
-                  ) : null}
-                </AnimatedSection>
-
                 {/* ════ CURRENTLY WORKING TOWARDS ════ */}
                 {profile.latest_analysis && (
                   <AnimatedSection delay={380}>
@@ -1047,83 +1130,6 @@ export default function PublicProfile() {
                     </section>
                   </AnimatedSection>
                 )}
-
-                {/* ════ SKILLS ════ */}
-                <AnimatedSection delay={420}>
-                  {isSectionLocked('skills') ? (
-                    <SectionCard id="skills" title="Skills" accentColor="#ec4899" locked lockedMessage="Connect to see skills" />
-                  ) : isSectionVisible('skills') ? (
-                    <SectionCard id="skills" title="Skills" accentColor="#ec4899" isEmpty={!es.topSkills?.length && !profile.skills?.length} emptyMessage="No skills listed yet.">
-                      
-                      {/* Top Skills with precise lines */}
-                      {(es.topSkills?.length > 0) && (
-                        <div className="space-y-4 mb-6">
-                          {es.topSkills.map((skill, idx) => {
-                            const level = Math.max(55, 100 - (idx * 15));
-                            return (
-                              <div key={skill} className="group/skill">
-                                <div className="flex justify-between items-baseline mb-1">
-                                  <span className="text-sm font-bold text-[var(--text)] group-hover/skill:text-[#ec4899] transition-colors">{skill}</span>
-                                </div>
-                                <div className="h-1 w-full bg-[var(--border)] rounded-full overflow-hidden">
-                                  <div className="h-full bg-gradient-to-r from-[#fbcfe8] to-[#ec4899] rounded-full transition-all duration-1000 ease-out" style={{ width: `${level}%` }} />
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {/* All skills as pills */}
-                      {profile.skills?.length > 0 && (
-                        <div>
-                          {es.topSkills?.length > 0 && <p className="text-[10px] font-black uppercase tracking-wider text-[var(--muted-strong)] mb-2.5">Other Skills</p>}
-                          <div className="flex flex-wrap gap-1.5">
-                            {profile.skills.map((skill) => (
-                              <span key={skill} className="rounded-lg border border-[var(--border)] bg-[var(--panel-soft)]/50 px-2.5 py-1 text-xs font-semibold text-[var(--text)] hover:border-[#ec4899]/50 hover:text-[#ec4899] transition-all cursor-default backdrop-blur-sm">{skill}</span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Tools & Languages */}
-                      {(es.tools?.length > 0 || es.languages?.length > 0) && (
-                        <div className="mt-6 pt-5 border-t border-[var(--border)] space-y-4">
-                          {es.tools?.length > 0 && (
-                            <div>
-                              <p className="text-[10px] font-black uppercase tracking-wider text-[var(--muted-strong)] mb-2">Tools & Tech Stack</p>
-                              <div className="flex flex-wrap gap-1.5">
-                                {es.tools.map((t) => <span key={t} className="rounded border border-indigo-500/20 bg-indigo-500/5 px-2 py-0.5 text-[11px] font-bold text-indigo-700 dark:text-indigo-400">{t}</span>)}
-                              </div>
-                            </div>
-                          )}
-                          {es.languages?.length > 0 && (
-                            <div>
-                              <p className="text-[10px] font-black uppercase tracking-wider text-[var(--muted-strong)] mb-2">Languages</p>
-                              <div className="flex flex-wrap gap-1.5">
-                                {es.languages.map((l) => <span key={l} className="rounded border border-emerald-500/20 bg-emerald-500/5 px-2 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-400">{l}</span>)}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </SectionCard>
-                  ) : null}
-                </AnimatedSection>
-
-                {/* ════ ACTIVITY ════ */}
-                <AnimatedSection delay={460}>
-                  {isSectionLocked('activity') ? (
-                    <SectionCard id="activity" title="Activity" accentColor="#8b5cf6" locked lockedMessage="Connect to see activity" />
-                  ) : isSectionVisible('activity') ? (
-                    <SectionCard id="activity" title="Activity" accentColor="#8b5cf6" isEmpty={!posts.length} emptyMessage="No recent activity.">
-                      <div className="space-y-3">
-                        {posts.map((post) => <MiniPost key={post.id} post={post} />)}
-                        {posts.length >= 5 && <Link to="/home" className="block text-center text-xs font-black uppercase tracking-widest text-[#8b5cf6] hover:text-[var(--text)] transition-colors mt-4 py-2 border border-[#8b5cf6]/20 bg-[#8b5cf6]/5 rounded-xl">View all activity</Link>}
-                      </div>
-                    </SectionCard>
-                  ) : null}
-                </AnimatedSection>
 
                 {/* ════ CONNECTIONS ════ */}
                 <AnimatedSection delay={500}>

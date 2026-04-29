@@ -9,6 +9,7 @@ import UserListModal from '../components/UserListModal.jsx';
 import { useProfileSettings } from '../hooks/useProfileSettings.js';
 import { selectAuth } from '../store/authSlice.js';
 import { selectCurrentAnalysis } from '../store/historySlice.js';
+import StickerShowcase from '../components/StickerShowcase.jsx';
 
 function initials(name) {
   return String(name || 'A').trim().charAt(0).toUpperCase() || 'A';
@@ -389,6 +390,12 @@ export default function ProfilePage() {
               <span className="hidden sm:inline">Preview Public</span>
             </Link>
           ) : null}
+          <Link to="/rewards" className="app-button-secondary flex items-center gap-2 transition-colors hover:bg-[var(--panel-soft)]">
+            <svg className="h-4 w-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+            </svg>
+            <span className="hidden sm:inline">Rewards</span>
+          </Link>
           <Link to="/settings" className="app-button-secondary transition-colors hover:bg-[var(--panel-soft)]">
             Edit Information
           </Link>
@@ -539,6 +546,12 @@ export default function ProfilePage() {
                             </div>
                           ) : null}
                         </div>
+
+                        {profile.equippedStickers?.length > 0 && (
+                          <div className="mt-5">
+                            <StickerShowcase equippedStickers={profile.equippedStickers} />
+                          </div>
+                        )}
 
                         {socialProfile ? (
                           <div className="mt-8 flex gap-6 border-t border-[var(--border)] pt-5 sm:gap-8">
