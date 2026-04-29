@@ -2,6 +2,11 @@ import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { applicationLogs, notifications, squadActivities, squadMembers, squads, users } from '../db/schema.js';
 import { applyXpDecayIfNeeded, calculateApplicationXp, getTodayIntegrityCounts, grantXp, shouldShadowban } from '../services/xpEngine.js';
+import {
+  injectAppLoggedCommsEvent,
+  injectDailyBriefingController,
+  injectMissionSecuredCommsEvent
+} from './squadCommsController.js';
 
 const joinSquadSchema = z.object({
   weeklyGoal: z.coerce.number().int().min(4).max(500).optional()
@@ -264,7 +269,9 @@ async function ensureCurrentSquadWeek(db, squadId, currentWeek) {
     .update(squads)
     .set({
       weekOf: currentWeek,
-      goalRewardedAt: null
+      goalRewardedAt: null,
+      synergyScore: 0,
+      synergyBurstAt: null
     })
     .where(eq(squads.id, squadId));
 
@@ -272,14 +279,18 @@ async function ensureCurrentSquadWeek(db, squadId, currentWeek) {
     .update(squadMembers)
     .set({
       appsSentThisWeek: 0,
-      interviewsThisWeek: 0
+      interviewsThisWeek: 0,
+      archetypeRole: null,
+      sparksSentThisWeek: 0
     })
     .where(eq(squadMembers.squadId, squadId));
 
   return {
     ...squad,
     weekOf: currentWeek,
-    goalRewardedAt: null
+    goalRewardedAt: null,
+    synergyScore: 0,
+    synergyBurstAt: null
   };
 }
 
@@ -797,7 +808,20 @@ export async function logSquadAppController(request, reply) {
         }
       });
 
+      await injectAppLoggedCommsEvent(request.server.db, {
+        squadId: membership.squadId,
+        userId: request.auth.userId,
+        companyName: body.companyName,
+        roleTitle: body.roleTitle
+      });
+
       goalRewardGranted = await grantGoalRewardIfNeeded(request.server.db, membership.squadId, request.auth.userId);
+
+      if (goalRewardGranted) {
+        await injectMissionSecuredCommsEvent(request.server.db, membership.squadId);
+      }
+
+      await injectDailyBriefingController(request.server.db, membership.squadId);
     }
 
     const snapshot = await getSquadSnapshot(request.server.db, request.auth.userId, currentWeek);

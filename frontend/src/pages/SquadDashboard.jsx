@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useDispatch } from 'react-redux';
 import AppShell from '../components/AppShell.jsx';
+import SquadCommsHub from '../components/SquadCommsHub.jsx';
 import { getMySquad, joinSquad, logSquadApplications, pingSquad } from '../api/squadApi.js';
 import { updateAuthUser } from '../store/authSlice.js';
 
@@ -407,6 +408,13 @@ export default function SquadDashboard() {
                 )}
               </div>
             </article>
+
+            <SquadCommsHub
+              squadId={squadData.squad.id}
+              myAlias={squadData.me?.alias}
+              progressPercent={squadData.squad.progressPercent}
+              members={squadData.members}
+            />
           </div>
 
           <div className="space-y-6">

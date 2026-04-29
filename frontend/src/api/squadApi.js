@@ -19,3 +19,18 @@ export async function pingSquad(payload = {}) {
   const response = await api.post('/api/squads/ping', payload);
   return response.data;
 }
+
+export async function getSquadComms() {
+  const response = await api.get('/api/squads/comms');
+  return response.data.data;
+}
+
+export async function postSquadMessage(payload) {
+  const response = await api.post('/api/squads/comms/message', payload);
+  return response.data.data;
+}
+
+export async function setSquadArchetype(role) {
+  const response = await api.post('/api/squads/comms/archetype', { role });
+  return response.data.data;
+}

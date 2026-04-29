@@ -398,7 +398,7 @@ export const notifications = pgTable(
     userReadCreatedAtIdx: index('notifications_user_id_is_read_created_at_idx').on(table.userId, table.isRead, table.createdAt),
     typeCheck: check(
       'notifications_type_check',
-      sql`${table.type} in ('new_follower', 'new_connection_request', 'connection_accepted', 'post_like', 'post_comment', 'job_match_alert', 'squad_ping', 'squad_goal_reached')`
+      sql`${table.type} in ('new_follower', 'new_connection_request', 'connection_accepted', 'post_like', 'post_comment', 'job_match_alert', 'squad_ping', 'squad_goal_reached', 'squad_synergy_burst')`
     )
   })
 );
@@ -409,6 +409,8 @@ export const squads = pgTable('squads', {
   weeklyGoal: integer('weekly_goal').notNull().default(40),
   weekOf: date('week_of').notNull(),
   goalRewardedAt: timestamp('goal_rewarded_at', { withTimezone: true }),
+  synergyScore: integer('synergy_score').notNull().default(0),
+  synergyBurstAt: timestamp('synergy_burst_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
 });
 
@@ -425,6 +427,8 @@ export const squadMembers = pgTable(
     anonymousAlias: text('anonymous_alias').notNull(),
     appsSentThisWeek: integer('apps_sent_this_week').notNull().default(0),
     interviewsThisWeek: integer('interviews_this_week').notNull().default(0),
+    archetypeRole: varchar('archetype_role', { length: 20 }).default(null),
+    sparksSentThisWeek: integer('sparks_sent_this_week').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
   },
   (table) => ({
@@ -455,6 +459,30 @@ export const squadActivities = pgTable(
     activityTypeCheck: check(
       'squad_activities_activity_type_check',
       sql`${table.activityType} in ('member_joined', 'apps_logged', 'squad_ping', 'rejection_logged')`
+    )
+  })
+);
+
+export const squadMessages = pgTable(
+  'squad_messages',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    squadId: uuid('squad_id')
+      .notNull()
+      .references(() => squads.id, { onDelete: 'cascade' }),
+    senderMemberId: uuid('sender_member_id').references(() => squadMembers.id, { onDelete: 'set null' }),
+    messageType: varchar('message_type', { length: 30 }).notNull(),
+    content: text('content').notNull(),
+    metadata: jsonb('metadata').notNull().default({}),
+    milestonePhase: integer('milestone_phase').notNull().default(0),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    squadCreatedAtIdx: index('squad_messages_squad_id_created_at_idx').on(table.squadId, table.createdAt),
+    squadPhaseIdx: index('squad_messages_squad_id_phase_idx').on(table.squadId, table.milestonePhase),
+    messageTypeCheck: check(
+      'squad_messages_message_type_check',
+      sql`${table.messageType} in ('text', 'quick_signal', 'sticker_drop', 'signal_drop', 'accolade', 'system')`
     )
   })
 );
@@ -571,7 +599,8 @@ export const userEducationsRelations = relations(userEducations, ({ one }) => ({
 
 export const squadsRelations = relations(squads, ({ many }) => ({
   members: many(squadMembers),
-  activities: many(squadActivities)
+  activities: many(squadActivities),
+  messages: many(squadMessages)
 }));
 
 export const squadMembersRelations = relations(squadMembers, ({ one }) => ({
@@ -582,6 +611,17 @@ export const squadMembersRelations = relations(squadMembers, ({ one }) => ({
   user: one(users, {
     fields: [squadMembers.userId],
     references: [users.id]
+  })
+}));
+
+export const squadMessagesRelations = relations(squadMessages, ({ one }) => ({
+  squad: one(squads, {
+    fields: [squadMessages.squadId],
+    references: [squads.id]
+  }),
+  sender: one(squadMembers, {
+    fields: [squadMessages.senderMemberId],
+    references: [squadMembers.id]
   })
 }));
 

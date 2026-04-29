@@ -4,6 +4,11 @@ import {
   logSquadAppController,
   pingSquadController
 } from '../controllers/squadController.js';
+import {
+  getCommsController,
+  postMessageController,
+  setArchetypeController
+} from '../controllers/squadCommsController.js';
 import { authenticateRequest } from '../middlewares/authMiddleware.js';
 
 const strictSquadRateLimit = {
@@ -18,4 +23,15 @@ export default async function squadRoutes(app) {
   app.post('/log-app', { preHandler: authenticateRequest, config: strictSquadRateLimit }, logSquadAppController);
   app.get('/my-squad', { preHandler: authenticateRequest }, getMySquadController);
   app.post('/ping', { preHandler: authenticateRequest, config: strictSquadRateLimit }, pingSquadController);
+  app.get('/comms', {
+    preHandler: authenticateRequest,
+    config: {
+      rateLimit: {
+        max: 30,
+        timeWindow: '1 minute'
+      }
+    }
+  }, getCommsController);
+  app.post('/comms/message', { preHandler: authenticateRequest, config: strictSquadRateLimit }, postMessageController);
+  app.post('/comms/archetype', { preHandler: authenticateRequest }, setArchetypeController);
 }
