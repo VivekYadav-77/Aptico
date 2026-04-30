@@ -20,8 +20,9 @@ function notificationTarget(item) {
   if (item.type === 'new_follower' || item.type === 'connection_accepted') {
     return item.actor?.username ? `/u/${item.actor.username}` : '/home';
   }
+  if (item.type === 'squad_ping' || item.type === 'squad_goal_reached') return '/squads';
   if (item.type === 'job_match_alert') return '/jobs';
-  return '/home';
+  return '/squads';
 }
 
 export default function NotificationBell() {

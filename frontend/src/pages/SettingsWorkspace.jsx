@@ -124,6 +124,17 @@ function TextAreaField({ label, value, onChange, placeholder, minHeight = "min-h
   );
 }
 
+function createEmptyExperience() {
+  return {
+    title: '',
+    company: '',
+    startDate: '',
+    endDate: '',
+    description: '',
+    isCurrent: false
+  };
+}
+
 export default function SettingsWorkspace() {
   const dispatch = useDispatch();
   const auth = useSelector(selectAuth);
@@ -171,7 +182,7 @@ export default function SettingsWorkspace() {
     try {
       await saveProfile(draft);
       await bootstrapAuthSession({ dispatch });
-      setStatusMessage({ type: 'success', text: 'Profile settings successfully updated and published.' });
+      setStatusMessage({ type: 'success', text: 'Profile settings and experience records successfully updated.' });
       setTimeout(() => setStatusMessage(null), 5000);
     } catch (error) {
       setStatusMessage({ type: 'error', text: error.response?.data?.error || 'Could not save profile settings right now.' });
@@ -449,7 +460,7 @@ export default function SettingsWorkspace() {
                     <div className="space-y-6">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium text-[var(--muted-strong)]">Add your work history entries. Most recent first.</p>
-                        <button type="button" className="app-button text-sm py-2 px-4" onClick={() => updateField('experiences', [...(draft.experiences || []), { title: '', company: '', location: '', startDate: '', endDate: '', description: '', isCurrent: false }])}>+ Add Experience</button>
+                        <button type="button" className="app-button text-sm py-2 px-4" onClick={() => updateField('experiences', [...(draft.experiences || []), createEmptyExperience()])}>+ Add Experience</button>
                       </div>
                       {(draft.experiences || []).length === 0 && (
                         <div className="p-8 rounded-2xl border border-dashed border-[var(--border)] text-center text-[var(--muted-strong)] bg-[var(--panel-soft)]">
@@ -459,20 +470,19 @@ export default function SettingsWorkspace() {
                         </div>
                       )}
                       {(draft.experiences || []).map((exp, idx) => (
-                        <div key={idx} className="p-6 rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] space-y-4 relative group">
+                        <div key={exp.id || idx} className="p-6 rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] space-y-4 relative group">
                           <button type="button" onClick={() => updateField('experiences', draft.experiences.filter((_, i) => i !== idx))} className="absolute top-3 right-3 text-xs font-bold text-[var(--warning-text)] opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[var(--warning-soft)] px-2 py-1 rounded-lg">Remove</button>
                           <div className="grid gap-4 md:grid-cols-2">
                             <InputField label="Job Title" value={exp.title} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], title: e.target.value }; updateField('experiences', next); }} placeholder="e.g. Software Engineer" />
                             <InputField label="Company" value={exp.company} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], company: e.target.value }; updateField('experiences', next); }} placeholder="e.g. Google" />
-                            <InputField label="Location" value={exp.location} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], location: e.target.value }; updateField('experiences', next); }} placeholder="e.g. San Francisco, CA" />
                             <div className="grid grid-cols-2 gap-3">
-                              <InputField label="Start Date" value={exp.startDate} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], startDate: e.target.value }; updateField('experiences', next); }} placeholder="e.g. Jan 2022" />
-                              <InputField label="End Date" value={exp.endDate} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], endDate: e.target.value }; updateField('experiences', next); }} placeholder="Present" />
+                              <InputField type="date" label="Start Date" value={exp.startDate} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], startDate: e.target.value }; updateField('experiences', next); }} />
+                              <InputField type="date" label="End Date" value={exp.endDate} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], endDate: e.target.value }; updateField('experiences', next); }} />
                             </div>
                           </div>
                           <TextAreaField label="Description" value={exp.description} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], description: e.target.value }; updateField('experiences', next); }} placeholder="Describe your responsibilities and achievements..." minHeight="min-h-[80px]" />
                           <label className="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" checked={exp.isCurrent || false} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], isCurrent: e.target.checked }; updateField('experiences', next); }} className="accent-[var(--accent)]" />
+                            <input type="checkbox" checked={exp.isCurrent || false} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], isCurrent: e.target.checked, endDate: e.target.checked ? '' : next[idx].endDate }; updateField('experiences', next); }} className="accent-[var(--accent)]" />
                             <span className="text-sm font-medium text-[var(--text)]">I currently work here</span>
                           </label>
                         </div>
@@ -621,11 +631,14 @@ export default function SettingsWorkspace() {
                             { key: 'about', label: 'About' },
                             { key: 'featured', label: 'Featured' },
                             { key: 'activity', label: 'Activity' },
+                            { key: 'dashboard', label: 'Career Dashboard' },
                             { key: 'experience', label: 'Experience' },
                             { key: 'education', label: 'Education' },
                             { key: 'licenses', label: 'Licenses & Certifications' },
                             { key: 'skills', label: 'Skills' },
-                            { key: 'honorsAwards', label: 'Honors & Awards' }
+                            { key: 'honorsAwards', label: 'Honors & Awards' }, { key: 'digitalFootprint', label: 'Digital Footprint' },
+                            { key: 'resiliencePortfolio', label: 'Proof of Resilience' },
+                            { key: 'socialNetwork', label: 'Social Network (Followers & Connections)' }
                           ].map(({ key, label }) => {
                             const currentValue = draft.sectionVisibility?.[key] || 'everyone';
                             return (

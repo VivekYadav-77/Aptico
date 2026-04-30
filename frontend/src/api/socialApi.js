@@ -30,6 +30,21 @@ export async function getPublicProfile(username) {
   return response.data;
 }
 
+export async function getPublicResilienceProfile(username) {
+  const response = await api.get(`/api/social/profile/${username}`);
+  return response.data?.resilience_portfolio || null;
+}
+
+export async function getResilienceDetails(username) {
+  const response = await api.get(`/api/social/profile/${username}/resilience-details`);
+  return response.data;
+}
+
+export async function chatWithShadowResume(username, message) {
+  const response = await api.post(`/api/shadow-resume/${username}/chat`, { message });
+  return response.data;
+}
+
 export async function getMyProfile() {
   const response = await api.get('/api/social/my-profile');
   return response.data;
@@ -117,7 +132,7 @@ export async function getPendingConnections() {
 
 export async function getConnectionStatus(username) {
   const response = await api.get(`/api/social/connections/status/${username}`);
-  return response.data.status;
+  return response.data;
 }
 
 export async function getNotifications(params = {}) {
@@ -138,4 +153,19 @@ export async function getUnreadNotificationCount() {
 export async function searchPeople(params = {}) {
   const response = await api.get('/api/social/people/search', { params });
   return response.data.people || [];
+}
+
+export async function getProfileFollowers(username) {
+  const response = await api.get(`/api/social/profile/${username}/followers`);
+  return response.data.followers || [];
+}
+
+export async function getProfileFollowing(username) {
+  const response = await api.get(`/api/social/profile/${username}/following`);
+  return response.data.following || [];
+}
+
+export async function getProfileConnections(username) {
+  const response = await api.get(`/api/social/profile/${username}/connections`);
+  return response.data.connections || [];
 }

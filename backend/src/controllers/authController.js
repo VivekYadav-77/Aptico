@@ -14,6 +14,7 @@ import {
   sendEmailVerification,
   verifyEmailToken
 } from '../services/authService.js';
+import { applyXpDecayIfNeeded } from '../services/xpEngine.js';
 
 const googleSchema = z.object({
   credential: z.string().trim().min(1)
@@ -62,6 +63,23 @@ function sendError(reply, error) {
   });
 }
 
+async function sendSessionReply(request, reply, session) {
+  await applyXpDecayIfNeeded(request.server.db, session.user.id);
+  const user = await getCurrentUser({
+    db: request.server.db,
+    userId: session.user.id
+  });
+
+  reply.header('Set-Cookie', buildRefreshCookie(session.refreshToken, session.refreshTokenExpiresIn)).send({
+    success: true,
+    data: {
+      user,
+      accessToken: session.accessToken,
+      expiresIn: session.accessTokenExpiresIn
+    }
+  });
+}
+
 export async function registerController(request, reply) {
   try {
     const body = registerSchema.parse(request.body || {});
@@ -91,14 +109,7 @@ export async function loginController(request, reply) {
       request
     });
 
-    reply.header('Set-Cookie', buildRefreshCookie(session.refreshToken, session.refreshTokenExpiresIn)).send({
-      success: true,
-      data: {
-        user: session.user,
-        accessToken: session.accessToken,
-        expiresIn: session.accessTokenExpiresIn
-      }
-    });
+    await sendSessionReply(request, reply, session);
   } catch (error) {
     sendError(reply, error);
   }
@@ -113,14 +124,7 @@ export async function googleAuthController(request, reply) {
       request
     });
 
-    reply.header('Set-Cookie', buildRefreshCookie(session.refreshToken, session.refreshTokenExpiresIn)).send({
-      success: true,
-      data: {
-        user: session.user,
-        accessToken: session.accessToken,
-        expiresIn: session.accessTokenExpiresIn
-      }
-    });
+    await sendSessionReply(request, reply, session);
   } catch (error) {
     sendError(reply, error);
   }
@@ -152,14 +156,7 @@ export async function verifyEmailController(request, reply) {
       request
     });
 
-    reply.header('Set-Cookie', buildRefreshCookie(session.refreshToken, session.refreshTokenExpiresIn)).send({
-      success: true,
-      data: {
-        user: session.user,
-        accessToken: session.accessToken,
-        expiresIn: session.accessTokenExpiresIn
-      }
-    });
+    await sendSessionReply(request, reply, session);
   } catch (error) {
     sendError(reply, error);
   }

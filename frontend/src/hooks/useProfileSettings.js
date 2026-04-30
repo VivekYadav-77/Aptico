@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { fetchProfileSettings, saveProfileSettings } from '../api/profileApi.js';
+import { fetchProfileSettings, removeExperience, saveExperience, saveProfileSettings } from '../api/profileApi.js';
 
 const STORAGE_KEY = 'aptico-profile-settings';
 const UPDATE_EVENT = 'aptico-profile-settings-updated';
@@ -83,12 +83,15 @@ function createDefaults(auth, analysis) {
     sectionVisibility: {
       about: 'everyone',
       featured: 'everyone',
+      digitalFootprint: 'everyone',
       activity: 'everyone',
+      dashboard: 'everyone',
       experience: 'everyone',
       education: 'everyone',
       licenses: 'everyone',
       skills: 'everyone',
-      honorsAwards: 'everyone'
+      honorsAwards: 'everyone',
+      resiliencePortfolio: 'everyone'
     },
     // Multi-entry sections
     featured: [],
@@ -105,6 +108,25 @@ function parseArrayField(value, fallback) {
   return [];
 }
 
+function normalizeExperienceEntry(experience) {
+  return {
+    id: experience?.id || undefined,
+    title: experience?.title || '',
+    company: experience?.company || '',
+    startDate: experience?.startDate || '',
+    endDate: experience?.endDate || '',
+    description: experience?.description || '',
+    isCurrent: Boolean(experience?.isCurrent)
+  };
+}
+
+function stripExperienceIds(experiences) {
+  return (experiences || []).map(({ id, ...rest }) => ({
+    ...rest,
+    isCurrent: Boolean(rest.isCurrent)
+  }));
+}
+
 function mergeWithDefaults(defaults, incoming) {
   const nextValue = incoming && typeof incoming === 'object' ? incoming : {};
 
@@ -118,7 +140,7 @@ function mergeWithDefaults(defaults, incoming) {
     achievements: parseList(nextValue.achievements || defaults.achievements),
     sectionVisibility: { ...defaults.sectionVisibility, ...(nextValue.sectionVisibility || {}) },
     featured: parseArrayField(nextValue.featured, defaults.featured),
-    experiences: parseArrayField(nextValue.experiences, defaults.experiences),
+    experiences: parseArrayField(nextValue.experiences, defaults.experiences).map(normalizeExperienceEntry),
     educationEntries: parseArrayField(nextValue.educationEntries, defaults.educationEntries),
     licenses: parseArrayField(nextValue.licenses, defaults.licenses),
     honorsAwards: parseArrayField(nextValue.honorsAwards, defaults.honorsAwards)
@@ -221,14 +243,56 @@ export function useProfileSettings(auth, analysis) {
     };
   }, [defaults]);
 
+  async function syncExperiences(nextExperiences, previousExperiences = profile.experiences || []) {
+    const normalizedNext = (nextExperiences || []).map(normalizeExperienceEntry);
+
+    if (!isAuthenticated) {
+      return normalizedNext;
+    }
+
+    const previousIds = new Set((previousExperiences || []).map((experience) => experience?.id).filter(Boolean));
+    const nextIds = new Set(normalizedNext.map((experience) => experience.id).filter(Boolean));
+    const deletedIds = Array.from(previousIds).filter((id) => !nextIds.has(id));
+
+    let latestExperiences = normalizedNext;
+
+    for (const experienceId of deletedIds) {
+      latestExperiences = await removeExperience(experienceId);
+    }
+
+    for (const experience of normalizedNext) {
+      latestExperiences = await saveExperience({
+        id: experience.id,
+        title: experience.title,
+        company: experience.company,
+        startDate: experience.startDate,
+        endDate: experience.endDate,
+        description: experience.description,
+        isCurrent: experience.isCurrent
+      });
+    }
+
+    return latestExperiences.map(normalizeExperienceEntry);
+  }
+
   async function saveProfile(nextProfile) {
     const mergedProfile = mergeWithDefaults(defaults, nextProfile);
+    const profileWithoutExperienceIds = {
+      ...mergedProfile,
+      experiences: stripExperienceIds(mergedProfile.experiences)
+    };
 
     if (isAuthenticated) {
-      const savedProfile = await saveProfileSettings(mergedProfile);
-      persistProfile(savedProfile);
-      setProfile(savedProfile);
-      return savedProfile;
+      const savedProfile = await saveProfileSettings(profileWithoutExperienceIds);
+      const syncedExperiences = await syncExperiences(mergedProfile.experiences, profile.experiences || []);
+      const nextSavedProfile = {
+        ...savedProfile,
+        experiences: syncedExperiences
+      };
+
+      persistProfile(nextSavedProfile);
+      setProfile(nextSavedProfile);
+      return nextSavedProfile;
     }
 
     persistProfile(mergedProfile);
@@ -244,9 +308,15 @@ export function useProfileSettings(auth, analysis) {
   async function resetProfile() {
     if (isAuthenticated) {
       const savedProfile = await saveProfileSettings(defaults);
-      persistProfile(savedProfile);
-      setProfile(savedProfile);
-      return savedProfile;
+      const syncedExperiences = await syncExperiences([], profile.experiences || []);
+      const nextSavedProfile = {
+        ...savedProfile,
+        experiences: syncedExperiences
+      };
+
+      persistProfile(nextSavedProfile);
+      setProfile(nextSavedProfile);
+      return nextSavedProfile;
     }
 
     persistProfile(defaults);
@@ -259,6 +329,7 @@ export function useProfileSettings(auth, analysis) {
     setProfile,
     saveProfile,
     saveProfileLocally,
+    syncExperiences,
     resetProfile,
     isLoadingProfile,
     profileError

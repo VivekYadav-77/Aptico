@@ -187,7 +187,7 @@ export async function getPendingRequests(db, userId) {
 
 export async function getConnectionStatus(db, userId, targetUserId) {
   if (userId === targetUserId) {
-    return 'self';
+    return { status: 'self' };
   }
 
   const rows = await db
@@ -203,12 +203,15 @@ export async function getConnectionStatus(db, userId, targetUserId) {
 
   const connection = rows[0];
   if (!connection || connection.status === 'declined') {
-    return 'not_connected';
+    return { status: 'not_connected' };
   }
 
   if (connection.status === 'accepted') {
-    return 'connected';
+    return { status: 'connected', connectionId: connection.id };
   }
 
-  return connection.requesterId === userId ? 'pending_sent' : 'pending_received';
+  return {
+    status: connection.requesterId === userId ? 'pending_sent' : 'pending_received',
+    connectionId: connection.id
+  };
 }

@@ -1,10 +1,26 @@
 import crypto from 'node:crypto';
 import { z } from 'zod';
 import { env } from '../config/env.js';
-import { createGeminiClient, isRateLimitError, sleep } from '../utils/geminiClient.js';
+import { createGeminiClient, isRateLimitError, sleep, normalizeGeminiError } from '../utils/geminiClient.js';
 
 const CACHE_TTL_SECONDS = 2 * 60 * 60;
 const STAGE_TIMEOUT_MS = 20_000;
+
+const portfolioReadmeSchema = z.object({
+  readmeMarkdown: z.string().trim().min(1),
+  headline: z.string().trim().min(1),
+  suggestedTitle: z.string().trim().min(1)
+});
+
+const portfolioReadmeJsonSchema = {
+  type: 'object',
+  required: ['readmeMarkdown', 'headline', 'suggestedTitle'],
+  properties: {
+    readmeMarkdown: { type: 'string' },
+    headline: { type: 'string' },
+    suggestedTitle: { type: 'string' }
+  }
+};
 
 // ─── Zod schemas ──────────────────────────────────────────────────────────────
 
@@ -478,7 +494,7 @@ async function callGeminiStage({ apiKey, fallbackKey, model, prompt, config, log
         await sleep(200);
         continue;
       }
-      throw error;
+      throw normalizeGeminiError(error);
     }
   }
 
@@ -644,6 +660,29 @@ function buildPrompt({ resumeText, jobDescription }) {
   ].join('\n');
 }
 
+function buildPortfolioReadmePrompt(profilePayload) {
+  return [
+    'You are Aptico, an elite developer brand strategist.',
+    'Turn the following candidate profile data into a stellar GitHub profile README.',
+    'Return only valid JSON matching the provided schema.',
+    'The markdown must be polished, specific, recruiter-friendly, and credible.',
+    'Do not invent employers, dates, metrics, open-source work, technologies, or achievements that are not present in the data.',
+    'Do not include any badge markdown at the beginning because the caller will prepend that separately.',
+    'Use standard GitHub-flavored Markdown only.',
+    'The markdown should include:',
+    '- a strong headline section',
+    '- a concise professional summary',
+    '- a focused skills/tooling section',
+    '- a highlighted experience section',
+    '- a featured work or achievement section when supported by the data',
+    '- a brief contact/collaboration close',
+    'Keep the result under 1200 words.',
+    '',
+    'Candidate data:',
+    JSON.stringify(profilePayload, null, 2)
+  ].join('\n');
+}
+
 function createPromptHash(prompt) {
   return crypto.createHash('sha256').update(prompt).digest('hex');
 }
@@ -719,4 +758,30 @@ export async function analyzeResumeWithGemini({
     cached: false,
     promptHash
   };
+}
+
+export async function generatePortfolioReadme({ profilePayload, logger = console }) {
+  const prompt = buildPortfolioReadmePrompt(profilePayload);
+
+  const rawText = await callGeminiStage({
+    apiKey: env.geminiPortfolioKey || env.geminiKey2 || env.geminiKey1,
+    fallbackKey: env.geminiKeyFallback,
+    model: env.geminiPortfolioModel || env.geminiModel2 || env.geminiModel1,
+    prompt,
+    config: {
+      responseMimeType: 'application/json',
+      responseJsonSchema: portfolioReadmeJsonSchema,
+      temperature: 0.6,
+      topP: 0.95
+    },
+    logger
+  });
+
+  try {
+    return portfolioReadmeSchema.parse(JSON.parse(rawText));
+  } catch {
+    const parseError = new Error('README generation returned invalid structured JSON.');
+    parseError.statusCode = 500;
+    throw parseError;
+  }
 }
