@@ -6,8 +6,12 @@ import {
   createOrUpdateProfile,
   followUser,
   getPublicProfile,
+  getResilienceFullHistory,
   isFollowing,
-  unfollowUser
+  unfollowUser,
+  getFollowers,
+  getFollowing,
+  getPublicConnections
 } from '../services/profileService.js';
 import {
   getConnections,
@@ -168,6 +172,73 @@ export default async function socialRoutes(app) {
       return reply.send({ isFollowing: following });
     } catch (error) {
       return sendError(reply, error, 'Could not check follow status.');
+    }
+  });
+
+  app.get('/profile/:username/followers', { preHandler: optionalAuthenticateRequest }, async (request, reply) => {
+    try {
+      const followers = await getFollowers(request.server.db, request.params.username);
+      return reply.send({ followers });
+    } catch (error) {
+      return sendError(reply, error, 'Could not fetch followers.');
+    }
+  });
+
+  app.get('/profile/:username/following', { preHandler: optionalAuthenticateRequest }, async (request, reply) => {
+    try {
+      const following = await getFollowing(request.server.db, request.params.username);
+      return reply.send({ following });
+    } catch (error) {
+      return sendError(reply, error, 'Could not fetch following.');
+    }
+  });
+
+  app.get('/profile/:username/connections', { preHandler: optionalAuthenticateRequest }, async (request, reply) => {
+    try {
+      const userConnections = await getPublicConnections(request.server.db, request.params.username);
+      return reply.send({ connections: userConnections });
+    } catch (error) {
+      return sendError(reply, error, 'Could not fetch connections.');
+    }
+  });
+
+  app.get('/profile/:username/resilience-details', { preHandler: optionalAuthenticateRequest }, async (request, reply) => {
+    try {
+      const username = String(request.params.username || '').trim();
+      const viewerId = request.auth?.userId || null;
+
+      // Reuse getPublicProfile to enforce visibility (throws 404 if private)
+      const profile = await getPublicProfile(request.server.db, username, viewerId);
+      const profileOwnerId = profile.user_id;
+
+      // Check section-level visibility for resiliencePortfolio
+      const sectionVis = profile.enriched_settings?.sectionVisibility || {};
+      const vis = sectionVis.resiliencePortfolio || 'everyone';
+      const isSelf = viewerId && viewerId === profileOwnerId;
+      const viewerRel = profile.enriched_settings?.viewerRelationship || 'public';
+      const canView = vis === 'everyone'
+        || (vis === 'connections' && (isSelf || viewerRel === 'connected'))
+        || (vis === 'only_me' && isSelf);
+
+      if (!canView) {
+        return reply.code(403).send({ error: 'Resilience portfolio is private.' });
+      }
+
+      const resilienceData = await getResilienceFullHistory(request.server.db, profileOwnerId);
+
+      return reply.send({
+        username: profile.username,
+        name: profile.name,
+        headline: profile.headline,
+        avatar_url: profile.avatar_url,
+        resilience_xp: profile.resilience_xp || 0,
+        ...resilienceData
+      });
+    } catch (error) {
+      if (error.statusCode === 404) {
+        return reply.code(404).send({ error: 'Profile not found' });
+      }
+      return sendError(reply, error, 'Could not load resilience details.');
     }
   });
 
@@ -462,8 +533,8 @@ export default async function socialRoutes(app) {
         return reply.code(404).send({ success: false, error: 'User not found' });
       }
 
-      const status = await getConnectionStatus(request.server.db, request.auth.userId, target.userId);
-      return reply.send({ status });
+      const connectionData = await getConnectionStatus(request.server.db, request.auth.userId, target.userId);
+      return reply.send(connectionData);
     } catch (error) {
       return sendError(reply, error, 'Could not load connection status.');
     }

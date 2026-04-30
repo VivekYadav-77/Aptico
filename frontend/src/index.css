@@ -302,6 +302,107 @@ body {
   animation: search-dropdown-in 160ms ease forwards;
 }
 
+@keyframes rejection-confetti-burst {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(0.8) rotate(0deg);
+  }
+
+  12% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateY(210px) scale(1.05) rotate(220deg);
+  }
+}
+
+.rejection-confetti {
+  animation-name: rejection-confetti-burst;
+  animation-timing-function: cubic-bezier(0.2, 0.9, 0.2, 1);
+  animation-fill-mode: forwards;
+}
+
+@keyframes comms-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(78, 222, 163, 0);
+  }
+
+  50% {
+    box-shadow: 0 0 0 4px rgba(78, 222, 163, 0.25);
+  }
+}
+
+.comms-pulse-active {
+  animation: comms-pulse 2s ease-in-out infinite;
+}
+
+@keyframes synergy-burst {
+  0% {
+    background-color: transparent;
+  }
+
+  20% {
+    background-color: rgba(78, 222, 163, 0.18);
+  }
+
+  100% {
+    background-color: transparent;
+  }
+}
+
+.synergy-burst-flash {
+  animation: synergy-burst 1.2s ease-out forwards;
+}
+
+@keyframes signal-pop {
+  0% {
+    opacity: 0;
+    transform: scale(0.88) translateY(8px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.signal-pop {
+  animation: signal-pop 220ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.sticker-drop-common {
+  box-shadow: 0 0 8px rgba(78, 222, 163, 0.3);
+}
+
+.sticker-drop-rare {
+  box-shadow: 0 0 14px rgba(113, 161, 255, 0.5);
+}
+
+.sticker-drop-legendary {
+  box-shadow: 0 0 22px rgba(245, 158, 11, 0.6), 0 0 40px rgba(245, 158, 11, 0.2);
+}
+
+.synergy-meter-fill {
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), #71a1ff);
+  transition: width 600ms cubic-bezier(0.34, 1.2, 0.64, 1);
+}
+
+.hud-scanlines {
+  background-image: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.04) 2px,
+    rgba(0, 0, 0, 0.04) 4px
+  );
+  pointer-events: none;
+}
+
 kbd {
   font-family: "JetBrains Mono", monospace;
 }

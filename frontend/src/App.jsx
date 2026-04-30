@@ -12,17 +12,21 @@ import AuthPermanent from './pages/AuthPermanent.jsx';
 import CommunityWins from './pages/CommunityWins.jsx';
 import ControlCenter from './pages/ControlCenter.jsx';
 import GuestDashboard from './pages/GuestDashboard.jsx';
-import HomeFeed from './pages/HomeFeed.jsx';
 import InterviewPrepPage from './pages/InterviewPrepPage.jsx';
 import LatestAnalysisPage from './pages/LatestAnalysisPage.jsx';
 import MainDashboard from './pages/MainDashboard.jsx';
 import ModernJobSearchPage from './pages/ModernJobSearchPage.jsx';
 import Notifications from './pages/Notifications.jsx';
 import PeopleDiscovery from './pages/PeopleDiscovery.jsx';
+import PortfolioGenerator from './pages/PortfolioGenerator.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import PublicProfile from './pages/PublicProfile.jsx';
+import ResilienceDetailsPage from './pages/ResilienceDetailsPage.jsx';
+import RewardsPage from './pages/RewardsPage.jsx';
 import SavedJobsPage from './pages/SavedJobsPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
+import ShadowResume from './pages/ShadowResume.jsx';
+import SquadDashboard from './pages/SquadDashboard.jsx';
 
 function RootRoute() {
   const auth = useSelector(selectAuth);
@@ -31,7 +35,7 @@ function RootRoute() {
     return <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] text-[var(--muted-strong)]">Loading Aptico...</div>;
   }
 
-  return auth.isAuthenticated ? <Navigate replace to="/home" /> : <GuestDashboard />;
+  return auth.isAuthenticated ? <Navigate replace to="/squads" /> : <GuestDashboard />;
 }
 
 export default function App() {
@@ -68,12 +72,22 @@ export default function App() {
         <Route path="/signup" element={<AuthPermanent />} />
         <Route path="/guest" element={<GuestDashboard />} />
         <Route path="/u/:username" element={<PublicProfile />} />
+        <Route path="/u/:username/resilience" element={<ResilienceDetailsPage />} />
+        <Route path="/hire/:username" element={<ShadowResume />} />
         <Route path="/wins" element={<CommunityWins />} />
         <Route
           path="/home"
           element={
             <ProtectedRoute>
-              <HomeFeed />
+              <Navigate replace to="/squads" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/squads"
+          element={
+            <ProtectedRoute>
+              <SquadDashboard />
             </ProtectedRoute>
           }
         />
@@ -158,10 +172,26 @@ export default function App() {
           }
         />
         <Route
+          path="/portfolio-generator"
+          element={
+            <ProtectedRoute>
+              <PortfolioGenerator />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/settings"
           element={
             <ProtectedRoute>
               <SettingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/rewards"
+          element={
+            <ProtectedRoute>
+              <RewardsPage />
             </ProtectedRoute>
           }
         />

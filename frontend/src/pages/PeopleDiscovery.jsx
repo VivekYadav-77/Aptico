@@ -12,7 +12,7 @@ function PersonCard({ person }) {
   const [sending, setSending] = useState(false);
 
   useEffect(() => {
-    getConnectionStatus(person.username).then(setStatus).catch(() => setStatus('not_connected'));
+    getConnectionStatus(person.username).then((data) => setStatus(data.status)).catch(() => setStatus('not_connected'));
   }, [person.username]);
 
   async function connect() {

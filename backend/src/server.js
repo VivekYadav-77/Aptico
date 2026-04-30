@@ -17,6 +17,10 @@ import jobRoutes from './routes/jobRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import profileRoutes from './routes/profileRoutes.js';
 import socialRoutes from './routes/social.js';
+import rejectionRoutes from './routes/rejectionRoutes.js';
+import shadowResumeRoutes from './routes/shadowResumeRoutes.js';
+import squadRoutes from './routes/squadRoutes.js';
+import badgeRoutes from './routes/badgeRoutes.js';
 import { authenticateAdminRequest } from './middlewares/authMiddleware.js';
 import { createRedisService } from './utils/redisService.js';
 
@@ -116,6 +120,10 @@ export function buildServer() {
   app.register(jobRoutes, { prefix: '/api/jobs' });
   app.register(profileRoutes, { prefix: '/api' });
   app.register(socialRoutes, { prefix: '/api/social' });
+  app.register(rejectionRoutes, { prefix: '/api' });
+  app.register(shadowResumeRoutes, { prefix: '/api/shadow-resume' });
+  app.register(squadRoutes, { prefix: '/api/squads' });
+  app.register(badgeRoutes, { prefix: '/api/badge' });
   app.register(async function adminScope(adminApp) {
     adminApp.addHook('onRequest', authenticateAdminRequest);
     adminApp.register(adminRoutes, { prefix: '/api/admin' });

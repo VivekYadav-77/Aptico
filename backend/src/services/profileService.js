@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
-import { and, desc, eq, inArray, ne, or, sql } from 'drizzle-orm';
-import { analyses, connections, follows, profileSettings, userProfiles, users } from '../db/schema.js';
+import { and, asc, desc, eq, gte, inArray, ne, or, sql } from 'drizzle-orm';
+import { analyses, applicationLogs, connections, follows, profileSettings, rejectionLogs, userProfiles, users } from '../db/schema.js';
 import { createNotification } from '../utils/notificationHelper.js';
 
 const USERNAME_PATTERN = /^[a-z0-9_-]{3,30}$/;
@@ -84,6 +84,14 @@ function serviceError(message, statusCode) {
   return error;
 }
 
+function isMissingRelationError(error, relationName) {
+  return error?.code === '42P01' && String(error?.message || '').includes(`relation "${relationName}" does not exist`);
+}
+
+function isMissingColumnError(error, columnName) {
+  return error?.code === '42703' && String(error?.message || '').includes(columnName);
+}
+
 function normalizeProfileData(data) {
   return {
     username: String(data.username || '').trim(),
@@ -91,6 +99,437 @@ function normalizeProfileData(data) {
     location: data.location ? String(data.location).trim() : null,
     skills: Array.isArray(data.skills) ? data.skills.map((skill) => String(skill).trim()).filter(Boolean).slice(0, 20) : null,
     isPublic: typeof data.is_public === 'boolean' ? data.is_public : data.isPublic ?? true
+  };
+}
+
+function startOfUtcDay(date) {
+  const next = new Date(date);
+  next.setUTCHours(0, 0, 0, 0);
+  return next;
+}
+
+function toDateKey(date) {
+  return startOfUtcDay(date).toISOString().slice(0, 10);
+}
+
+function addUtcDays(date, days) {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+function formatDisplayDate(value) {
+  const date = value ? new Date(value) : null;
+  if (!date || Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return date.toLocaleDateString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric'
+  });
+}
+
+function calculateLongestStreak(dateKeys) {
+  if (!dateKeys.length) {
+    return 0;
+  }
+
+  let longest = 0;
+  let current = 0;
+  let previous = null;
+
+  for (const key of dateKeys) {
+    const currentDate = new Date(`${key}T00:00:00Z`);
+
+    if (!previous) {
+      current = 1;
+    } else {
+      const dayDiff = Math.round((currentDate.getTime() - previous.getTime()) / 86400000);
+      current = dayDiff === 1 ? current + 1 : 1;
+    }
+
+    longest = Math.max(longest, current);
+    previous = currentDate;
+  }
+
+  return longest;
+}
+
+async function buildResiliencePortfolio(db, profileOwnerId) {
+  const now = new Date();
+  const today = startOfUtcDay(now);
+  const applicationsSince = addUtcDays(today, -89);
+  const heatmapSince = addUtcDays(today, -29);
+  const averageSince = addUtcDays(today, -6);
+  let recentApplications = [];
+  let totalApplicationsRows = [{ total: 0 }];
+  let streakRows = [];
+
+  try {
+    [recentApplications, totalApplicationsRows, streakRows] = await Promise.all([
+      db
+        .select({
+          companyName: applicationLogs.companyName,
+          roleTitle: applicationLogs.roleTitle,
+          jobUrl: applicationLogs.jobUrl,
+          createdAt: applicationLogs.createdAt
+        })
+        .from(applicationLogs)
+        .where(
+          and(
+            eq(applicationLogs.userId, profileOwnerId),
+            eq(applicationLogs.isShadowbanned, false),
+            gte(applicationLogs.createdAt, applicationsSince)
+          )
+        )
+        .orderBy(desc(applicationLogs.createdAt)),
+      db
+        .select({ total: sql`count(*)::int` })
+        .from(applicationLogs)
+        .where(and(eq(applicationLogs.userId, profileOwnerId), eq(applicationLogs.isShadowbanned, false))),
+      db
+        .select({
+          createdAt: applicationLogs.createdAt
+        })
+        .from(applicationLogs)
+        .where(and(eq(applicationLogs.userId, profileOwnerId), eq(applicationLogs.isShadowbanned, false)))
+        .orderBy(asc(applicationLogs.createdAt))
+    ]);
+  } catch (error) {
+    if (isMissingColumnError(error, 'job_url')) {
+      [recentApplications, totalApplicationsRows, streakRows] = await Promise.all([
+        db
+          .select({
+            companyName: applicationLogs.companyName,
+            roleTitle: applicationLogs.roleTitle,
+            createdAt: applicationLogs.createdAt
+          })
+          .from(applicationLogs)
+          .where(
+            and(
+              eq(applicationLogs.userId, profileOwnerId),
+              eq(applicationLogs.isShadowbanned, false),
+              gte(applicationLogs.createdAt, applicationsSince)
+            )
+          )
+          .orderBy(desc(applicationLogs.createdAt)),
+        db
+          .select({ total: sql`count(*)::int` })
+          .from(applicationLogs)
+          .where(and(eq(applicationLogs.userId, profileOwnerId), eq(applicationLogs.isShadowbanned, false))),
+        db
+          .select({
+            createdAt: applicationLogs.createdAt
+          })
+          .from(applicationLogs)
+          .where(and(eq(applicationLogs.userId, profileOwnerId), eq(applicationLogs.isShadowbanned, false)))
+          .orderBy(asc(applicationLogs.createdAt))
+      ]);
+    } else if (!isMissingRelationError(error, 'application_logs')) {
+      throw error;
+    }
+  }
+
+  let recentRejections = [];
+  let totalRejectionsRows = [{ total: 0 }];
+
+  try {
+    [recentRejections, totalRejectionsRows] = await Promise.all([
+      db
+        .select({
+          companyName: rejectionLogs.companyName,
+          roleTitle: rejectionLogs.roleTitle,
+          jobUrl: rejectionLogs.jobUrl,
+          stageRejected: rejectionLogs.stageRejected,
+          createdAt: rejectionLogs.createdAt
+        })
+        .from(rejectionLogs)
+        .where(
+          and(
+            eq(rejectionLogs.userId, profileOwnerId),
+            eq(rejectionLogs.isShadowbanned, false),
+            gte(rejectionLogs.createdAt, applicationsSince)
+          )
+        )
+        .orderBy(desc(rejectionLogs.createdAt)),
+      db
+        .select({ total: sql`count(*)::int` })
+        .from(rejectionLogs)
+        .where(and(eq(rejectionLogs.userId, profileOwnerId), eq(rejectionLogs.isShadowbanned, false)))
+    ]);
+  } catch (error) {
+    if (!isMissingColumnError(error, 'job_url')) {
+      throw error;
+    }
+
+    [recentRejections, totalRejectionsRows] = await Promise.all([
+      db
+        .select({
+          companyName: rejectionLogs.companyName,
+          roleTitle: rejectionLogs.roleTitle,
+          stageRejected: rejectionLogs.stageRejected,
+          createdAt: rejectionLogs.createdAt
+        })
+        .from(rejectionLogs)
+        .where(
+          and(
+            eq(rejectionLogs.userId, profileOwnerId),
+            eq(rejectionLogs.isShadowbanned, false),
+            gte(rejectionLogs.createdAt, applicationsSince)
+          )
+        )
+        .orderBy(desc(rejectionLogs.createdAt)),
+      db
+        .select({ total: sql`count(*)::int` })
+        .from(rejectionLogs)
+        .where(and(eq(rejectionLogs.userId, profileOwnerId), eq(rejectionLogs.isShadowbanned, false)))
+    ]);
+  }
+
+  const dailyCounts = new Map();
+
+  for (let index = 0; index < 30; index += 1) {
+    const date = addUtcDays(heatmapSince, index);
+    dailyCounts.set(toDateKey(date), 0);
+  }
+
+  for (const row of recentApplications) {
+    const key = toDateKey(row.createdAt);
+    if (dailyCounts.has(key)) {
+      dailyCounts.set(key, Number(dailyCounts.get(key) || 0) + 1);
+    }
+  }
+
+  // Count rejections toward the daily heatmap as well
+  for (const row of recentRejections) {
+    const key = toDateKey(row.createdAt);
+    if (dailyCounts.has(key)) {
+      dailyCounts.set(key, Number(dailyCounts.get(key) || 0) + 1);
+    }
+  }
+
+  // Combine application + rejection dates for streak calculation
+  const rejectionDateKeys = recentRejections.map((row) => toDateKey(row.createdAt));
+  const combinedDateKeys = [...new Set([...streakRows.map((row) => toDateKey(row.createdAt)), ...rejectionDateKeys])].sort();
+  const averageWindowCount = recentApplications.filter((row) => row.createdAt && new Date(row.createdAt).getTime() >= averageSince.getTime()).length
+    + recentRejections.filter((row) => row.createdAt && new Date(row.createdAt).getTime() >= averageSince.getTime()).length;
+
+  return {
+    heatmap: Array.from(dailyCounts.entries()).map(([date, count]) => ({
+      date,
+      count,
+      intensity: count >= 5 ? 'strong' : count >= 3 ? 'medium' : count >= 1 ? 'light' : 'empty'
+    })),
+    applicationHistory: recentApplications.slice(0, 10).map((row) => ({
+      companyName: row.companyName,
+      roleTitle: row.roleTitle,
+      jobUrl: row.jobUrl,
+      createdAt: row.createdAt,
+      dateLabel: formatDisplayDate(row.createdAt)
+    })),
+    rejectionJourney: recentRejections.slice(0, 10).map((row) => ({
+      companyName: row.companyName,
+      roleTitle: row.roleTitle,
+      jobUrl: row.jobUrl,
+      stageRejected: row.stageRejected,
+      stageLabel: String(row.stageRejected || '').replace(/_/g, ' '),
+      createdAt: row.createdAt,
+      dateLabel: formatDisplayDate(row.createdAt)
+    })),
+    stats: {
+      totalApplications: Number(totalApplicationsRows[0]?.total || 0),
+      totalRejections: Number(totalRejectionsRows[0]?.total || 0),
+      currentDailyAverage: Number((averageWindowCount / 7).toFixed(1)),
+      longestStreak: calculateLongestStreak(combinedDateKeys)
+    }
+  };
+}
+
+/**
+ * Full resilience history for the dedicated details page.
+ * Returns 365 days of heatmap data and ALL application/rejection logs.
+ */
+export async function getResilienceFullHistory(db, profileOwnerId) {
+  const now = new Date();
+  const today = startOfUtcDay(now);
+  const historySince = addUtcDays(today, -364);
+  const averageSince = addUtcDays(today, -6);
+
+  let allApplications = [];
+  let totalApplicationsRows = [{ total: 0 }];
+  let streakRows = [];
+
+  try {
+    [allApplications, totalApplicationsRows, streakRows] = await Promise.all([
+      db
+        .select({
+          companyName: applicationLogs.companyName,
+          roleTitle: applicationLogs.roleTitle,
+          jobUrl: applicationLogs.jobUrl,
+          createdAt: applicationLogs.createdAt
+        })
+        .from(applicationLogs)
+        .where(
+          and(
+            eq(applicationLogs.userId, profileOwnerId),
+            eq(applicationLogs.isShadowbanned, false)
+          )
+        )
+        .orderBy(desc(applicationLogs.createdAt)),
+      db
+        .select({ total: sql`count(*)::int` })
+        .from(applicationLogs)
+        .where(and(eq(applicationLogs.userId, profileOwnerId), eq(applicationLogs.isShadowbanned, false))),
+      db
+        .select({ createdAt: applicationLogs.createdAt })
+        .from(applicationLogs)
+        .where(and(eq(applicationLogs.userId, profileOwnerId), eq(applicationLogs.isShadowbanned, false)))
+        .orderBy(asc(applicationLogs.createdAt))
+    ]);
+  } catch (error) {
+    if (isMissingColumnError(error, 'job_url')) {
+      [allApplications, totalApplicationsRows, streakRows] = await Promise.all([
+        db
+          .select({
+            companyName: applicationLogs.companyName,
+            roleTitle: applicationLogs.roleTitle,
+            createdAt: applicationLogs.createdAt
+          })
+          .from(applicationLogs)
+          .where(
+            and(
+              eq(applicationLogs.userId, profileOwnerId),
+              eq(applicationLogs.isShadowbanned, false)
+            )
+          )
+          .orderBy(desc(applicationLogs.createdAt)),
+        db
+          .select({ total: sql`count(*)::int` })
+          .from(applicationLogs)
+          .where(and(eq(applicationLogs.userId, profileOwnerId), eq(applicationLogs.isShadowbanned, false))),
+        db
+          .select({ createdAt: applicationLogs.createdAt })
+          .from(applicationLogs)
+          .where(and(eq(applicationLogs.userId, profileOwnerId), eq(applicationLogs.isShadowbanned, false)))
+          .orderBy(asc(applicationLogs.createdAt))
+      ]);
+    } else if (!isMissingRelationError(error, 'application_logs')) {
+      throw error;
+    }
+  }
+
+  let allRejections = [];
+  let totalRejectionsRows = [{ total: 0 }];
+
+  try {
+    [allRejections, totalRejectionsRows] = await Promise.all([
+      db
+        .select({
+          companyName: rejectionLogs.companyName,
+          roleTitle: rejectionLogs.roleTitle,
+          jobUrl: rejectionLogs.jobUrl,
+          stageRejected: rejectionLogs.stageRejected,
+          createdAt: rejectionLogs.createdAt
+        })
+        .from(rejectionLogs)
+        .where(
+          and(
+            eq(rejectionLogs.userId, profileOwnerId),
+            eq(rejectionLogs.isShadowbanned, false)
+          )
+        )
+        .orderBy(desc(rejectionLogs.createdAt)),
+      db
+        .select({ total: sql`count(*)::int` })
+        .from(rejectionLogs)
+        .where(and(eq(rejectionLogs.userId, profileOwnerId), eq(rejectionLogs.isShadowbanned, false)))
+    ]);
+  } catch (error) {
+    if (!isMissingColumnError(error, 'job_url')) {
+      throw error;
+    }
+
+    [allRejections, totalRejectionsRows] = await Promise.all([
+      db
+        .select({
+          companyName: rejectionLogs.companyName,
+          roleTitle: rejectionLogs.roleTitle,
+          stageRejected: rejectionLogs.stageRejected,
+          createdAt: rejectionLogs.createdAt
+        })
+        .from(rejectionLogs)
+        .where(
+          and(
+            eq(rejectionLogs.userId, profileOwnerId),
+            eq(rejectionLogs.isShadowbanned, false)
+          )
+        )
+        .orderBy(desc(rejectionLogs.createdAt)),
+      db
+        .select({ total: sql`count(*)::int` })
+        .from(rejectionLogs)
+        .where(and(eq(rejectionLogs.userId, profileOwnerId), eq(rejectionLogs.isShadowbanned, false)))
+    ]);
+  }
+
+  // Build 365-day heatmap
+  const dailyCounts = new Map();
+  for (let index = 0; index < 365; index += 1) {
+    const date = addUtcDays(historySince, index);
+    dailyCounts.set(toDateKey(date), 0);
+  }
+
+  for (const row of allApplications) {
+    const key = toDateKey(row.createdAt);
+    if (dailyCounts.has(key)) {
+      dailyCounts.set(key, Number(dailyCounts.get(key) || 0) + 1);
+    }
+  }
+
+  for (const row of allRejections) {
+    const key = toDateKey(row.createdAt);
+    if (dailyCounts.has(key)) {
+      dailyCounts.set(key, Number(dailyCounts.get(key) || 0) + 1);
+    }
+  }
+
+  const rejectionDateKeys = allRejections.map((row) => toDateKey(row.createdAt));
+  const combinedDateKeys = [...new Set([...streakRows.map((row) => toDateKey(row.createdAt)), ...rejectionDateKeys])].sort();
+
+  const recentApps = allApplications.filter((row) => row.createdAt && new Date(row.createdAt).getTime() >= averageSince.getTime());
+  const recentRejs = allRejections.filter((row) => row.createdAt && new Date(row.createdAt).getTime() >= averageSince.getTime());
+  const averageWindowCount = recentApps.length + recentRejs.length;
+
+  return {
+    heatmap: Array.from(dailyCounts.entries()).map(([date, count]) => ({
+      date,
+      count,
+      intensity: count >= 5 ? 'strong' : count >= 3 ? 'medium' : count >= 1 ? 'light' : 'empty'
+    })),
+    applicationHistory: allApplications.map((row) => ({
+      companyName: row.companyName,
+      roleTitle: row.roleTitle,
+      jobUrl: row.jobUrl,
+      createdAt: row.createdAt,
+      dateLabel: formatDisplayDate(row.createdAt)
+    })),
+    rejectionJourney: allRejections.map((row) => ({
+      companyName: row.companyName,
+      roleTitle: row.roleTitle,
+      jobUrl: row.jobUrl,
+      stageRejected: row.stageRejected,
+      stageLabel: String(row.stageRejected || '').replace(/_/g, ' '),
+      createdAt: row.createdAt,
+      dateLabel: formatDisplayDate(row.createdAt)
+    })),
+    stats: {
+      totalApplications: Number(totalApplicationsRows[0]?.total || 0),
+      totalRejections: Number(totalRejectionsRows[0]?.total || 0),
+      currentDailyAverage: Number((averageWindowCount / 7).toFixed(1)),
+      longestStreak: calculateLongestStreak(combinedDateKeys)
+    }
   };
 }
 
@@ -139,9 +578,11 @@ export async function createOrUpdateProfile(db, userId, data) {
 }
 
 export async function getPublicProfile(db, username, viewerId = null) {
+  const normalizedUsername = String(username || '').trim().toLowerCase();
   const rows = await db
     .select({
       user_id: userProfiles.userId,
+      is_public: userProfiles.isPublic,
       username: userProfiles.username,
       headline: userProfiles.headline,
       location: userProfiles.location,
@@ -154,7 +595,7 @@ export async function getPublicProfile(db, username, viewerId = null) {
     })
     .from(userProfiles)
     .innerJoin(users, eq(userProfiles.userId, users.id))
-    .where(and(eq(userProfiles.username, username), eq(userProfiles.isPublic, true)))
+    .where(eq(userProfiles.username, normalizedUsername))
     .limit(1);
 
   if (!rows[0]) {
@@ -175,6 +616,13 @@ export async function getPublicProfile(db, username, viewerId = null) {
   // Determine viewer relationship
   const isSelf = viewerId && viewerId === profileOwnerId;
   let isConnected = false;
+  const effectiveIsPublic = typeof rawSettings.publicProfile === 'boolean'
+    ? rawSettings.publicProfile
+    : rows[0].is_public !== false;
+
+  if (!effectiveIsPublic && !isSelf) {
+    throw serviceError('Profile not found', 404);
+  }
 
   if (viewerId && !isSelf) {
     const connRows = await db
@@ -206,7 +654,11 @@ export async function getPublicProfile(db, username, viewerId = null) {
   // Build enriched settings — only include sections the viewer can see
   const enrichedSettings = {
     sectionVisibility: sectionVis,
-    viewerRelationship: isSelf ? 'self' : isConnected ? 'connected' : 'public'
+    viewerRelationship: isSelf ? 'self' : isConnected ? 'connected' : 'public',
+    banner_url: rawSettings.banner_url || null,
+    banner_preference: rawSettings.banner_preference || 'badge',
+    equippedStickers: Array.isArray(rawSettings.equippedStickers) ? rawSettings.equippedStickers : [],
+    unlockedStickers: Array.isArray(rawSettings.unlockedStickers) ? rawSettings.unlockedStickers : []
   };
 
   // About section
@@ -225,6 +677,14 @@ export async function getPublicProfile(db, username, viewerId = null) {
   // Featured section
   if (canViewSection('featured')) {
     enrichedSettings.featured = Array.isArray(rawSettings.featured) ? rawSettings.featured : [];
+  }
+
+  // Digital footprint / public links
+  if (canViewSection('digitalFootprint')) {
+    enrichedSettings.linkedin = rawSettings.linkedin || null;
+    enrichedSettings.github = rawSettings.github || null;
+    enrichedSettings.portfolio = rawSettings.portfolio || null;
+    enrichedSettings.website = rawSettings.website || null;
   }
 
   // Experience section
@@ -284,6 +744,10 @@ export async function getPublicProfile(db, username, viewerId = null) {
     }
   }
 
+  const resiliencePortfolio = canViewSection('resiliencePortfolio')
+    ? await buildResiliencePortfolio(db, profileOwnerId)
+    : null;
+
   // Fetch analysis, connections as before
   const latestAnalysisRows = await db
     .select({
@@ -320,6 +784,7 @@ export async function getPublicProfile(db, username, viewerId = null) {
   return {
     ...rows[0],
     enriched_settings: enrichedSettings,
+    resilience_portfolio: resiliencePortfolio,
     connection_count: connectionRows.length,
     connections_preview: connectionPreview,
     latest_analysis: latestAnalysis
@@ -436,4 +901,102 @@ export async function isFollowing(db, followerId, targetUserId) {
     .limit(1);
 
   return Boolean(rows[0]);
+}
+
+export async function getFollowers(db, username) {
+  // Find the target user first
+  const targetProfiles = await db
+    .select({ userId: userProfiles.userId })
+    .from(userProfiles)
+    .where(eq(userProfiles.username, username))
+    .limit(1);
+
+  if (!targetProfiles[0]) return [];
+  const targetUserId = targetProfiles[0].userId;
+
+  const result = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      avatarUrl: users.avatarUrl,
+      username: userProfiles.username,
+      headline: userProfiles.headline
+    })
+    .from(follows)
+    .innerJoin(users, eq(follows.followerId, users.id))
+    .innerJoin(userProfiles, eq(users.id, userProfiles.userId))
+    .where(eq(follows.followingId, targetUserId))
+    .orderBy(desc(follows.createdAt))
+    .limit(50);
+
+  return result;
+}
+
+export async function getFollowing(db, username) {
+  // Find the target user first
+  const targetProfiles = await db
+    .select({ userId: userProfiles.userId })
+    .from(userProfiles)
+    .where(eq(userProfiles.username, username))
+    .limit(1);
+
+  if (!targetProfiles[0]) return [];
+  const targetUserId = targetProfiles[0].userId;
+
+  const result = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      avatarUrl: users.avatarUrl,
+      username: userProfiles.username,
+      headline: userProfiles.headline
+    })
+    .from(follows)
+    .innerJoin(users, eq(follows.followingId, users.id))
+    .innerJoin(userProfiles, eq(users.id, userProfiles.userId))
+    .where(eq(follows.followerId, targetUserId))
+    .orderBy(desc(follows.createdAt))
+    .limit(50);
+
+  return result;
+}
+
+export async function getPublicConnections(db, username) {
+  // Find the target user first
+  const targetProfiles = await db
+    .select({ userId: userProfiles.userId })
+    .from(userProfiles)
+    .where(eq(userProfiles.username, username))
+    .limit(1);
+
+  if (!targetProfiles[0]) return [];
+  const targetUserId = targetProfiles[0].userId;
+
+  const result = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      avatarUrl: users.avatarUrl,
+      username: userProfiles.username,
+      headline: userProfiles.headline
+    })
+    .from(connections)
+    .innerJoin(
+      users,
+      or(
+        and(eq(connections.requesterId, targetUserId), eq(users.id, connections.recipientId)),
+        and(eq(connections.recipientId, targetUserId), eq(users.id, connections.requesterId))
+      )
+    )
+    .innerJoin(userProfiles, eq(users.id, userProfiles.userId))
+    .where(
+      and(
+        or(eq(connections.requesterId, targetUserId), eq(connections.recipientId, targetUserId)),
+        eq(connections.status, 'accepted')
+      )
+    )
+    .orderBy(desc(connections.updatedAt))
+    .limit(50);
+
+  return result;
 }

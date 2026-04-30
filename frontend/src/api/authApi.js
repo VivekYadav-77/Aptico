@@ -1,5 +1,6 @@
 import api from './axios.js';
 import { clearAuthSession, setAuthReady, setAuthSession, updateAccessToken } from '../store/authSlice.js';
+import { invalidateReadmeCache } from './profileApi.js';
 
 let interceptorsReady = false;
 let activeStore = null;
@@ -170,6 +171,7 @@ export async function logoutRequest(store) {
   try {
     await api.post('/api/auth/logout');
   } finally {
+    invalidateReadmeCache();
     store.dispatch(clearAuthSession());
   }
 }

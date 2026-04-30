@@ -14,6 +14,20 @@ export function isRateLimitError(error) {
   return error?.status === 429 || error?.code === 429 || error?.response?.status === 429;
 }
 
+export function normalizeGeminiError(error) {
+  let isHighDemand = error?.status === 503 || error?.code === 503 || error?.response?.status === 503;
+  if (!isHighDemand && typeof error?.message === 'string' && error.message.toLowerCase().includes('high demand')) {
+    isHighDemand = true;
+  }
+  
+  if (isHighDemand) {
+    const customError = new Error('Our AI systems are currently handling exceptionally high traffic. Please try again in a few moments.');
+    customError.statusCode = 503;
+    return customError;
+  }
+  return error;
+}
+
 export function getGeminiKeys(keys) {
   const availableKeys = (keys || []).filter(Boolean);
   console.log("availableKeys", availableKeys);
@@ -61,7 +75,7 @@ export async function callGeminiWithRotation({ prompt, model, keys, clientFactor
       lastError = error;
 
       if (!isRateLimitError(error) || attempt === totalKeys - 1) {
-        throw error;
+        throw normalizeGeminiError(error);
       }
 
       logger?.warn?.(`Gemini key ${keyIndex + 1} hit 429. Rotating to the next key.`);
@@ -69,5 +83,5 @@ export async function callGeminiWithRotation({ prompt, model, keys, clientFactor
     }
   }
 
-  throw lastError;
+  throw normalizeGeminiError(lastError);
 }
