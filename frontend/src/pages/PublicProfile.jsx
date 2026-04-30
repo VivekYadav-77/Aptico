@@ -21,6 +21,7 @@ import { saveProfileSettings, fetchProfileSettings } from '../api/profileApi.js'
 import { selectAuth } from '../store/authSlice.js';
 import ResumeTemplate from '../components/ResumeTemplate.jsx';
 import StickerShowcase from '../components/StickerShowcase.jsx';
+import StickerInventoryModal from '../components/StickerInventoryModal.jsx';
 
 function initials(name) {
   return String(name || 'A').trim().charAt(0).toUpperCase() || 'A';
@@ -219,6 +220,7 @@ export default function PublicProfile() {
   const [activeBannerView, setActiveBannerView] = useState('badge');
   const [bannerSettingsOpen, setBannerSettingsOpen] = useState(false);
   const [badgePopupOpen, setBadgePopupOpen] = useState(false);
+  const [stickerGalleryOpen, setStickerGalleryOpen] = useState(false);
   const [bannerPrefTemp, setBannerPrefTemp] = useState('badge');
   const [listModalState, setListModalState] = useState({ isOpen: false, type: null, title: '', fetchFn: null });
   
@@ -557,9 +559,14 @@ export default function PublicProfile() {
                             <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-[var(--text)] truncate">{profile.name || profile.username}</h1>
                             <p className="mt-1 text-base sm:text-lg font-bold text-[var(--accent-strong)] leading-snug">{profile.headline || 'Career builder'}</p>
                             {profile.location && <p className="mt-2 text-sm font-medium text-[var(--muted-strong)] flex items-center gap-1.5"><svg className="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.243-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>{profile.location}</p>}
-                            {profile.enriched_settings?.equippedStickers?.length > 0 && (
+                            {(profile.enriched_settings?.equippedStickers?.length > 0 || profile.enriched_settings?.unlockedStickers?.length > 0) && (
                               <div className="mt-5">
-                                <StickerShowcase equippedStickers={profile.enriched_settings.equippedStickers} />
+                                  <StickerShowcase 
+                                    equippedStickers={profile.enriched_settings.equippedStickers || []} 
+                                    unlockedStickers={profile.enriched_settings.unlockedStickers || []}
+                                    userName={profile.name || username}
+                                    onSeeAll={() => setStickerGalleryOpen(true)}
+                                  />
                               </div>
                             )}
                           </div>
@@ -1256,6 +1263,16 @@ export default function PublicProfile() {
               </div>
           </div>
         </div>
+      )}
+      
+      {/* ════ MODAL: STICKER GALLERY ════ */}
+      {stickerGalleryOpen && (
+        <StickerInventoryModal 
+          isOpen={stickerGalleryOpen} 
+          onClose={() => setStickerGalleryOpen(false)} 
+          unlockedStickers={profile?.enriched_settings?.unlockedStickers || []} 
+          userName={profile?.name || username}
+        />
       )}
 
       <div className="resume-print-only bg-white">

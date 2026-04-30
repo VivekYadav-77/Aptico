@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import AppShell from '../components/AppShell.jsx';
 import { fetchStickerStats, unlockSticker, equipStickers } from '../api/profileApi.js';
 import { STICKER_REGISTRY, RARITY_CONFIG, STICKER_CATEGORIES, MAX_EQUIPPED_STICKERS, getStickerById, getHighestInChain } from '../utils/stickerRegistry.js';
+import StickerVisual from '../components/StickerVisual.jsx';
 
 /* ── Confetti burst ── */
 function ConfettiOverlay({ onDone }) {
@@ -26,25 +27,25 @@ function ConfettiOverlay({ onDone }) {
   );
 }
 
-/* ── Sticker Icon Renderer ── */
+/* ── Sticker Icon Renderer (now uses StickerVisual) ── */
 function StickerIcon({ sticker, size = 40 }) {
-  if (sticker.iconType === 'emoji') {
-    return <span style={{ fontSize: size * 0.7, lineHeight: 1 }}>{sticker.icon}</span>;
-  }
-  return (
-    <svg width={size * 0.6} height={size * 0.6} fill="none" viewBox="0 0 24 24" stroke={sticker.color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-      <path d={sticker.icon} />
-    </svg>
-  );
+  return <StickerVisual id={sticker.id} visualId={sticker.visualId} subVariant={sticker.subVariant} color={sticker.color} size={size} rarity={sticker.rarity} tier={sticker.tier || 1} />;
 }
 
 /* ── Requirement label ── */
 function reqLabel(req) {
   const labels = {
-    xp: `${req.value} XP`, streak: `${req.value}-day streak`, total_applications: `${req.value} applications`,
+    xp: `${req.value.toLocaleString()} XP`, streak: `${req.value} day streak`, total_applications: `${req.value} applications`,
     total_rejections: `${req.value} rejections`, followers: `${req.value} followers`, connections: `${req.value} connections`,
     night_owl: 'Log an app between 12–4 AM', early_bird: 'Log an app between 4–6 AM',
     join_before: `Join before ${new Date(req.value).getFullYear()}`, squad_goal: 'Squad hits weekly goal',
+    speed_demon: 'Log an app within 1hr of discovery', weekend_warrior: 'Log an app on weekends',
+    skill: `Master ${req.value} skill`, posts: `${req.value} community posts`, sparks_given: `Give ${req.value} sparks to squad`,
+    post_likes: `${req.value} likes on posts`, daily_apps: `${req.value} apps in one day`, skill_count: `${req.value} skills on profile`,
+    streak_no_rejections: `${req.value} days no rejections`, hired_after_rejections: `Hired after ${req.value} rejections`,
+    ghost_jobs_found: `Find ${req.value} ghost jobs`, hours_active: `${req.value}h active time`, squad_contribution: '50% squad goal contribution',
+    hired_silent: 'Hired without posting', squad_connections: 'Connect 2 squads', join_order: 'Early adopter status',
+    xp_rank: 'Top 1% XP rank', bug_report: 'Report a bug', repo_contribution: 'Code contribution', test_phase: `${req.value} tester`,
   };
   return labels[req.type] || 'Special requirement';
 }
@@ -54,7 +55,17 @@ function reqProgress(req, stats) {
     xp: [stats.xp, req.value], streak: [stats.streak, req.value], total_applications: [stats.totalApplications, req.value],
     total_rejections: [stats.totalRejections, req.value], followers: [stats.followers, req.value], connections: [stats.connections, req.value],
     night_owl: [stats.nightOwl, 1], early_bird: [stats.earlyBird, 1], squad_goal: [stats.squadGoalReached, 1],
+    speed_demon: [stats.speedDemon, 1], weekend_warrior: [stats.weekendWarrior, 1],
+    posts: [stats.posts, req.value], sparks_given: [stats.sparksGiven, req.value],
+    post_likes: [stats.postLikes, req.value], daily_apps: [stats.maxDailyApps, req.value],
+    skill_count: [(stats.skills || []).length, req.value],
+    streak_no_rejections: [stats.streak, req.value], hired_after_rejections: [stats.totalRejections, req.value],
+    ghost_jobs_found: [stats.totalApplications, req.value * 5], hours_active: [stats.xp, req.value * 100],
+    squad_contribution: [stats.squadGoalReached, 1], hired_silent: [stats.totalApplications >= 10 && stats.posts === 0 ? 1 : 0, 1],
+    squad_connections: [stats.connections >= 20 ? 1 : 0, 1], join_order: [1, 1],
+    xp_rank: [stats.xp >= 10000 ? 1 : 0, 1], bug_report: [1, 1], repo_contribution: [1, 1], test_phase: [1, 1],
   };
+  if (req.type === 'skill') return (stats.skills || []).includes(req.value) ? [1, 1] : [0, 1];
   if (req.type === 'join_before') return stats.joinDate < new Date(req.value) ? [1, 1] : [0, 1];
   return map[req.type] || [0, req.value];
 }

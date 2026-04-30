@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getSquadComms, postSquadMessage, setSquadArchetype } from '../api/squadApi.js';
 import { getStickerById } from '../utils/stickerRegistry.js';
+import StickerVisual from './StickerVisual.jsx';
 
 const PHASE_LABELS = ['Pre-25%', '25-50%', '50-75%', '75-100%', 'Goal secured'];
 const QUICK_SIGNAL_META = {
@@ -53,22 +54,12 @@ function isRecent(value) {
   return Number.isFinite(time) && Date.now() - time < 60 * 1000;
 }
 
-function StickerIcon({ stickerId }) {
+function StickerIcon({ stickerId, size = 44 }) {
   const sticker = getStickerById(stickerId);
-
   if (!sticker) {
     return <span className="material-symbols-outlined text-[32px]">interests</span>;
   }
-
-  if (sticker.iconType === 'emoji') {
-    return <span className="text-4xl leading-none">{sticker.icon}</span>;
-  }
-
-  return (
-    <svg width="44" height="44" fill="none" viewBox="0 0 24 24" stroke={sticker.color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-      <path d={sticker.icon} />
-    </svg>
-  );
+  return <StickerVisual id={sticker.id} visualId={sticker.visualId} subVariant={sticker.subVariant} color={sticker.color} size={size} rarity={sticker.rarity} tier={sticker.tier || 1} />;
 }
 
 function MessageCard({ message, myAlias }) {

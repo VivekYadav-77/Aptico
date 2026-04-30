@@ -657,7 +657,8 @@ export async function getPublicProfile(db, username, viewerId = null) {
     viewerRelationship: isSelf ? 'self' : isConnected ? 'connected' : 'public',
     banner_url: rawSettings.banner_url || null,
     banner_preference: rawSettings.banner_preference || 'badge',
-    equippedStickers: Array.isArray(rawSettings.equippedStickers) ? rawSettings.equippedStickers : []
+    equippedStickers: Array.isArray(rawSettings.equippedStickers) ? rawSettings.equippedStickers : [],
+    unlockedStickers: Array.isArray(rawSettings.unlockedStickers) ? rawSettings.unlockedStickers : []
   };
 
   // About section

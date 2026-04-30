@@ -1,28 +1,29 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { getStickerById, RARITY_CONFIG, STICKER_CATEGORIES } from '../utils/stickerRegistry.js';
+import StickerVisual from './StickerVisual.jsx';
 
 function StickerIcon({ sticker, size = 32 }) {
-  if (sticker.iconType === 'emoji') {
-    return <span style={{ fontSize: size * 0.65, lineHeight: 1 }}>{sticker.icon}</span>;
-  }
-  return (
-    <svg width={size * 0.55} height={size * 0.55} fill="none" viewBox="0 0 24 24" stroke={sticker.color} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-      <path d={sticker.icon} />
-    </svg>
-  );
+  return <StickerVisual id={sticker.id} visualId={sticker.visualId} subVariant={sticker.subVariant} color={sticker.color} size={size} rarity={sticker.rarity} tier={sticker.tier || 1} />;
 }
 
 /**
  * StickerShowcase — displays equipped stickers on a profile with custom hover tooltips.
- * @param {{ equippedStickers: string[] }} props
+ * The "See All" button fires onSeeAll so the parent can render the modal at the root level
+ * (avoiding overflow-hidden traps in nested containers).
+ * @param {{ equippedStickers: string[], unlockedStickers: string[], userName: string, onSeeAll: () => void }} props
  */
-export default function StickerShowcase({ equippedStickers = [] }) {
+export default function StickerShowcase({ equippedStickers = [], unlockedStickers = [], userName = 'User', onSeeAll }) {
   const [activeTooltip, setActiveTooltip] = useState(null);
 
-  if (!equippedStickers.length) return null;
+  const stickers = useMemo(() => {
+    if (!Array.isArray(equippedStickers)) return [];
+    return equippedStickers.map(getStickerById).filter(Boolean);
+  }, [equippedStickers]);
 
-  const stickers = equippedStickers.map(getStickerById).filter(Boolean);
-  if (!stickers.length) return null;
+  const hasUnlocked = Array.isArray(unlockedStickers) && unlockedStickers.length > 0;
+
+  // Don't render anything if there's nothing to show at all
+  if (stickers.length === 0 && !hasUnlocked) return null;
 
   return (
     <>
@@ -41,6 +42,7 @@ export default function StickerShowcase({ equippedStickers = [] }) {
           100% { opacity: 1; transform: translateY(0) scale(1); }
         }
       `}</style>
+      
       <div className="flex flex-wrap items-center gap-2.5 relative">
         {stickers.map((s) => {
           const rc = RARITY_CONFIG[s.rarity];
@@ -80,6 +82,20 @@ export default function StickerShowcase({ equippedStickers = [] }) {
             </div>
           );
         })}
+
+        {/* See All Button — calls parent handler instead of rendering modal here */}
+        {hasUnlocked && (
+          <button 
+            onClick={onSeeAll}
+            className="sticker-showcase-item flex items-center justify-center h-10 px-3 rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] hover:bg-[var(--panel)] transition-all hover:border-[var(--muted-strong)] group"
+            title="View all stickers"
+          >
+            <span className="text-[10px] font-black uppercase tracking-wider text-[var(--muted-strong)] group-hover:text-[var(--text)] mr-1.5">See All</span>
+            <svg className="w-3.5 h-3.5 text-[var(--muted-strong)] group-hover:text-[var(--text)]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+            </svg>
+          </button>
+        )}
       </div>
     </>
   );
