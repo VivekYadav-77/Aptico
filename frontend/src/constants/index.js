@@ -57,34 +57,61 @@ export const SEARCHABLE_INSIGHTS = [
 // ── Landing page content ─────────────────────────────────────
 export const LANDING_FEATURES = [
   {
-    title: 'Resume-to-Role Match Scoring',
-    copy: 'See how your profile performs against a real job description before you apply.',
+    title: 'AI Resume Audit',
+    copy: 'Get a brutalist gap analysis of your profile against any job description in seconds.',
     icon: 'analytics',
   },
   {
-    title: '8 Focused AI Insights',
-    copy: 'Gap analysis, rewrites, interview prep, salary coaching, learning paths, and outreach in one flow.',
+    title: 'Interview Intelligence',
+    copy: 'Practice with AI-driven coaching sessions tailored to the specific role you matched with.',
     icon: 'psychology',
   },
   {
-    title: 'Cross-Platform Job Search',
-    copy: 'Search multiple job sources with filters tuned to remote, hybrid, full-time, and internship roles.',
-    icon: 'travel_explore',
+    title: 'The Shadow Resume',
+    copy: 'A public profile that tracks your career resilience, wins, and grit—not just your job titles.',
+    icon: 'shield_with_heart',
   },
   {
-    title: 'Anonymous Squad System',
-    copy: 'Join accountability squads that track collective momentum without revealing personal details.',
+    title: 'GitHub README Badges',
+    copy: 'Export your Aptico intelligence to your GitHub profile with a live-updating career badge.',
+    icon: 'code_blocks',
+  },
+  {
+    title: 'Anonymous Squads',
+    copy: 'Collaborate and stay accountable in squads where your progress is public, but your identity is private.',
     icon: 'groups',
   },
   {
-    title: 'Gamified XP & Rewards',
-    copy: 'Earn experience points, unlock stickers, and level up your career journey with tangible milestones.',
-    icon: 'emoji_events',
+    title: 'Sticker Registry',
+    copy: 'Earn and showcase rare digital stickers for hitting application milestones and community wins.',
+    icon: 'token',
+  },
+];
+
+export const LANDING_CORE_PILLARS = [
+  {
+    id: 'analysis',
+    title: 'Intelligence',
+    subtitle: 'Beyond standard matching.',
+    description: 'We don\'t just scan for keywords. We map your actual experience to the underlying architectural needs of the role.',
+    features: ['Match Scoring', 'Gap Analysis', 'Bullet Rewrites', 'Salary Coaching'],
+    image: 'analysis_mockup',
   },
   {
-    title: 'Dark & Light Clarity',
-    copy: 'Aptico keeps the same information hierarchy and comfort across desktop and mobile in both themes.',
-    icon: 'contrast',
+    id: 'squads',
+    title: 'Resilience',
+    subtitle: 'Never search alone.',
+    description: 'Job searching is a mental game. Join 10-person squads to share wins, pings, and momentum without the friction of networking.',
+    features: ['Daily Squad Pings', 'Anonymized Progress', 'Collective Wins', 'Tactical Comms'],
+    image: 'squads_mockup',
+  },
+  {
+    id: 'portfolio',
+    title: 'Presence',
+    subtitle: 'Prove your value.',
+    description: 'Turn your application data into a professional public presence. From GitHub badges to shadow resumes that prove your grit.',
+    features: ['GitHub Integration', 'Public Profiles', 'Live Badges', 'XP Showcase'],
+    image: 'portfolio_mockup',
   },
 ];
 
@@ -115,6 +142,46 @@ export const FOOTER_LINKS = {
     { label: 'Terms of Service', href: '#' },
   ],
 };
+
+export const LANDING_COMPARISON = {
+  bad: {
+    title: 'The Amateur Way',
+    items: [
+      'Blindly applying to 50+ roles a day',
+      'Generic PDF resume with no match data',
+      'Searching alone and burning out',
+      'Guessing why you were rejected',
+    ],
+  },
+  good: {
+    title: 'The Aptico Way',
+    items: [
+      'Applying to 5 high-match roles',
+      'AI-audited resume for every role',
+      'Daily momentum with an elite squad',
+      'Gap analysis for every "No"',
+    ],
+  },
+};
+
+export const LANDING_FAQ = [
+  {
+    question: 'Is my data private in a Squad?',
+    answer: 'Yes. Your squad sees your momentum (XP, app logs, wins), but your name and specific profile are never linked. You are identified by a unique alias or avatar.',
+  },
+  {
+    question: 'How do the GitHub Badges work?',
+    answer: 'Once you reach Level 5, you can generate a public URL for your Career Badge. Paste it into your GitHub README to show off your resilience score and match rating live.',
+  },
+  {
+    question: 'Do I need to pay for AI Analysis?',
+    answer: 'Every user gets 3 deep-match analyses for free per month. Pro members unlock unlimited matching, interview prep, and learning roadmap generation.',
+  },
+  {
+    question: 'Can I change squads?',
+    answer: 'Squads are formed weekly based on your activity and goals. If your goals change, you can request a new squad assignment every Sunday.',
+  },
+];
 
 // ── Social links ─────────────────────────────────────────────
 export const SOCIAL_LINKS = [

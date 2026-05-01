@@ -10,6 +10,7 @@ import { logoutRequest } from '../api/authApi.js';
 import { getMyProfile } from '../api/socialApi.js';
 import NotificationBell from './NotificationBell.jsx';
 import ThemeToggle from './ThemeToggle.jsx';
+import ApticoLogo from './ApticoLogo.jsx';
 import { selectAuth } from '../store/authSlice.js';
 import {
   APP_NAME,
@@ -24,9 +25,7 @@ import {
 function AppLogo({ compact = false }) {
   return (
     <Link to="/" className="flex items-center gap-3 select-none">
-      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent)] text-sm font-black text-[#003824] transition-transform hover:scale-105">
-        A
-      </div>
+      <ApticoLogo className="h-9 w-9 text-[var(--accent)] drop-shadow-[0_0_12px_var(--accent-soft)] transition-transform hover:scale-105" />
       {!compact && (
         <div>
           <p className="text-base font-black tracking-[-0.04em] text-[var(--text)]">{APP_NAME}</p>
