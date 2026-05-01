@@ -135,7 +135,6 @@ export const FOOTER_LINKS = {
   company: [
     { label: 'About', href: '#' },
     { label: 'Blog', href: '#' },
-    { label: 'Careers', href: '#' },
   ],
   legal: [
     { label: 'Privacy Policy', href: '#' },
@@ -186,7 +185,6 @@ export const LANDING_FAQ = [
 // ── Social links ─────────────────────────────────────────────
 export const SOCIAL_LINKS = [
   { label: 'GitHub', href: 'https://github.com/VivekYadav-77/Aptico', icon: 'code' },
-  { label: 'Twitter', href: '#', icon: 'tag' },
 ];
 
 // ── XP / Gamification ────────────────────────────────────────

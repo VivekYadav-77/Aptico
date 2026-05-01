@@ -116,54 +116,56 @@ body {
 }
 
 /* ─── BUTTONS ────────────────────────────────────────────────── */
-.app-button,
-.app-button-secondary,
-.app-icon-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  border-radius: 0.5rem;
-  font-size: 0.875rem;
-  font-weight: 700;
-  transition: 180ms ease;
-  cursor: pointer;
-  text-decoration: none;
-  border: none;
-}
+@layer components {
+  .app-button,
+  .app-button-secondary,
+  .app-icon-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 700;
+    transition: 180ms ease;
+    cursor: pointer;
+    text-decoration: none;
+    border: none;
+  }
 
-.app-button {
-  background: var(--accent);
-  color: #003824;
-  padding: 0.85rem 1.25rem;
-  border-radius: 0.5rem;
-}
+  .app-button {
+    background: var(--accent);
+    color: #003824;
+    padding: 0.85rem 1.25rem;
+    border-radius: 0.5rem;
+  }
 
-.app-button:hover {
-  transform: translateY(-1px);
-  filter: brightness(1.04);
-  box-shadow: 0 4px 16px rgba(78, 222, 163, 0.3);
-}
+  .app-button:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.04);
+    box-shadow: 0 4px 16px rgba(78, 222, 163, 0.3);
+  }
 
-.app-button-secondary {
-  border: 1px solid var(--border);
-  color: var(--text);
-  padding: 0.85rem 1.25rem;
-  background: transparent;
-  border-radius: 0.5rem;
-}
+  .app-button-secondary {
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 0.85rem 1.25rem;
+    background: transparent;
+    border-radius: 0.5rem;
+  }
 
-.app-button-secondary:hover,
-.app-icon-button:hover {
-  background: var(--panel-soft);
-}
+  .app-button-secondary:hover,
+  .app-icon-button:hover {
+    background: var(--panel-soft);
+  }
 
-.app-icon-button {
-  width: 2.5rem;
-  height: 2.5rem;
-  border: 1px solid var(--border);
-  background: transparent;
-  color: var(--text);
+  .app-icon-button {
+    width: 2.5rem;
+    height: 2.5rem;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+  }
 }
 
 /* ─── TYPOGRAPHY UTILITIES ───────────────────────────────────── */

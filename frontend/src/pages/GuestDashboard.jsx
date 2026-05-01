@@ -464,7 +464,29 @@ export default function GuestDashboard() {
                     transformOrigin: 'bottom center'
                   }}
                 >
-                  {APP_NAME}
+                  <div className="flex gap-x-2 sm:gap-x-4" style={{ transformStyle: 'preserve-3d' }}>
+                    {APP_NAME.split('').map((char, i) => {
+                      // Custom staggered offsets for the "unordered" look with Z-depth
+                      const y = [15, -20, 25, -10, 30, -5][i % 6];
+                      const r = [8, -12, 15, -5, 10, -18][i % 6];
+                      const z = [40, -20, 60, 10, -30, 50][i % 6]; // Z-axis depth
+                      const ry = [10, -15, 5, -20, 15, -10][i % 6]; // Y-axis rotation
+                      
+                      return (
+                        <span 
+                          key={i} 
+                          className="inline-block"
+                          style={{ 
+                            transform: `translateY(${y}px) rotateZ(${r}deg) translateZ(${z}px) rotateY(${ry}deg)`,
+                            transition: 'transform 0.5s ease-out',
+                            textShadow: '0 10px 20px rgba(0,0,0,0.5)'
+                          }}
+                        >
+                          {char}
+                        </span>
+                      );
+                    })}
+                  </div>
                 </h2>
               </div>
             </Reveal>
