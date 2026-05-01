@@ -1,9 +1,13 @@
 
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import ApticoLogo from './ApticoLogo.jsx';
+import ContactModal from './ContactModal.jsx';
 import { APP_NAME, APP_COPYRIGHT, FOOTER_LINKS, SOCIAL_LINKS } from '../constants/index.js';
 
 export default function Footer() {
+  const [isContactOpen, setIsContactOpen] = useState(false);
+
   return (
     <footer className="border-t border-[var(--border)] bg-[var(--panel-soft)]">
       <div className="app-container py-12 md:py-16">
@@ -83,32 +87,43 @@ export default function Footer() {
                 Have questions or feedback? Drop your email and we'll get back to you shortly.
               </p>
             </div>
-            <form className="relative" onSubmit={(e) => e.preventDefault()}>
-              <input 
-                type="email" 
-                placeholder="support@aptico.ai" 
-                className="app-input pr-12 text-xs"
-              />
-              <button 
-                type="submit" 
-                className="absolute right-1 top-1 flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent)] text-[#003824] transition hover:brightness-110"
-              >
+            <div 
+              className="relative cursor-pointer group" 
+              onClick={() => setIsContactOpen(true)}
+            >
+              <div className="app-input pr-12 text-xs flex items-center text-[var(--muted)] group-hover:border-[var(--accent)] transition-colors">
+                support@aptico.ai
+              </div>
+              <div className="absolute right-1 top-1 flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent)] text-[#003824]">
                 <span className="material-symbols-outlined text-[16px]">send</span>
-              </button>
-            </form>
+              </div>
+            </div>
             <div className="flex flex-col gap-3 pt-2">
                {FOOTER_LINKS.legal.map(link => (
-                 <a key={link.label} href={link.href} className="text-[10px] font-bold text-[var(--muted)] transition hover:text-[var(--text)]">
+                 <Link key={link.label} to={link.to} className="text-[10px] font-bold text-[var(--muted)] transition hover:text-[var(--text)]">
                    {link.label}
-                 </a>
+                 </Link>
                ))}
             </div>
           </div>
         </div>
 
+        {/* Contact Modal */}
+        <ContactModal 
+          isOpen={isContactOpen} 
+          onClose={() => setIsContactOpen(false)} 
+        />
+
         {/* Copyright bar */}
-        <div className="mt-12 border-t border-[var(--border)] pt-6">
-          <p className="text-center text-xs text-[var(--muted)]">{APP_COPYRIGHT}</p>
+        <div className="mt-12 flex flex-col items-center justify-between gap-6 border-t border-[var(--border)] pt-8 md:flex-row">
+          <p className="text-xs text-[var(--muted)]">{APP_COPYRIGHT}</p>
+          
+          <div className="flex items-center gap-6">
+             <div className="flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--panel)] px-4 py-1.5 transition hover:border-[var(--accent-soft)]">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--muted)]">Engineered by</span>
+                <span className="text-xs font-black text-[var(--text)]">Vivek Yadav</span>
+             </div>
+          </div>
         </div>
       </div>
     </footer>

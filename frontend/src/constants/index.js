@@ -137,8 +137,8 @@ export const FOOTER_LINKS = {
     { label: 'Blog', href: '#' },
   ],
   legal: [
-    { label: 'Privacy Policy', href: '#' },
-    { label: 'Terms of Service', href: '#' },
+    { label: 'Privacy Policy', to: '/privacy' },
+    { label: 'Terms of Service', to: '/terms' },
   ],
 };
 

@@ -4,6 +4,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { bootstrapAuthSession } from './api/authApi.js';
 import { getMyProfile } from './api/socialApi.js';
 import ProfileSetupModal from './components/ProfileSetupModal.jsx';
+import ScrollToTop from './components/ScrollToTop.jsx';
 import { AdminRoute, ProtectedRoute } from './components/ProtectedRoute.jsx';
 import { selectAuth } from './store/authSlice.js';
 import AnalysisHistoryPage from './pages/AnalysisHistoryPage.jsx';
@@ -27,6 +28,7 @@ import SavedJobsPage from './pages/SavedJobsPage.jsx';
 import SettingsPage from './pages/SettingsPage.jsx';
 import ShadowResume from './pages/ShadowResume.jsx';
 import SquadDashboard from './pages/SquadDashboard.jsx';
+import LegalPage from './pages/LegalPage.jsx';
 
 function RootRoute() {
   const auth = useSelector(selectAuth);
@@ -65,6 +67,7 @@ export default function App() {
 
   return (
     <>
+      <ScrollToTop />
       <Routes>
         <Route path="/" element={<RootRoute />} />
         <Route path="/auth" element={<AuthPermanent />} />
@@ -75,6 +78,8 @@ export default function App() {
         <Route path="/u/:username/resilience" element={<ResilienceDetailsPage />} />
         <Route path="/hire/:username" element={<ShadowResume />} />
         <Route path="/wins" element={<CommunityWins />} />
+        <Route path="/privacy" element={<LegalPage />} />
+        <Route path="/terms" element={<LegalPage />} />
         <Route
           path="/home"
           element={
