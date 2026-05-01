@@ -1,6 +1,7 @@
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap");
 @import "tailwindcss";
 
+/* ─── LIGHT THEME ────────────────────────────────────────────── */
 :root {
   color-scheme: light;
   --bg: #f7f7f5;
@@ -20,8 +21,12 @@
   --warning-text: #92400e;
   --danger-soft: rgba(239, 68, 68, 0.12);
   --danger-border: rgba(239, 68, 68, 0.24);
+  --navbar-height: 4rem;
+  --sidebar-width: 15rem;
+  --sidebar-collapsed: 4rem;
 }
 
+/* ─── DARK THEME ─────────────────────────────────────────────── */
 html.dark {
   color-scheme: dark;
   --bg: #131315;
@@ -43,6 +48,7 @@ html.dark {
   --danger-border: rgba(248, 113, 113, 0.24);
 }
 
+/* ─── RESET & BASE ───────────────────────────────────────────── */
 html,
 body,
 #root {
@@ -52,6 +58,8 @@ body,
 body {
   margin: 0;
   font-family: "Inter", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   background:
     radial-gradient(circle at top left, rgba(78, 222, 163, 0.1), transparent 24%),
     radial-gradient(circle at top right, rgba(113, 161, 255, 0.07), transparent 20%),
@@ -63,10 +71,35 @@ body {
   box-sizing: border-box;
 }
 
+/* ─── LAYOUT PRIMITIVES ──────────────────────────────────────── */
 .app-page {
   min-height: 100vh;
 }
 
+.app-container {
+  width: 100%;
+  max-width: 80rem; /* 1280px = max-w-7xl */
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+@media (min-width: 640px) {
+  .app-container {
+    padding-left: 1.5rem;
+    padding-right: 1.5rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .app-container {
+    padding-left: 2rem;
+    padding-right: 2rem;
+  }
+}
+
+/* ─── PANELS & CARDS ─────────────────────────────────────────── */
 .app-panel {
   border: 1px solid var(--border);
   background: var(--panel);
@@ -82,6 +115,7 @@ body {
   padding: 1.25rem;
 }
 
+/* ─── BUTTONS ────────────────────────────────────────────────── */
 .app-button,
 .app-button-secondary,
 .app-icon-button {
@@ -95,6 +129,7 @@ body {
   transition: 180ms ease;
   cursor: pointer;
   text-decoration: none;
+  border: none;
 }
 
 .app-button {
@@ -107,6 +142,7 @@ body {
 .app-button:hover {
   transform: translateY(-1px);
   filter: brightness(1.04);
+  box-shadow: 0 4px 16px rgba(78, 222, 163, 0.3);
 }
 
 .app-button-secondary {
@@ -130,6 +166,7 @@ body {
   color: var(--text);
 }
 
+/* ─── TYPOGRAPHY UTILITIES ───────────────────────────────────── */
 .app-kicker,
 .app-field-label {
   font-family: "JetBrains Mono", monospace;
@@ -139,6 +176,11 @@ body {
   color: var(--muted);
 }
 
+.mono-text {
+  font-family: "JetBrains Mono", monospace;
+}
+
+/* ─── FORM INPUTS ────────────────────────────────────────────── */
 /* NOTE: app-input uses shorthand `padding` which overrides Tailwind padding utilities.
  * To add icon-offset padding, use inline style={{ paddingLeft: '...' }} instead of pl-* classes. */
 .app-input {
@@ -170,6 +212,101 @@ body {
   font-weight: 600;
 }
 
+/* ─── MATERIAL SYMBOLS ───────────────────────────────────────── */
+.material-symbols-outlined {
+  font-family: "Material Symbols Outlined";
+  font-weight: normal;
+  font-style: normal;
+  font-size: 20px;
+  line-height: 1;
+  letter-spacing: normal;
+  text-transform: none;
+  display: inline-block;
+  white-space: nowrap;
+  word-wrap: normal;
+  direction: ltr;
+  -webkit-font-feature-settings: "liga";
+  font-feature-settings: "liga";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── SWITCH ─────────────────────────────────────────────────── */
+.app-switch {
+  position: relative;
+  width: 3rem;
+  height: 1.7rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel-soft);
+}
+
+.app-switch::after {
+  content: "";
+  position: absolute;
+  top: 0.18rem;
+  left: 0.2rem;
+  width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 999px;
+  background: var(--text);
+  transition: 180ms ease;
+}
+
+.app-switch.is-on {
+  background: var(--accent-soft);
+  border-color: rgba(52, 211, 153, 0.3);
+}
+
+.app-switch.is-on::after {
+  transform: translateX(1.3rem);
+  background: var(--accent);
+}
+
+/* ─── SKELETON LOADING ANIMATION ─────────────────────────────── */
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--panel-soft) 25%,
+    var(--panel-strong) 50%,
+    var(--panel-soft) 75%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: 0.5rem;
+}
+
+.skeleton-text {
+  height: 0.875rem;
+  margin-bottom: 0.5rem;
+}
+
+.skeleton-text-sm {
+  height: 0.625rem;
+  width: 60%;
+  margin-bottom: 0.375rem;
+}
+
+.skeleton-avatar {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+}
+
+.skeleton-card {
+  height: 10rem;
+  border-radius: 0.75rem;
+}
+
+/* ─── FEATURE MARQUEE ────────────────────────────────────────── */
 .feature-marquee {
   position: relative;
   overflow: hidden;
@@ -197,63 +334,10 @@ body {
   min-height: 220px;
 }
 
-.app-switch {
-  position: relative;
-  width: 3rem;
-  height: 1.7rem;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: var(--panel-soft);
-}
-
-.mono-text {
-  font-family: "JetBrains Mono", monospace;
-}
-
-.material-symbols-outlined {
-  font-family: "Material Symbols Outlined";
-  font-weight: normal;
-  font-style: normal;
-  font-size: 20px;
-  line-height: 1;
-  letter-spacing: normal;
-  text-transform: none;
-  display: inline-block;
-  white-space: nowrap;
-  word-wrap: normal;
-  direction: ltr;
-  -webkit-font-feature-settings: "liga";
-  font-feature-settings: "liga";
-  -webkit-font-smoothing: antialiased;
-}
-
-.app-switch::after {
-  content: "";
-  position: absolute;
-  top: 0.18rem;
-  left: 0.2rem;
-  width: 1.2rem;
-  height: 1.2rem;
-  border-radius: 999px;
-  background: var(--text);
-  transition: 180ms ease;
-}
-
-.app-switch.is-on {
-  background: var(--accent-soft);
-  border-color: rgba(52, 211, 153, 0.3);
-}
-
-.app-switch.is-on::after {
-  transform: translateX(1.3rem);
-  background: var(--accent);
-}
-
 @keyframes feature-marquee-scroll {
   from {
     transform: translateX(0);
   }
-
   to {
     transform: translateX(calc(-50% - 0.5rem));
   }
@@ -276,7 +360,7 @@ body {
   }
 }
 
-/* Mobile drawer transition */
+/* ─── MOBILE DRAWER ──────────────────────────────────────────── */
 .mobile-drawer-enter {
   transform: translateX(-100%);
 }
@@ -286,7 +370,7 @@ body {
   transition: transform 300ms cubic-bezier(0.32, 0.72, 0, 1);
 }
 
-/* Search dropdown animation */
+/* ─── SEARCH DROPDOWN ────────────────────────────────────────── */
 @keyframes search-dropdown-in {
   from {
     opacity: 0;
@@ -302,6 +386,7 @@ body {
   animation: search-dropdown-in 160ms ease forwards;
 }
 
+/* ─── REJECTION CONFETTI ─────────────────────────────────────── */
 @keyframes rejection-confetti-burst {
   0% {
     opacity: 0;
@@ -324,6 +409,7 @@ body {
   animation-fill-mode: forwards;
 }
 
+/* ─── SQUAD / COMMS ANIMATIONS ───────────────────────────────── */
 @keyframes comms-pulse {
   0%,
   100% {
@@ -373,6 +459,7 @@ body {
   animation: signal-pop 220ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 
+/* ─── STICKER EFFECTS ────────────────────────────────────────── */
 .sticker-drop-common {
   box-shadow: 0 0 8px rgba(78, 222, 163, 0.3);
 }
@@ -403,6 +490,51 @@ body {
   pointer-events: none;
 }
 
+/* ─── GLASSMORPHISM UTILITY ──────────────────────────────────── */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+html:not(.dark) .glass {
+  background: rgba(255, 255, 255, 0.7);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+/* ─── FADE-IN ANIMATION ──────────────────────────────────────── */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 500ms ease forwards;
+}
+
+.animate-fade-in-up-delay-1 {
+  animation: fade-in-up 500ms 100ms ease forwards;
+  opacity: 0;
+}
+
+.animate-fade-in-up-delay-2 {
+  animation: fade-in-up 500ms 200ms ease forwards;
+  opacity: 0;
+}
+
+.animate-fade-in-up-delay-3 {
+  animation: fade-in-up 500ms 300ms ease forwards;
+  opacity: 0;
+}
+
+/* ─── MISC ───────────────────────────────────────────────────── */
 kbd {
   font-family: "JetBrains Mono", monospace;
 }

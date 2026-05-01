@@ -1,3 +1,8 @@
+// ─────────────────────────────────────────────────────────────
+// AppShell — Main authenticated layout shell
+// Frosted-glass navbar (64px), slide-in mobile drawer,
+// desktop sidebar, and page content container.
+// ─────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -6,76 +11,58 @@ import { getMyProfile } from '../api/socialApi.js';
 import NotificationBell from './NotificationBell.jsx';
 import ThemeToggle from './ThemeToggle.jsx';
 import { selectAuth } from '../store/authSlice.js';
+import {
+  APP_NAME,
+  APP_TAGLINE,
+  NAV_ITEMS,
+  ADMIN_NAV_ITEM,
+  SEARCHABLE_INSIGHTS,
+  NAVBAR_HEIGHT,
+} from '../constants/index.js';
 
-const NAV_ITEMS = [
-  { to: '/squads', label: 'Squad', icon: 'groups', description: 'Anonymous squad progress and weekly goal' },
-  { to: '/people', label: 'People', icon: 'diversity_3', description: 'Find people to connect with' },
-  { to: '/dashboard', label: 'Dashboard', icon: 'dashboard', description: 'Your career overview and activity' },
-  { to: '/analysis', label: 'Analysis', icon: 'analytics', description: 'Resume and job match analysis' },
-  { to: '/portfolio-generator', label: 'Portfolio', icon: 'code_blocks', description: 'Generate a GitHub README and live Aptico badge' },
-  { to: '/jobs', label: 'Job Search', icon: 'work', description: 'Discover and filter roles' },
-  { to: '/wins', label: 'Community', icon: 'groups', description: 'Community wins and career stories' },
-  { to: '/profile', label: 'Profile', icon: 'person', description: 'Edit your professional profile' },
-  { to: '/settings', label: 'Settings', icon: 'settings', description: 'Account, career, and theme settings' }
-];
-
-const SEARCHABLE_INSIGHTS = [
-  { label: 'View squad progress', icon: 'groups', to: '/squads', category: 'Squad' },
-  { label: 'Log job applications', icon: 'send', to: '/squads', category: 'Squad' },
-  { label: 'Ping squadmates', icon: 'campaign', to: '/squads', category: 'Squad' },
-  { label: 'Upload resume for analysis', icon: 'upload_file', to: '/analysis', category: 'Analysis' },
-  { label: 'Check resume match score', icon: 'analytics', to: '/analysis', category: 'Analysis' },
-  { label: 'Generate GitHub README', icon: 'code_blocks', to: '/portfolio-generator', category: 'Portfolio' },
-  { label: 'Create Aptico badge', icon: 'military_tech', to: '/portfolio-generator', category: 'Portfolio' },
-  { label: 'Find remote jobs', icon: 'wifi', to: '/jobs', category: 'Job Search' },
-  { label: 'Browse full-time roles', icon: 'work', to: '/jobs', category: 'Job Search' },
-  { label: 'Browse internship roles', icon: 'school', to: '/jobs', category: 'Job Search' },
-  { label: 'Update career settings', icon: 'settings', to: '/settings', category: 'Settings' },
-  { label: 'Edit profile headline', icon: 'person', to: '/settings', category: 'Settings' },
-  { label: 'Set work mode preference', icon: 'home_work', to: '/settings', category: 'Settings' },
-  { label: 'Toggle dark mode', icon: 'dark_mode', to: '/settings', category: 'Theme' },
-  { label: 'View dashboard overview', icon: 'dashboard', to: '/dashboard', category: 'Dashboard' },
-  { label: 'Matched skills from resume', icon: 'star', to: '/analysis', category: 'Analysis' },
-  { label: 'High pay job search', icon: 'payments', to: '/jobs', category: 'Job Search' },
-  { label: 'Verified listings only', icon: 'verified', to: '/jobs', category: 'Job Search' },
-];
-
-function AppLogo() {
+// ── Logo ─────────────────────────────────────────────────────
+function AppLogo({ compact = false }) {
   return (
-    <Link to="/" className="flex items-center gap-3">
-      <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--accent)] text-sm font-black text-slate-950">
+    <Link to="/" className="flex items-center gap-3 select-none">
+      <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent)] text-sm font-black text-[#003824] transition-transform hover:scale-105">
         A
       </div>
-      <div>
-        <p className="text-lg font-black tracking-[-0.04em] text-[var(--text)]">Aptico</p>
-        <p className="text-[10px] uppercase tracking-[0.28em] text-[var(--muted)]">Career Intelligence</p>
-      </div>
+      {!compact && (
+        <div>
+          <p className="text-base font-black tracking-[-0.04em] text-[var(--text)]">{APP_NAME}</p>
+          <p className="text-[9px] uppercase tracking-[0.28em] text-[var(--muted)]">{APP_TAGLINE}</p>
+        </div>
+      )}
     </Link>
   );
 }
 
+// ── Sidebar Navigation ───────────────────────────────────────
 function Navigation({ mobile = false, onNavigate, showAdmin }) {
   const location = useLocation();
-  const items = showAdmin ? [...NAV_ITEMS, { to: '/admin', label: 'Admin', icon: 'admin_panel_settings', description: 'Admin control center' }] : NAV_ITEMS;
+  const items = showAdmin ? [...NAV_ITEMS, ADMIN_NAV_ITEM] : NAV_ITEMS;
 
   return (
-    <nav className={`flex ${mobile ? 'flex-col gap-1' : 'flex-col gap-1'}`}>
+    <nav className="flex flex-col gap-0.5">
       {items.map((item) => {
         const isActive =
-          location.pathname === item.to || (item.to !== '/' && location.pathname.startsWith(`${item.to}/`));
+          location.pathname === item.to ||
+          (item.to !== '/' && location.pathname.startsWith(`${item.to}/`));
 
         return (
           <Link
             key={item.to}
             to={item.to}
             onClick={onNavigate}
-            className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${
+            className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition-all duration-150 ${
               isActive
                 ? 'border-l-2 border-[var(--accent)] bg-[var(--accent-soft)] pl-[10px] font-bold text-[var(--accent-strong)]'
                 : 'text-[var(--muted-strong)] hover:bg-[var(--panel-soft)] hover:text-[var(--text)]'
             }`}
           >
-            <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
+            <span className={`material-symbols-outlined text-[20px] transition-transform duration-150 ${isActive ? '' : 'group-hover:scale-110'}`}>
+              {item.icon}
+            </span>
             <span className="flex-1">{item.label}</span>
             {isActive && <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />}
           </Link>
@@ -85,6 +72,7 @@ function Navigation({ mobile = false, onNavigate, showAdmin }) {
   );
 }
 
+// ── Search Dropdown ──────────────────────────────────────────
 function SearchDropdown({ query, onClose, navigate }) {
   const trimmed = query.trim().toLowerCase();
 
@@ -109,12 +97,12 @@ function SearchDropdown({ query, onClose, navigate }) {
 
   return (
     <div
-      className="absolute left-0 top-[calc(100%+8px)] z-[200] w-full min-w-[320px] max-w-sm overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel)] shadow-[0_24px_48px_rgba(0,0,0,0.18)]"
+      className="search-dropdown absolute left-0 top-[calc(100%+8px)] z-[200] w-full min-w-[320px] max-w-sm overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel)] shadow-[0_24px_48px_rgba(0,0,0,0.18)]"
       style={{ backdropFilter: 'blur(20px)' }}
     >
       {!trimmed ? (
         <div className="px-5 py-4">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)] mb-3">Quick navigation</p>
+          <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Quick navigation</p>
           <div className="space-y-0.5">
             {NAV_ITEMS.map((item) => (
               <button
@@ -136,7 +124,7 @@ function SearchDropdown({ query, onClose, navigate }) {
         <div className="py-3">
           {navResults.length > 0 && (
             <div className="px-5 pb-2">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)] mb-2">Pages</p>
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Pages</p>
               {navResults.map((item) => (
                 <button
                   key={item.to}
@@ -156,7 +144,7 @@ function SearchDropdown({ query, onClose, navigate }) {
           {insightResults.length > 0 && (
             <div className="px-5 pt-1">
               {navResults.length > 0 && <div className="mb-2 border-t border-[var(--border)]" />}
-              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)] mb-2">Insights</p>
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Insights</p>
               {insightResults.slice(0, 5).map((item, i) => (
                 <button
                   key={i}
@@ -177,7 +165,7 @@ function SearchDropdown({ query, onClose, navigate }) {
       ) : (
         <div className="px-5 py-8 text-center">
           <span className="material-symbols-outlined text-[32px] text-[var(--muted)]">search_off</span>
-          <p className="mt-2 text-sm font-medium text-[var(--text)]">No results for "{query}"</p>
+          <p className="mt-2 text-sm font-medium text-[var(--text)]">No results for &ldquo;{query}&rdquo;</p>
           <p className="mt-1 text-xs text-[var(--muted-strong)]">Try searching for a page, feature, or setting</p>
         </div>
       )}
@@ -189,6 +177,7 @@ function SearchDropdown({ query, onClose, navigate }) {
   );
 }
 
+// ── Main Shell ───────────────────────────────────────────────
 export default function AppShell({ title, description, actions, children, banner = null }) {
   const auth = useSelector(selectAuth);
   const dispatch = useDispatch();
@@ -201,18 +190,9 @@ export default function AppShell({ title, description, actions, children, banner
   const searchInputRef = useRef(null);
 
   const userLabel = useMemo(() => {
-    if (auth.user?.name) {
-      return auth.user.name;
-    }
-
-    if (auth.user?.email) {
-      return auth.user.email;
-    }
-
-    if (auth.guestMode) {
-      return 'Guest mode';
-    }
-
+    if (auth.user?.name) return auth.user.name;
+    if (auth.user?.email) return auth.user.email;
+    if (auth.guestMode) return 'Guest mode';
     return 'Visitor';
   }, [auth.guestMode, auth.user]);
 
@@ -224,7 +204,6 @@ export default function AppShell({ title, description, actions, children, banner
       setSocialProfile(null);
       return;
     }
-
     getMyProfile().then(setSocialProfile).catch(() => setSocialProfile(null));
   }, [auth.isAuthenticated]);
 
@@ -268,14 +247,17 @@ export default function AppShell({ title, description, actions, children, banner
 
   return (
     <div className="app-page">
-      <header className="fixed left-0 right-0 top-0 z-50 border-b border-[var(--border)] bg-[var(--shell)]" style={{ backdropFilter: 'blur(16px)' }}>
+      {/* ── NAVBAR ──────────────────────────────────────────── */}
+      <header
+        className="glass fixed left-0 right-0 top-0 z-50 border-b border-[var(--border)]"
+      >
         {banner}
-        <div className="flex h-14 items-center justify-between gap-3 px-4 sm:px-6">
-          {/* Left: hamburger + mobile logo OR desktop search */}
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-6" style={{ height: `${NAVBAR_HEIGHT}px` }}>
+          {/* Left: hamburger + logo + search */}
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <button
               type="button"
-              className="app-icon-button shrink-0"
+              className="app-icon-button shrink-0 lg:hidden"
               onClick={() => setMobileMenuOpen((current) => !current)}
               aria-label="Toggle navigation"
             >
@@ -284,13 +266,14 @@ export default function AppShell({ title, description, actions, children, banner
             <div className="min-w-0">
               <AppLogo />
             </div>
-            {/* Search — desktop: inline, mobile: also shown inline after logo */}
-            <div className="relative hidden md:block" ref={searchRef}>
+
+            {/* Desktop search */}
+            <div className="relative ml-4 hidden md:block" ref={searchRef}>
               <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-[var(--muted)]">search</span>
               <input
                 ref={searchInputRef}
-                className="w-56 rounded-full border border-[var(--border)] bg-[var(--panel-soft)] py-2 pl-9 pr-4 text-sm text-[var(--text)] outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] lg:w-72"
-                placeholder="Search insights..."
+                className="w-56 rounded-full border border-[var(--border)] bg-[var(--panel-soft)] py-2 pl-9 pr-4 text-sm text-[var(--text)] outline-none transition-all duration-200 focus:w-72 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] lg:w-72 lg:focus:w-80"
+                placeholder="Search insights…"
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
                 onFocus={() => setSearchOpen(true)}
@@ -305,12 +288,18 @@ export default function AppShell({ title, description, actions, children, banner
             </div>
           </div>
 
-          {/* Right: theme, notifications, user label, auth button */}
+          {/* Right: theme, notifications, user, auth */}
           <div className="flex shrink-0 items-center gap-2">
             <ThemeToggle compact />
             {auth.isAuthenticated ? <NotificationBell /> : null}
             {auth.isAuthenticated ? (
-              <Link to={profileHref} className="hidden rounded-full border border-[var(--border)] px-4 py-2 text-sm text-[var(--muted-strong)] transition hover:bg-[var(--panel-soft)] lg:block">
+              <Link
+                to={profileHref}
+                className="hidden items-center gap-2 rounded-full border border-[var(--border)] px-4 py-2 text-sm text-[var(--muted-strong)] transition hover:bg-[var(--panel-soft)] hover:text-[var(--text)] lg:inline-flex"
+              >
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--accent)] text-[10px] font-black text-[#003824]">
+                  {userLabel.charAt(0).toUpperCase()}
+                </div>
                 {profileLabel}
               </Link>
             ) : (
@@ -319,11 +308,11 @@ export default function AppShell({ title, description, actions, children, banner
               </div>
             )}
             {auth.isAuthenticated || auth.guestMode ? (
-              <button type="button" onClick={handleSignOut} className="app-button-secondary hidden sm:inline-flex">
+              <button type="button" onClick={handleSignOut} className="app-button-secondary hidden px-4 py-2 sm:inline-flex">
                 {auth.guestMode ? 'Exit guest' : 'Sign out'}
               </button>
             ) : (
-              <Link to="/auth" className="app-button hidden sm:inline-flex">
+              <Link to="/auth" className="app-button hidden px-5 py-2 sm:inline-flex">
                 Sign in
               </Link>
             )}
@@ -331,17 +320,17 @@ export default function AppShell({ title, description, actions, children, banner
         </div>
       </header>
 
-      {/* Mobile backdrop overlay */}
+      {/* ── MOBILE OVERLAY ─────────────────────────────────── */}
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/40"
+          className="fixed inset-0 z-40 bg-black/40 transition-opacity duration-300"
           style={{ backdropFilter: 'blur(4px)' }}
           onClick={() => setMobileMenuOpen(false)}
           aria-hidden="true"
         />
       )}
 
-      {/* Mobile slide-in drawer */}
+      {/* ── MOBILE SLIDE-IN DRAWER ─────────────────────────── */}
       <div
         className={`fixed left-0 top-0 z-[45] flex h-full w-72 flex-col border-r border-[var(--border)] bg-[var(--shell)] transition-transform duration-300 ease-out ${
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
@@ -349,7 +338,7 @@ export default function AppShell({ title, description, actions, children, banner
         style={{ backdropFilter: 'blur(20px)' }}
       >
         {/* Drawer header */}
-        <div className="flex h-14 items-center justify-between gap-3 border-b border-[var(--border)] px-4">
+        <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-4" style={{ height: `${NAVBAR_HEIGHT}px` }}>
           <AppLogo />
           <button
             type="button"
@@ -362,12 +351,12 @@ export default function AppShell({ title, description, actions, children, banner
         </div>
 
         {/* Mobile search */}
-        <div className="px-4 pt-4 pb-2">
+        <div className="px-4 pb-2 pt-4">
           <div className="relative">
             <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[16px] text-[var(--muted)]">search</span>
             <input
               className="w-full rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] py-2.5 pl-9 pr-4 text-sm text-[var(--text)] outline-none transition focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)]"
-              placeholder="Search insights..."
+              placeholder="Search insights…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -381,7 +370,7 @@ export default function AppShell({ title, description, actions, children, banner
                 const insRes = SEARCHABLE_INSIGHTS.filter(i => i.label.toLowerCase().includes(trimmed) || i.category.toLowerCase().includes(trimmed));
                 const hasAny = navRes.length > 0 || insRes.length > 0;
                 if (!hasAny) {
-                  return <p className="px-4 py-3 text-xs text-[var(--muted-strong)]">No results for "{searchQuery}"</p>;
+                  return <p className="px-4 py-3 text-xs text-[var(--muted-strong)]">No results for &ldquo;{searchQuery}&rdquo;</p>;
                 }
                 return (
                   <>
@@ -424,9 +413,9 @@ export default function AppShell({ title, description, actions, children, banner
         </div>
 
         {/* User info + auth actions */}
-        <div className="border-t border-[var(--border)] px-4 py-4 space-y-3">
-          <Link to={auth.isAuthenticated ? profileHref : '/auth'} className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-sm font-black text-slate-950">
+        <div className="space-y-3 border-t border-[var(--border)] px-4 py-4">
+          <Link to={auth.isAuthenticated ? profileHref : '/auth'} className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-3 transition hover:bg-[var(--panel-strong)]">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-sm font-black text-[#003824]">
               {userLabel.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0">
@@ -453,17 +442,20 @@ export default function AppShell({ title, description, actions, children, banner
         </div>
       </div>
 
-      <main className="px-4 pb-8 pt-20 sm:px-6 lg:pb-10">
-        <section className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+      {/* ── MAIN CONTENT ───────────────────────────────────── */}
+      <main className="px-4 pb-8 sm:px-6 lg:pb-10" style={{ paddingTop: `calc(${NAVBAR_HEIGHT}px + 1.5rem)` }}>
+        <section className="mx-auto mb-8 flex max-w-7xl flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl space-y-3">
             <p className="app-kicker">Aptico workspace</p>
-            <h1 className="text-3xl font-black tracking-[-0.04em] text-[var(--text)] sm:text-5xl">{title}</h1>
+            <h1 className="text-2xl font-black tracking-[-0.04em] text-[var(--text)] sm:text-3xl md:text-4xl lg:text-5xl">{title}</h1>
             {description ? <p className="max-w-2xl text-sm leading-7 text-[var(--muted-strong)] sm:text-base">{description}</p> : null}
           </div>
           {actions ? <div className="flex flex-wrap gap-3">{actions}</div> : null}
         </section>
 
-        {children}
+        <div className="mx-auto max-w-7xl">
+          {children}
+        </div>
       </main>
     </div>
   );
