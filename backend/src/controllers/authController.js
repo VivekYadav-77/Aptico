@@ -56,10 +56,20 @@ const resetPasswordSchema = z.object({
 });
 
 function sendError(reply, error) {
-  reply.code(error.statusCode || 500).send({
+  let message = error.message || 'Internal server error.';
+  let statusCode = error.statusCode || 500;
+  let code = error.code || 'INTERNAL_ERROR';
+
+  if (error instanceof z.ZodError) {
+    message = error.errors[0]?.message || 'Invalid input data.';
+    statusCode = 400;
+    code = 'VALIDATION_ERROR';
+  }
+
+  reply.code(statusCode).send({
     success: false,
-    message: error.message || 'Internal server error.',
-    code: error.code || 'INTERNAL_ERROR'
+    message,
+    code
   });
 }
 
