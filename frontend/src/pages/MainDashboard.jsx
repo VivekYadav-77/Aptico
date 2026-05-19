@@ -18,11 +18,7 @@ import {
   selectCurrentAnalysis
 } from '../store/historySlice.js';
 
-const recommendationsFallback = [
-  "Add 'Distributed Systems' to your profile. It's a high-priority signal for many senior platform roles.",
-  'Refresh your portfolio and public links so recruiters can validate your strongest work instantly.',
-  'Schedule system design prep this week if you are actively targeting staff or lead positions.'
-];
+
 
 function NeonGauge({ score }) {
   const radius = 60;
@@ -51,12 +47,16 @@ function NeonGauge({ score }) {
           />
         </svg>
         <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-4xl font-black text-[var(--text)] drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]">{normalizedScore}</span>
+          <span className="text-4xl font-black text-[var(--text)] drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]">
+            {score === 0 ? '--' : normalizedScore}
+          </span>
         </div>
       </div>
       <div className="mt-4 flex items-center gap-2 rounded-full border border-[var(--accent)]/30 bg-[var(--accent-soft)] px-4 py-1.5 z-10 shadow-[0_0_15px_rgba(78,222,163,0.2)]">
-        <div className="h-2 w-2 rounded-full bg-[var(--accent)] animate-ping" />
-        <span className="mono-text text-[11px] font-bold uppercase tracking-widest text-[var(--accent-strong)]">Match Resonance</span>
+        <div className={`h-2 w-2 rounded-full bg-[var(--accent)] ${score > 0 ? 'animate-ping' : ''}`} />
+        <span className="mono-text text-[11px] font-bold uppercase tracking-widest text-[var(--accent-strong)]">
+          {score > 0 ? 'Match Resonance' : 'Calibration Required'}
+        </span>
       </div>
     </div>
   );
@@ -96,6 +96,128 @@ function ResilienceHUD({ xp, flashXp }) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ResonanceTrendChart({ history }) {
+  if (!history || history.length < 2) {
+    return (
+      <div className="flex h-40 flex-col items-center justify-center rounded-3xl border border-[var(--border)] bg-[var(--panel)] shadow-xl">
+        <span className="material-symbols-outlined mb-2 text-3xl text-[var(--muted)] opacity-30">show_chart</span>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--muted-strong)]">Awaiting Telemetry</p>
+      </div>
+    );
+  }
+
+  const scores = history.slice(0, 10).reverse().map((h) => h.confidenceScore || 0);
+  const width = 400;
+  const height = 150;
+  const padding = 20;
+
+  const points = scores.map((score, index) => {
+    const x = padding + (index / (scores.length - 1)) * (width - padding * 2);
+    const y = height - padding - (score / 100) * (height - padding * 2);
+    return { x, y, score };
+  });
+
+  const pathD = `M ${points.map((p) => `${p.x},${p.y}`).join(' L ')}`;
+  const areaD = `${pathD} L ${points[points.length - 1].x},${height} L ${points[0].x},${height} Z`;
+
+  return (
+    <div className="relative w-full rounded-3xl border border-[var(--border)] bg-[var(--panel)] p-5 shadow-xl group mb-4">
+      <div className="flex items-center justify-between mb-2">
+        <p className="app-kicker text-[11px]">Resonance Trend</p>
+        <span className="text-[9px] font-bold uppercase tracking-widest text-[var(--accent)] animate-pulse">Live</span>
+      </div>
+      <div className="relative w-full overflow-hidden" style={{ aspectRatio: '400/150' }}>
+        <style>
+          {`@keyframes drawLine { to { stroke-dashoffset: 0; } }`}
+        </style>
+        <svg viewBox={`0 0 ${width} ${height}`} className="h-full w-full overflow-visible drop-shadow-[0_0_15px_rgba(78,222,163,0.15)]">
+          <defs>
+            <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.4" />
+              <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
+            </linearGradient>
+            <filter id="glow">
+              <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+              <feMerge>
+                <feMergeNode in="coloredBlur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+          </defs>
+          
+          <line x1="0" y1={padding} x2={width} y2={padding} stroke="var(--border)" strokeWidth="1" strokeDasharray="4 4" />
+          <line x1="0" y1={height/2} x2={width} y2={height/2} stroke="var(--border)" strokeWidth="1" strokeDasharray="4 4" />
+          <line x1="0" y1={height - padding} x2={width} y2={height - padding} stroke="var(--border)" strokeWidth="1" strokeDasharray="4 4" />
+
+          <path d={areaD} fill="url(#trendGradient)" className="animate-fade-in-up" />
+          
+          <path
+            d={pathD}
+            fill="none"
+            stroke="var(--accent)"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            filter="url(#glow)"
+            style={{ strokeDasharray: 2000, strokeDashoffset: 2000, animation: 'drawLine 2s ease-out forwards' }}
+          />
+
+          {points.map((p, i) => (
+            <g key={i} className="group/dot cursor-pointer transition-transform duration-300 hover:scale-150 origin-center" style={{ transformOrigin: `${p.x}px ${p.y}px` }}>
+              <circle cx={p.x} cy={p.y} r="3" fill="var(--panel)" stroke="var(--accent)" strokeWidth="2" className="transition-colors duration-300 group-hover/dot:fill-[var(--accent)]" />
+              <text x={p.x} y={p.y - 12} textAnchor="middle" className="pointer-events-none fill-[var(--text)] text-[10px] font-bold opacity-0 transition-opacity duration-300 group-hover/dot:opacity-100 drop-shadow-md">
+                {p.score}%
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function ActivityPulseGraph({ activity }) {
+  const pulseData = Array.from({ length: 7 }, () => 0);
+  
+  const now = new Date();
+  (activity || []).forEach((item) => {
+    const d = new Date(item.createdAt || Date.now());
+    const diffTime = Math.abs(now - d);
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    if (diffDays < 7) {
+      pulseData[6 - diffDays] += 1;
+    }
+  });
+
+  const maxPulse = Math.max(...pulseData, 1);
+
+  return (
+    <div className="rounded-3xl border border-[var(--border)] bg-[var(--panel)] p-6 shadow-xl">
+       <p className="app-kicker mb-4 text-[11px]">Telemetry Pulse</p>
+       <div className="flex h-20 items-end justify-between gap-1.5">
+          {pulseData.map((val, i) => {
+            const heightPercent = Math.max((val / maxPulse) * 100, 15);
+            return (
+              <div key={i} className="group relative flex w-full flex-col justify-end h-full">
+                <div 
+                  className="w-full rounded-t-sm bg-[#71a1ff]/40 transition-all duration-500 ease-out group-hover:bg-[#71a1ff] shadow-[0_0_10px_rgba(113,161,255,0)] group-hover:shadow-[0_0_15px_rgba(113,161,255,0.4)]"
+                  style={{ height: `${heightPercent}%` }}
+                />
+                <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 transition-opacity group-hover:opacity-100 z-10 pointer-events-none">
+                   <span className="rounded bg-[var(--panel-strong)] px-2 py-0.5 text-[9px] font-bold text-[var(--text)] shadow-lg">{val}</span>
+                </div>
+              </div>
+            );
+          })}
+       </div>
+       <div className="mt-3 flex justify-between text-[8px] font-bold uppercase tracking-widest text-[var(--muted-strong)]">
+          <span>7d ago</span>
+          <span>Today</span>
+       </div>
     </div>
   );
 }
@@ -142,7 +264,16 @@ export default function MainDashboard() {
 
   const name = auth.user?.name?.split(' ')[0] || (auth.guestMode ? 'Explorer' : 'there');
   const matchedSkills = currentAnalysis?.matchedSkills?.slice(0, 6) || [];
-  const score = currentAnalysis?.confidenceScore || 82;
+  const score = useMemo(() => {
+    if (currentAnalysis?.confidenceScore) return currentAnalysis.confidenceScore;
+    if (analysisHistory.length > 0) {
+      const validScores = analysisHistory.map(h => h.confidenceScore).filter(s => typeof s === 'number');
+      if (validScores.length > 0) {
+        return Math.round(validScores.reduce((a, b) => a + b, 0) / validScores.length);
+      }
+    }
+    return 0;
+  }, [currentAnalysis, analysisHistory]);
   const resilienceXp = auth.user?.resilienceXp || 0;
   
   const dashboardQuery = useQuery({
@@ -261,15 +392,19 @@ export default function MainDashboard() {
     }));
   }, [dashboardQuery.data?.savedJobs]);
 
-  const recommendations = dashboardQuery.data?.recommendations?.length
-    ? dashboardQuery.data.recommendations
-    : matchedSkills.length
-      ? [
-          `Feature '${matchedSkills[0]}' more clearly in your profile and resume summary to improve recruiter discovery.`,
-          'Use your latest matched skills to tighten targeting before your next job search session.',
-          'Review your portfolio and outreach assets so the strongest signals from analysis also show up publicly.'
-        ]
-      : recommendationsFallback;
+  const recommendations = useMemo(() => {
+    if (dashboardQuery.data?.recommendations?.length) {
+      return dashboardQuery.data.recommendations;
+    }
+    if (matchedSkills.length > 0) {
+      return [
+        `Feature '${matchedSkills[0]}' more clearly in your profile and resume summary to improve recruiter discovery.`,
+        'Use your latest matched skills to tighten targeting before your next job search session.',
+        'Review your portfolio and outreach assets so the strongest signals from analysis also show up publicly.'
+      ];
+    }
+    return [];
+  }, [dashboardQuery.data?.recommendations, matchedSkills]);
 
   const activity = useMemo(() => {
     return (dashboardQuery.data?.activity || []).map((item, index) => [
@@ -338,6 +473,16 @@ export default function MainDashboard() {
               <p className="mt-4 max-w-xl text-sm leading-relaxed text-[var(--muted-strong)]">
                 Telemetry indicates steady momentum. Review your AI insights, log recent activity, and proceed with your next tactical objective.
               </p>
+              <div className="mt-6 flex flex-wrap gap-2">
+                <Link to="/analysis/latest" className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-[var(--text)] transition hover:border-[#71a1ff]/50 hover:text-[#71a1ff]">
+                  <span className="material-symbols-outlined text-[14px]">history</span>
+                  Continue Last Match
+                </Link>
+                <Link to="/jobs" className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest text-[var(--text)] transition hover:border-[var(--accent)]/50 hover:text-[var(--accent-strong)]">
+                  <span className="material-symbols-outlined text-[14px]">search</span>
+                  Search Jobs
+                </Link>
+              </div>
             </div>
             <div className="flex flex-col sm:flex-row gap-3 shrink-0">
                <button type="button" onClick={() => setIsRejectionModalOpen(true)} className="app-button-secondary border-[var(--accent)]/30 hover:border-[var(--accent)] hover:bg-[var(--accent)]/10 text-[var(--accent-strong)] shadow-[0_0_20px_rgba(78,222,163,0.15)] group">
@@ -372,25 +517,35 @@ export default function MainDashboard() {
                <ResilienceHUD xp={resilienceXp} flashXp={xpFlash} />
              </div>
 
+             <ActivityPulseGraph activity={dashboardQuery.data?.activity || []} />
+
              <div className="rounded-3xl border border-[var(--border)] bg-[var(--panel)] shadow-xl p-6">
                 <p className="app-kicker mb-4">Skill Constellation</p>
                 <div className="flex flex-wrap gap-2">
-                  {(acquiredSkills.length > 0 ? acquiredSkills : ['Technical Project Management', 'Next.js Framework Architect', 'AI Engineering Fundamentals']).map((skill) => (
-                    <span
-                      key={skill}
-                      className="inline-flex items-center rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] px-3 py-1.5 text-[11px] font-bold text-[var(--muted-strong)] transition-all hover:-translate-y-0.5 hover:border-[var(--accent)]/50 hover:text-[var(--text)] hover:shadow-[0_0_15px_rgba(78,222,163,0.15)]"
-                    >
-                      <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]/50 mr-2" />
-                      {skill}
-                    </span>
-                  ))}
+                  {acquiredSkills.length > 0 ? (
+                    acquiredSkills.map((skill) => (
+                      <span
+                        key={skill}
+                        className="inline-flex items-center rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] px-3 py-1.5 text-[11px] font-bold text-[var(--muted-strong)] transition-all hover:-translate-y-0.5 hover:border-[var(--accent)]/50 hover:text-[var(--text)] hover:shadow-[0_0_15px_rgba(78,222,163,0.15)]"
+                      >
+                        <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]/50 mr-2" />
+                        {skill}
+                      </span>
+                    ))
+                  ) : (
+                    <div className="text-[11px] text-[var(--muted-strong)] text-center py-2 w-full">
+                      No skills matched yet. Analyze a job description to calibrate constellation.
+                    </div>
+                  )}
                 </div>
              </div>
           </div>
 
           {/* COLUMN 2: INTELLIGENCE STREAM (Center) */}
           <div className="lg:col-span-6 flex flex-col gap-6 animate-fade-in-up-delay-2">
-             <div className="flex items-center justify-between px-2">
+             <ResonanceTrendChart history={analysisHistory} />
+             
+             <div className="flex items-center justify-between px-2 mt-2">
                 <p className="app-kicker text-[11px] text-[var(--text)] font-black">Intelligence Stream</p>
                 <div className="flex gap-1 items-center">
                   <span className="h-1 w-1 rounded-full bg-[var(--accent)] animate-ping" />
@@ -498,11 +653,21 @@ export default function MainDashboard() {
                                <p className="text-[10px] text-[var(--muted-strong)] truncate">{job.company}</p>
                             </div>
                          </div>
-                         <div className="mt-3 flex gap-2">
-                           <button type="button" onClick={() => void handleToggleFollowUp(job)} className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--panel)] py-1.5 text-[9px] font-bold uppercase tracking-widest text-[var(--text)] transition hover:border-[var(--accent)]/50 hover:text-[var(--accent-strong)]">
-                             {expandedJobId === job.id ? 'Close' : 'Scripts'}
-                           </button>
-                         </div>
+                          <div className="mt-3 flex gap-2">
+                            <button type="button" onClick={() => void handleToggleFollowUp(job)} className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--panel)] py-1.5 text-[9px] font-bold uppercase tracking-widest text-[var(--text)] transition hover:border-[var(--accent)]/50 hover:text-[var(--accent-strong)]">
+                              {expandedJobId === job.id ? 'Close' : 'Scripts'}
+                            </button>
+                            {job.originalId && (
+                              <button
+                                type="button"
+                                onClick={() => void handleDeleteSavedJob(job.originalId)}
+                                disabled={deletingSavedJobId === job.originalId}
+                                className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--panel)] py-1.5 text-[9px] font-bold uppercase tracking-widest text-[var(--text)] transition hover:border-rose-500/30 hover:bg-rose-500/10 hover:text-rose-400"
+                              >
+                                {deletingSavedJobId === job.originalId ? '...' : 'Delete'}
+                              </button>
+                            )}
+                          </div>
                          {expandedJobId === job.id && (
                            <div className="mt-3 border-t border-[var(--border)] pt-3 max-h-40 overflow-y-auto custom-scrollbar space-y-3">
                               {loadingJobId === job.id ? (
