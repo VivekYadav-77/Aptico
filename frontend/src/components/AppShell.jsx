@@ -187,6 +187,9 @@ export default function AppShell({ title, description, actions, children, banner
   const [searchOpen, setSearchOpen] = useState(false);
   const searchRef = useRef(null);
   const searchInputRef = useRef(null);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const profileDropdownRef = useRef(null);
+  const [hubDropdownOpen, setHubDropdownOpen] = useState(false);
 
   const userLabel = useMemo(() => {
     if (auth.user?.name) return auth.user.name;
@@ -217,12 +220,24 @@ export default function AppShell({ title, description, actions, children, banner
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  // Escape key closes search and mobile menu
+  // Close profile dropdown on outside click
+  useEffect(() => {
+    function handleClick(e) {
+      if (profileDropdownRef.current && !profileDropdownRef.current.contains(e.target)) {
+        setProfileDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
+  // Escape key closes search, mobile menu and profile dropdown
   useEffect(() => {
     function handleKey(e) {
       if (e.key === 'Escape') {
         setSearchOpen(false);
         setMobileMenuOpen(false);
+        setProfileDropdownOpen(false);
       }
     }
     document.addEventListener('keydown', handleKey);
@@ -247,13 +262,11 @@ export default function AppShell({ title, description, actions, children, banner
   return (
     <div className="app-page">
       {/* ── NAVBAR ──────────────────────────────────────────── */}
-      <header
-        className="glass fixed left-0 right-0 top-0 z-50 border-b border-[var(--border)]"
-      >
+      <header className="glass fixed left-0 right-0 top-0 z-50 border-b border-[var(--border)]">
         {banner}
-        <div className="flex items-center justify-between gap-3 px-4 sm:px-6" style={{ height: `${NAVBAR_HEIGHT}px` }}>
-          {/* Left: hamburger + logo + search */}
-          <div className="flex min-w-0 flex-1 items-center gap-3">
+        <div className="flex items-center justify-between gap-4 px-4 sm:px-6" style={{ height: `${NAVBAR_HEIGHT}px` }}>
+          {/* Left: Mobile hamburger + App Logo */}
+          <div className="flex items-center gap-3 shrink-0">
             <button
               type="button"
               className="app-icon-button shrink-0 lg:hidden"
@@ -262,58 +275,216 @@ export default function AppShell({ title, description, actions, children, banner
             >
               <span className="material-symbols-outlined text-[20px]">{mobileMenuOpen ? 'close' : 'menu'}</span>
             </button>
-            <div className="min-w-0">
-              <AppLogo />
-            </div>
-
-            {/* Desktop search */}
-            <div className="relative ml-4 hidden md:block" ref={searchRef}>
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-[var(--muted)]">search</span>
-              <input
-                ref={searchInputRef}
-                className="w-56 rounded-full border border-[var(--border)] bg-[var(--panel-soft)] py-2 pl-9 pr-4 text-sm text-[var(--text)] outline-none transition-all duration-200 focus:w-72 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] lg:w-72 lg:focus:w-80"
-                placeholder="Search insights…"
-                value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
-                onFocus={() => setSearchOpen(true)}
-              />
-              {searchOpen && (
-                <SearchDropdown
-                  query={searchQuery}
-                  onClose={() => { setSearchOpen(false); setSearchQuery(''); }}
-                  navigate={navigate}
-                />
-              )}
-            </div>
+            <AppLogo />
           </div>
 
-          {/* Right: theme, notifications, user, auth */}
-          <div className="flex shrink-0 items-center gap-2">
-            <ThemeToggle compact />
-            {auth.isAuthenticated ? <NotificationBell /> : null}
-            {auth.isAuthenticated ? (
-              <Link
-                to={profileHref}
-                className="hidden items-center gap-2 rounded-full border border-[var(--border)] px-4 py-2 text-sm text-[var(--muted-strong)] transition hover:bg-[var(--panel-soft)] hover:text-[var(--text)] lg:inline-flex"
+          {/* Center: Desktop horizontal centered tabs (only when logged in) */}
+          {auth.isAuthenticated && (
+            <div className="hidden lg:flex items-center gap-1 bg-[var(--panel-soft)] border border-[var(--border)] rounded-full px-1.5 py-1">
+              {[
+                { to: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
+                { to: '/analysis', label: 'Analysis', icon: 'analytics' },
+                { to: '/jobs', label: 'Jobs', icon: 'work' },
+              ].map((tab) => {
+                const isActive = location.pathname === tab.to;
+                return (
+                  <Link
+                    key={tab.to}
+                    to={tab.to}
+                    className={`flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-widest transition-all duration-200 ${
+                      isActive
+                        ? 'bg-[var(--panel)] text-[var(--accent-strong)] border border-[var(--border)] shadow-[0_0_12px_rgba(78,222,163,0.15)]'
+                        : 'text-[var(--muted-strong)] hover:text-[var(--text)]'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[14px]">{tab.icon}</span>
+                    {tab.label}
+                  </Link>
+                );
+              })}
+
+              {/* Hub Dropdown containing the remaining page routes */}
+              <div 
+                className="relative"
+                onMouseEnter={() => setHubDropdownOpen(true)}
+                onMouseLeave={() => setHubDropdownOpen(false)}
               >
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--accent)] text-[10px] font-black text-[#003824]">
-                  {userLabel.charAt(0).toUpperCase()}
-                </div>
-                {profileLabel}
-              </Link>
-            ) : (
-              <div className="hidden rounded-full border border-[var(--border)] px-4 py-2 text-sm text-[var(--muted-strong)] lg:block">
-                {userLabel}
+                <button
+                  type="button"
+                  className={`flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-widest transition-all duration-200 cursor-pointer ${
+                    ['/squads', '/people', '/wins', '/portfolio-generator'].some(path => location.pathname === path)
+                      ? 'bg-[var(--panel)] text-[var(--accent-strong)] border border-[var(--border)] shadow-[0_0_12px_rgba(78,222,163,0.15)]'
+                      : 'text-[var(--muted-strong)] hover:text-[var(--text)]'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[14px]">hub</span>
+                  Hub
+                  <span className="material-symbols-outlined text-[12px] -ml-1">keyboard_arrow_down</span>
+                </button>
+
+                {hubDropdownOpen && (
+                  <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-48 rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-2 shadow-[0_16px_36px_rgba(0,0,0,0.25)] animate-fade-in-up">
+                    {[
+                      { to: '/squads', label: 'Squads', icon: 'groups' },
+                      { to: '/people', label: 'People', icon: 'diversity_3' },
+                      { to: '/wins', label: 'Wins', icon: 'military_tech' },
+                      { to: '/portfolio-generator', label: 'Portfolio', icon: 'code_blocks' }
+                    ].map((subTab) => {
+                      const isSubActive = location.pathname === subTab.to;
+                      return (
+                        <Link
+                          key={subTab.to}
+                          to={subTab.to}
+                          onClick={() => setHubDropdownOpen(false)}
+                          className={`flex items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-bold uppercase tracking-wider transition ${
+                            isSubActive
+                              ? 'bg-[var(--panel-soft)] text-[var(--accent-strong)]'
+                              : 'text-[var(--muted-strong)] hover:bg-[var(--panel-soft)] hover:text-[var(--text)]'
+                          }`}
+                        >
+                          <span className="material-symbols-outlined text-[14px]">{subTab.icon}</span>
+                          {subTab.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Right: Search, Theme, Notifications, Profile Dropdown */}
+          <div className="flex items-center gap-3 ml-auto">
+            {/* Desktop Search (Only when logged in) */}
+            {auth.isAuthenticated && (
+              <div className="relative hidden md:block" ref={searchRef}>
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-[var(--muted)]">search</span>
+                <input
+                  ref={searchInputRef}
+                  className="w-48 rounded-full border border-[var(--border)] bg-[var(--panel-soft)] py-2 pl-9 pr-4 text-xs text-[var(--text)] outline-none transition-all duration-200 focus:w-60 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] lg:w-52 lg:focus:w-64"
+                  placeholder="Search insights…"
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
+                  onFocus={() => setSearchOpen(true)}
+                />
+                {searchOpen && (
+                  <SearchDropdown
+                    query={searchQuery}
+                    onClose={() => { setSearchOpen(false); setSearchQuery(''); }}
+                    navigate={navigate}
+                  />
+                )}
               </div>
             )}
-            {auth.isAuthenticated || auth.guestMode ? (
-              <button type="button" onClick={handleSignOut} className="app-button-secondary hidden px-4 py-2 sm:inline-flex">
-                {auth.guestMode ? 'Exit guest' : 'Sign out'}
-              </button>
+
+            <ThemeToggle compact />
+            {auth.isAuthenticated ? <NotificationBell /> : null}
+
+            {/* Profile Dropdown / Auth CTA */}
+            {auth.isAuthenticated ? (
+              <div className="relative" ref={profileDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                  className="flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--panel-soft)] hover:bg-[var(--panel)] hover:border-[var(--accent)]/40 px-3 py-1.5 text-xs text-[var(--text)] font-semibold transition cursor-pointer select-none"
+                >
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)] text-[9px] font-black text-[#003824]">
+                    {userLabel.charAt(0).toUpperCase()}
+                  </div>
+                  <span className="hidden sm:inline max-w-[80px] truncate">{userLabel.split(' ')[0]}</span>
+                  <span className="material-symbols-outlined text-[16px] text-[var(--muted)]">keyboard_arrow_down</span>
+                </button>
+
+                {profileDropdownOpen && (
+                  <div className="absolute right-0 top-[calc(100%+8px)] z-[250] w-72 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.35)] animate-fade-in-up">
+                    <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(78,222,163,0.15),transparent_70%)]" />
+                    
+                    {/* User Profile Info */}
+                    <div className="relative z-10 flex items-center gap-3 pb-4 border-b border-[var(--border)]">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-sm font-black text-[#003824]">
+                        {userLabel.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-black text-[var(--text)]">{userLabel}</p>
+                        <p className="truncate text-xs text-[var(--muted-strong)]">{auth.user?.email || 'authenticated user'}</p>
+                      </div>
+                    </div>
+
+                    {/* Resilience Level HUD */}
+                    {auth.user?.resilienceXp !== undefined && (
+                      <div className="relative z-10 py-4 border-b border-[var(--border)]">
+                        {(() => {
+                          const xp = auth.user.resilienceXp || 0;
+                          const lvl = Math.floor(xp / 1000) + 1;
+                          const lvlXp = xp % 1000;
+                          const percent = (lvlXp / 1000) * 100;
+                          return (
+                            <div className="space-y-2">
+                              <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-[var(--muted-strong)]">
+                                <span>Lvl {lvl} Explorer</span>
+                                <span className="text-[var(--accent-strong)]">{lvlXp}/1000 XP</span>
+                              </div>
+                              <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--panel-strong)]">
+                                <div
+                                  className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-[#71a1ff] shadow-[0_0_8px_rgba(78,222,163,0.4)]"
+                                  style={{ width: `${Math.max(5, percent)}%` }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+
+                    {/* Action Links */}
+                    <div className="relative z-10 py-3 space-y-1">
+                      <Link
+                        to={profileHref}
+                        onClick={() => setProfileDropdownOpen(false)}
+                        className="flex items-center gap-3 rounded-xl px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[var(--muted-strong)] hover:bg-[var(--panel-soft)] hover:text-[var(--text)] transition"
+                      >
+                        <span className="material-symbols-outlined text-[16px] text-[var(--accent-strong)]">person</span>
+                        View Profile
+                      </Link>
+                      <Link
+                        to="/settings"
+                        onClick={() => setProfileDropdownOpen(false)}
+                        className="flex items-center gap-3 rounded-xl px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[var(--muted-strong)] hover:bg-[var(--panel-soft)] hover:text-[var(--text)] transition"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">settings</span>
+                        Account Settings
+                      </Link>
+                    </div>
+
+                    {/* Sign Out */}
+                    <div className="relative z-10 pt-3 border-t border-[var(--border)]">
+                      <button
+                        type="button"
+                        onClick={() => { setProfileDropdownOpen(false); void handleSignOut(); }}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/5 py-2 text-xs font-black uppercase tracking-widest text-rose-400 transition hover:bg-rose-500/10 hover:text-rose-300"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">logout</span>
+                        Sign Out
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : (
-              <Link to="/auth" className="app-button hidden px-5 py-2 sm:inline-flex">
-                Sign in
-              </Link>
+              <>
+                <div className="hidden rounded-full border border-[var(--border)] px-4 py-2 text-sm text-[var(--muted-strong)] lg:block">
+                  {userLabel}
+                </div>
+                {auth.guestMode ? (
+                  <button type="button" onClick={handleSignOut} className="app-button-secondary hidden px-4 py-2 sm:inline-flex">
+                    Exit guest
+                  </button>
+                ) : (
+                  <Link to="/auth" className="app-button hidden px-5 py-2 sm:inline-flex">
+                    Sign in
+                  </Link>
+                )}
+              </>
             )}
           </div>
         </div>
