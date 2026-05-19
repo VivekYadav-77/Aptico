@@ -235,13 +235,28 @@ export default function AnalysisWorkspace() {
                <p className="mb-8 max-w-sm text-base text-[var(--muted-strong)]">
                   The data stream has been fully processed. Your tactical report is ready.
                </p>
-               <button
-                  type="button"
-                  onClick={() => navigate('/analysis-history', { state: { openId: persistedWorkspace?.id || persistedWorkspace?.localId } })}
-                  className="rounded-full bg-[var(--accent)] px-8 py-3.5 text-sm font-black uppercase tracking-widest text-[#003824] shadow-[0_0_20px_rgba(78,222,163,0.3)] transition hover:scale-[1.02]"
-               >
-                  View Tactical Report
-               </button>
+               <div className="flex flex-col items-center gap-4">
+                 <button
+                    type="button"
+                    onClick={() => navigate('/analysis-history', { state: { openId: persistedWorkspace?.id || persistedWorkspace?.localId } })}
+                    className="rounded-full bg-[var(--accent)] px-8 py-3.5 text-sm font-black uppercase tracking-widest text-[#003824] shadow-[0_0_20px_rgba(78,222,163,0.3)] transition hover:scale-[1.02]"
+                 >
+                    View Tactical Report
+                 </button>
+                 <button
+                    type="button"
+                    onClick={() => {
+                       dispatch(clearAnalysisWorkspace());
+                       dispatch(resetAnalysisLiveState());
+                       setSelectedFile(null);
+                       setSelectedFileMeta(null);
+                       setJobDescription('');
+                    }}
+                    className="text-xs font-bold uppercase tracking-widest text-[var(--muted-strong)] hover:text-[var(--text)] transition-colors"
+                 >
+                    Start New Analysis
+                 </button>
+               </div>
             </div>
           ) : (
             <div className="rounded-[2.5rem] border border-[var(--border)] bg-[var(--panel)] p-8 sm:p-10 shadow-2xl relative overflow-hidden">

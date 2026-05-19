@@ -181,21 +181,21 @@ function FeatureButton({ active, ready, label, shortLabel, onClick }) {
     <button
       type="button"
       onClick={onClick}
-      className={`group flex items-center gap-3 rounded-full border px-4 py-2.5 text-sm font-semibold transition ${
+      className={`group flex items-center gap-2.5 rounded-full border px-4 py-2 text-sm font-bold tracking-wide transition-all duration-300 ${
         active
-          ? 'border-[var(--accent)] bg-[var(--accent)] text-slate-950'
+          ? 'border-[var(--accent)] bg-[var(--accent)] text-[#003824] shadow-[0_0_15px_rgba(78,222,163,0.25)] scale-105'
           : ready
-            ? 'border-[var(--border)] bg-[var(--panel-soft)] text-[var(--text)] hover:border-[var(--accent)]'
-            : 'border-[var(--border)] bg-transparent text-[var(--muted)]'
+            ? 'border-[var(--border)] bg-[var(--panel-soft)] text-[var(--text)] hover:border-[var(--accent)] hover:bg-[var(--panel)]'
+            : 'border-[var(--border)] bg-transparent text-[var(--muted)] opacity-60'
       }`}
     >
       <span
-        className={`h-2.5 w-2.5 rounded-full ${
-          active ? 'bg-slate-950' : ready ? 'bg-[var(--accent)] shadow-[0_0_10px_rgba(78,222,163,0.45)]' : 'border border-[var(--muted)]'
+        className={`h-2 w-2 rounded-full transition-all duration-300 ${
+          active ? 'bg-[#003824]' : ready ? 'bg-[var(--accent)] shadow-[0_0_8px_rgba(78,222,163,0.4)]' : 'border border-[var(--muted)]'
         }`}
       />
       <span>{label}</span>
-      <span className={`hidden rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.2em] sm:inline ${active ? 'bg-slate-950/10' : 'bg-black/5 dark:bg-white/5'}`}>
+      <span className={`hidden rounded-full px-2 py-0.5 text-[10px] uppercase tracking-[0.18em] sm:inline transition-colors ${active ? 'bg-[#003824]/10' : 'bg-[var(--bg)]'}`}>
         {shortLabel}
       </span>
     </button>
@@ -204,8 +204,12 @@ function FeatureButton({ active, ready, label, shortLabel, onClick }) {
 
 function EmptyState({ message }) {
   return (
-    <div className="rounded-[1.5rem] border border-dashed border-[var(--border)] bg-[var(--panel-soft)] px-5 py-10 text-sm leading-7 text-[var(--muted-strong)]">
-      {message}
+    <div className="flex flex-col items-center justify-center rounded-[2rem] border border-dashed border-[var(--border)] bg-[var(--panel-soft)] px-8 py-16 text-center shadow-inner">
+      <div className="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[var(--panel)] border border-[var(--border)] shadow-xl">
+        <span className="material-symbols-outlined text-4xl text-[var(--muted)]">history_toggle_off</span>
+      </div>
+      <h3 className="mb-2 text-xl font-bold text-[var(--text)]">No Data Available</h3>
+      <p className="max-w-md text-sm leading-7 text-[var(--muted-strong)]">{message}</p>
     </div>
   );
 }
@@ -298,39 +302,49 @@ function InsightContent({ selectedTab, stage1, stage2, stage3, loadingStates }) 
     const mismatches = stage1?.keywordMismatches || [];
 
     return mismatches.length ? (
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div className="grid gap-4 sm:grid-cols-3">
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] p-4">
-            <p className="app-field-label">Missing signals</p>
-            <p className="mt-2 text-2xl font-bold text-[var(--text)]">{mismatches.length}</p>
+          <div className="group rounded-2xl border border-rose-500/20 bg-rose-500/5 p-5 transition-all hover:border-rose-500/40 hover:shadow-[0_4px_20px_rgba(244,63,94,0.08)]">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-500/10"><span className="material-symbols-outlined text-[16px] text-rose-400">warning</span></span>
+              <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-rose-300">Missing signals</p>
+            </div>
+            <p className="text-3xl font-black text-[var(--text)]">{mismatches.length}</p>
           </div>
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] p-4">
-            <p className="app-field-label">Matched skills</p>
-            <p className="mt-2 text-2xl font-bold text-[var(--text)]">{stage1?.skillsPresent?.length || 0}</p>
+          <div className="group rounded-2xl border border-emerald-500/20 bg-emerald-500/5 p-5 transition-all hover:border-emerald-500/40 hover:shadow-[0_4px_20px_rgba(16,185,129,0.08)]">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/10"><span className="material-symbols-outlined text-[16px] text-emerald-400">check_circle</span></span>
+              <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-emerald-300">Matched skills</p>
+            </div>
+            <p className="text-3xl font-black text-[var(--text)]">{stage1?.skillsPresent?.length || 0}</p>
           </div>
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] p-4">
-            <p className="app-field-label">Confidence</p>
-            <p className="mt-2 text-2xl font-bold text-[var(--text)]">{clampPercent(stage1?.confidenceScore)}%</p>
+          <div className="group rounded-2xl border border-[var(--accent)]/20 bg-[var(--accent)]/5 p-5 transition-all hover:border-[var(--accent)]/40 hover:shadow-[0_4px_20px_rgba(78,222,163,0.08)]">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--accent)]/10"><span className="material-symbols-outlined text-[16px] text-[var(--accent-strong)]">speed</span></span>
+              <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-[var(--accent-strong)]">Confidence</p>
+            </div>
+            <p className="text-3xl font-black text-[var(--text)]">{clampPercent(stage1?.confidenceScore)}%</p>
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-[1.5rem] border border-[var(--border)]">
-          <div className="grid grid-cols-[minmax(120px,0.8fr)_1fr_1fr] bg-[var(--panel-strong)] px-4 py-3 text-[11px] uppercase tracking-[0.22em] text-[var(--muted)]">
-            <span>Skill</span>
-            <span>Job needs</span>
-            <span>Resume evidence</span>
+        <div className="overflow-hidden rounded-[2rem] border border-[var(--border)] shadow-lg">
+          <div className="hidden md:grid grid-cols-[minmax(140px,0.8fr)_1fr_1fr] bg-[var(--panel-strong)] px-6 py-4 text-[10px] uppercase tracking-[0.22em] font-bold text-[var(--muted)]">
+            <span className="flex items-center gap-2"><span className="material-symbols-outlined text-[14px]">key</span>Skill</span>
+            <span className="flex items-center gap-2"><span className="material-symbols-outlined text-[14px]">work</span>Job needs</span>
+            <span className="flex items-center gap-2"><span className="material-symbols-outlined text-[14px]">description</span>Resume evidence</span>
           </div>
           <div className="divide-y divide-[var(--border)] bg-[var(--panel)]">
             {mismatches.map((item, index) => (
-              <article key={`${item.keyword}-${index}`} className="grid gap-4 px-4 py-4 md:grid-cols-[minmax(120px,0.8fr)_1fr_1fr]">
+              <article key={`${item.keyword}-${index}`} className="group/row grid gap-4 px-6 py-5 md:grid-cols-[minmax(140px,0.8fr)_1fr_1fr] transition-colors hover:bg-[var(--panel-soft)]">
                 <div>
-                  <p className="font-semibold text-[var(--text)]">{item.keyword}</p>
-                  <span className="mt-2 inline-flex rounded-full border border-[var(--danger-border)] bg-[var(--danger-soft)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-rose-300">
-                    Needs attention
+                  <p className="font-bold text-[var(--text)] group-hover/row:text-[var(--accent-strong)] transition-colors">{item.keyword}</p>
+                  <span className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-rose-500/20 bg-rose-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-rose-400">
+                    <span className="h-1.5 w-1.5 rounded-full bg-rose-400 animate-pulse" />
+                    Gap detected
                   </span>
                 </div>
-                <p className="text-sm leading-7 text-[var(--muted-strong)]">{item.jobRequirement || 'No requirement details were returned.'}</p>
-                <p className="text-sm leading-7 text-[var(--text)]">{item.resumeEvidence || 'No resume evidence was found for this item.'}</p>
+                <p className="text-sm leading-relaxed text-[var(--muted-strong)]">{item.jobRequirement || 'No requirement details were returned.'}</p>
+                <p className="text-sm leading-relaxed text-[var(--text)]">{item.resumeEvidence || 'No resume evidence was found for this item.'}</p>
               </article>
             ))}
           </div>
@@ -347,24 +361,34 @@ function InsightContent({ selectedTab, stage1, stage2, stage3, loadingStates }) 
 
   if (selectedTab === 3) {
     return stage1?.seniorityMismatches?.length ? (
-      <div className="grid gap-4">
+      <div className="grid gap-5">
         {stage1.seniorityMismatches.map((item, index) => (
-          <article key={`${item.topic}-${index}`} className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] p-5">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-lg font-semibold text-[var(--text)]">{item.topic}</p>
-              <span className="app-chip">Level alignment</span>
-            </div>
-            <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4">
-                <p className="app-field-label">Resume level</p>
-                <p className="mt-2 text-sm leading-7 text-[var(--text)]">{item.resumeLevel}</p>
+          <article key={`${item.topic}-${index}`} className="group rounded-[2rem] border border-[var(--border)] bg-[var(--panel-soft)] p-6 transition-all hover:border-amber-500/30 hover:shadow-[0_4px_20px_rgba(245,158,11,0.06)]">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20">
+                  <span className="material-symbols-outlined text-[18px] text-amber-400">trending_up</span>
+                </span>
+                <p className="text-lg font-black text-[var(--text)]">{item.topic}</p>
               </div>
-              <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4">
-                <p className="app-field-label">Target level</p>
-                <p className="mt-2 text-sm leading-7 text-[var(--text)]">{item.targetLevel}</p>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-amber-400">
+                <span className="material-symbols-outlined text-[12px]">swap_vert</span>
+                Level delta
+              </span>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-amber-500/50 rounded-r" />
+                <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-[var(--muted)] mb-2 flex items-center gap-2"><span className="material-symbols-outlined text-[14px]">person</span>Your Level</p>
+                <p className="text-sm leading-relaxed font-medium text-[var(--text)]">{item.resumeLevel}</p>
+              </div>
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-5 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-[var(--accent)]/50 rounded-r" />
+                <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-[var(--muted)] mb-2 flex items-center gap-2"><span className="material-symbols-outlined text-[14px]">flag</span>Target Level</p>
+                <p className="text-sm leading-relaxed font-medium text-[var(--text)]">{item.targetLevel}</p>
               </div>
             </div>
-            <p className="mt-4 text-sm leading-7 text-[var(--muted-strong)]">{item.explanation}</p>
+            <p className="mt-5 text-sm leading-relaxed text-[var(--muted-strong)] border-t border-[var(--border)] pt-5">{item.explanation}</p>
           </article>
         ))}
       </div>
@@ -375,17 +399,18 @@ function InsightContent({ selectedTab, stage1, stage2, stage3, loadingStates }) 
 
   if (selectedTab === 4) {
     return stage2?.interviewQuestions?.length ? (
-      <ol className="grid gap-3">
+      <ol className="grid gap-4">
         {stage2.interviewQuestions.map((question, index) => {
           const priority = getQuestionPriority(index);
 
           return (
-            <li key={`${question}-${index}`} className="flex flex-col gap-3 rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] p-4 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex items-start gap-3">
-                <span className="mono-text mt-0.5 text-sm font-bold text-[var(--accent-strong)]">{String(index + 1).padStart(2, '0')}</span>
-                <p className="text-sm leading-7 text-[var(--text)]">{question}</p>
+            <li key={`${question}-${index}`} className="group flex flex-col gap-4 rounded-[2rem] border border-[var(--border)] bg-[var(--panel-soft)] p-5 lg:flex-row lg:items-center lg:justify-between transition-all hover:border-[var(--accent)]/30 hover:shadow-[0_4px_20px_rgba(78,222,163,0.06)]">
+              <div className="flex items-start gap-4">
+                <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] border border-[var(--accent)]/20 font-mono text-sm font-black text-[var(--accent-strong)]">{String(index + 1).padStart(2, '0')}</span>
+                <p className="text-sm leading-relaxed text-[var(--text)] pt-2">{question}</p>
               </div>
-              <span className={`inline-flex w-fit rounded-full border px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] ${priority.className}`}>
+              <span className={`inline-flex w-fit flex-shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] ${priority.className}`}>
+                <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
                 {priority.label}
               </span>
             </li>
@@ -401,25 +426,28 @@ function InsightContent({ selectedTab, stage1, stage2, stage3, loadingStates }) 
     const riskItems = parseRiskItems(stage2?.rejectionReasons);
 
     return riskItems.length ? (
-      <div className="rounded-[1.5rem] border border-[var(--danger-border)] bg-[var(--danger-soft)] p-5">
-        <div className="flex items-center gap-3">
-          <span className="material-symbols-outlined text-rose-300">warning</span>
+      <div className="rounded-[2rem] border border-rose-500/20 bg-gradient-to-b from-rose-500/5 to-transparent p-6">
+        <div className="flex items-center gap-4 mb-6 pb-5 border-b border-rose-500/15">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-500/10 border border-rose-500/20">
+            <span className="material-symbols-outlined text-2xl text-rose-400">shield</span>
+          </span>
           <div>
-            <p className="app-field-label">Rejection risk analysis</p>
-            <p className="mt-1 text-sm text-[var(--muted-strong)]">These are the blockers Aptico sees from the current resume-job pairing.</p>
+            <h4 className="text-lg font-black text-[var(--text)]">Rejection Risk Analysis</h4>
+            <p className="text-sm text-[var(--muted-strong)]">These are the blockers Aptico identified from the current resume-job pairing.</p>
           </div>
         </div>
-        <div className="mt-5 space-y-3">
+        <div className="space-y-3">
           {riskItems.map((risk, index) => (
-            <article key={`${risk}-${index}`} className="rounded-2xl border border-[var(--danger-border)] bg-black/10 px-4 py-4">
-              <div className="flex items-start gap-3">
-                <span className="material-symbols-outlined mt-0.5 text-rose-300">cancel</span>
-                <div>
-                  <p className="text-sm font-semibold text-[var(--text)]">{risk}</p>
-                  <span className="mt-2 inline-flex rounded-full bg-[var(--danger-soft)] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-rose-300">
-                    Review before applying
-                  </span>
-                </div>
+            <article key={`${risk}-${index}`} className="group flex items-start gap-4 rounded-xl border border-rose-500/15 bg-[var(--panel)]/50 p-5 transition-all hover:border-rose-500/30 hover:bg-rose-500/5">
+              <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-rose-500/10 mt-0.5">
+                <span className="material-symbols-outlined text-[18px] text-rose-400">error</span>
+              </span>
+              <div className="flex-1">
+                <p className="text-sm font-semibold leading-relaxed text-[var(--text)]">{risk}</p>
+                <span className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-rose-500/10 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-rose-400">
+                  <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
+                  Address before applying
+                </span>
               </div>
             </article>
           ))}
@@ -462,8 +490,13 @@ function CopyButton({ text, label = 'Copy' }) {
     <button
       type="button"
       onClick={handleCopy}
-      className="rounded-full border border-[var(--border)] px-3 py-1 text-[10px] uppercase tracking-[0.2em] text-[var(--muted-strong)] transition hover:border-[var(--accent)] hover:text-[var(--accent-strong)]"
+      className={`inline-flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.2em] transition-all duration-300 ${
+        copied
+          ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent-strong)] shadow-[0_0_10px_rgba(78,222,163,0.15)]'
+          : 'border-[var(--border)] text-[var(--muted-strong)] hover:border-[var(--accent)] hover:text-[var(--accent-strong)] hover:bg-[var(--accent)]/5'
+      }`}
     >
+      <span className="material-symbols-outlined text-[14px]">{copied ? 'check' : 'content_copy'}</span>
       {copied ? 'Copied!' : label}
     </button>
   );
@@ -474,30 +507,49 @@ function SalaryCoachView({ content }) {
   const positionColors = getPositionColor(sections.position);
 
   return (
-    <div className="grid gap-5">
-      <div className="rounded-[1.5rem] border border-emerald-500/30 bg-emerald-500/10 p-6 text-center">
-        <p className="app-field-label text-emerald-300">Estimated range</p>
-        <p className="mt-2 text-2xl font-bold text-[var(--text)]">{sections.range || 'Not provided'}</p>
+    <div className="grid gap-6">
+      <div className="rounded-[2rem] border border-emerald-500/20 bg-gradient-to-b from-emerald-500/10 to-transparent p-8 text-center relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.08),transparent_70%)] pointer-events-none" />
+        <div className="relative z-10">
+          <span className="material-symbols-outlined text-3xl text-emerald-400 mb-3">payments</span>
+          <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-emerald-300 mb-2">Estimated compensation range</p>
+          <p className="text-3xl font-black text-[var(--text)]">{sections.range || 'Not provided'}</p>
+        </div>
       </div>
 
-      <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] p-5">
-        <h4 className="app-field-label">Why this range</h4>
-        <p className="mt-3 text-sm leading-7 text-[var(--text)]">{sections.why || 'No explanation returned from the backend.'}</p>
+      <div className="rounded-[2rem] border border-[var(--border)] bg-[var(--panel-soft)] p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--panel)] border border-[var(--border)]">
+            <span className="material-symbols-outlined text-[16px] text-[var(--muted)]">info</span>
+          </span>
+          <h4 className="text-[10px] uppercase tracking-[0.2em] font-bold text-[var(--muted)]">Why this range</h4>
+        </div>
+        <p className="text-sm leading-relaxed text-[var(--text)]">{sections.why || 'No explanation returned from the backend.'}</p>
       </div>
 
-      <div className={`rounded-[1.5rem] border p-5 ${positionColors.border} ${positionColors.bg}`}>
-        <h4 className={`app-field-label ${positionColors.text}`}>Your negotiation position</h4>
-        <p className={`mt-3 text-sm leading-7 font-medium ${positionColors.text}`}>{sections.position || 'No position guidance returned.'}</p>
+      <div className={`rounded-[2rem] border p-6 ${positionColors.border} ${positionColors.bg}`}>
+        <div className="flex items-center gap-3 mb-4">
+          <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${positionColors.bg} border ${positionColors.border}`}>
+            <span className={`material-symbols-outlined text-[16px] ${positionColors.text}`}>gavel</span>
+          </span>
+          <h4 className={`text-[10px] uppercase tracking-[0.2em] font-bold ${positionColors.text}`}>Your negotiation position</h4>
+        </div>
+        <p className={`text-sm leading-relaxed font-medium ${positionColors.text}`}>{sections.position || 'No position guidance returned.'}</p>
       </div>
 
-      <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] p-5">
-        <h4 className="app-field-label">Exact phrases to use</h4>
-        <div className="mt-4 grid gap-3">
+      <div className="rounded-[2rem] border border-[var(--border)] bg-[var(--panel-soft)] p-6">
+        <div className="flex items-center gap-3 mb-5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent)]/10 border border-[var(--accent)]/20">
+            <span className="material-symbols-outlined text-[16px] text-[var(--accent-strong)]">format_quote</span>
+          </span>
+          <h4 className="text-[10px] uppercase tracking-[0.2em] font-bold text-[var(--muted)]">Exact phrases to use</h4>
+        </div>
+        <div className="grid gap-3">
           {sections.phrases.length ? (
             sections.phrases.map((phrase, index) => (
-              <div key={`${phrase}-${index}`} className="flex items-start justify-between gap-3 rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4">
-                <p className="text-sm leading-6 text-[var(--text)]">
-                  <span className="mr-2 text-xs font-bold text-[var(--accent-strong)]">{index + 1}.</span>
+              <div key={`${phrase}-${index}`} className="group flex items-start justify-between gap-4 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4 transition-all hover:border-[var(--accent)]/30">
+                <p className="text-sm leading-relaxed text-[var(--text)]">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-[var(--accent-soft)] text-[10px] font-black text-[var(--accent-strong)] mr-3">{index + 1}</span>
                   {phrase}
                 </p>
                 <CopyButton text={phrase} />
@@ -509,13 +561,18 @@ function SalaryCoachView({ content }) {
         </div>
       </div>
 
-      <div className="rounded-[1.5rem] border border-[var(--danger-border)] bg-[var(--danger-soft)] p-5">
-        <h4 className="app-field-label text-rose-300">What not to say</h4>
-        <div className="mt-4 grid gap-2">
+      <div className="rounded-[2rem] border border-rose-500/20 bg-gradient-to-b from-rose-500/5 to-transparent p-6">
+        <div className="flex items-center gap-3 mb-5">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-rose-500/10 border border-rose-500/20">
+            <span className="material-symbols-outlined text-[16px] text-rose-400">block</span>
+          </span>
+          <h4 className="text-[10px] uppercase tracking-[0.2em] font-bold text-rose-300">What not to say</h4>
+        </div>
+        <div className="grid gap-3">
           {sections.notToSay.length ? (
             sections.notToSay.map((phrase, index) => (
-              <div key={`${phrase}-${index}`} className="rounded-2xl border border-[var(--danger-border)] bg-black/10 px-4 py-3 text-sm leading-6 text-[var(--text)]">
-                <span className="mr-2 text-xs font-bold text-rose-300">{index + 1}.</span>
+              <div key={`${phrase}-${index}`} className="rounded-xl border border-rose-500/15 bg-[var(--panel)]/50 p-4 text-sm leading-relaxed text-[var(--text)] transition-all hover:border-rose-500/30">
+                <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-rose-500/10 text-[10px] font-black text-rose-400 mr-3">{index + 1}</span>
                 {phrase}
               </div>
             ))
@@ -533,7 +590,7 @@ function LearningPathView({ content }) {
   const maxHours = Math.max(...content.map((item) => Number(item.total_honest_hours || item.hours || 0)), 1);
 
   return (
-    <div className="grid gap-4">
+    <div className="grid gap-5">
       {content.map((item, index) => {
         const isExpanded = expandedIndex === index;
         const hours = Number(item.total_honest_hours || item.hours || 0);
@@ -546,52 +603,64 @@ function LearningPathView({ content }) {
         const barWidth = Math.round((hours / maxHours) * 100);
 
         return (
-          <article key={`${item.skill}-${index}`} className="overflow-hidden rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)]">
+          <article key={`${item.skill}-${index}`} className={`overflow-hidden rounded-[2rem] border transition-all ${isExpanded ? 'border-[var(--accent)]/30 shadow-[0_4px_20px_rgba(78,222,163,0.06)] bg-[var(--panel)]' : 'border-[var(--border)] bg-[var(--panel-soft)] hover:border-[var(--accent)]/20'}`}>
             <button
               type="button"
               onClick={() => setExpandedIndex(isExpanded ? -1 : index)}
-              className="flex w-full flex-col gap-3 p-5 text-left transition hover:bg-black/5 dark:hover:bg-white/[0.03]"
+              className="flex w-full flex-col gap-4 p-6 text-left transition-colors"
             >
               <div className="flex items-center justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-lg font-semibold text-[var(--text)]">{item.skill}</p>
-                  {missingSkill ? <p className="mt-1 text-sm leading-6 text-[var(--muted-strong)]">{missingSkill}</p> : null}
+                <div className="flex items-center gap-4 min-w-0">
+                  <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border transition-colors ${isExpanded ? 'bg-[var(--accent)] border-[var(--accent)] text-[#003824]' : 'bg-[var(--panel)] border-[var(--border)] text-[var(--accent-strong)]'}`}>
+                    <span className="material-symbols-outlined text-[20px]">school</span>
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-lg font-black text-[var(--text)]">{item.skill}</p>
+                    {missingSkill ? <p className="mt-1 text-sm leading-relaxed text-[var(--muted-strong)] truncate">{missingSkill}</p> : null}
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-shrink-0">
                   {daysRequired ? (
-                    <span className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-1 text-[10px] uppercase tracking-[0.18em] text-[var(--muted-strong)]">
-                      {daysRequired} days
+                    <span className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-1 text-[10px] uppercase tracking-[0.18em] font-bold text-[var(--muted-strong)]">
+                      {daysRequired}d
                     </span>
                   ) : null}
-                  <span className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.18em] ${hourColors.badge}`}>{hours || 0}h</span>
+                  <span className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.18em] font-bold ${hourColors.badge}`}>{hours || 0}h</span>
+                  <span className={`material-symbols-outlined transition-transform duration-300 text-[var(--muted)] ${isExpanded ? 'rotate-180' : ''}`}>expand_more</span>
                 </div>
               </div>
               <div>
-                <div className="mb-1 flex justify-between text-[10px] uppercase tracking-[0.2em] text-[var(--muted)]">
+                <div className="mb-1.5 flex justify-between text-[10px] uppercase tracking-[0.2em] font-bold text-[var(--muted)]">
                   <span>Time investment</span>
                   <span className={hourColors.label}>{hours || 0} hours</span>
                 </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-[var(--panel-strong)]">
-                  <div className={`h-full rounded-full ${hourColors.bar}`} style={{ width: `${barWidth}%` }} />
+                <div className="h-2 overflow-hidden rounded-full bg-[var(--panel-strong)]">
+                  <div className={`h-full rounded-full ${hourColors.bar} transition-all duration-500`} style={{ width: `${barWidth}%` }} />
                 </div>
               </div>
             </button>
 
             {isExpanded ? (
-              <div className="space-y-5 border-t border-[var(--border)] p-5">
+              <div className="space-y-6 border-t border-[var(--border)] p-6 animate-in slide-in-from-top-2 duration-200">
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4">
-                    <p className="mt-3 text-sm leading-7 text-[var(--text)]">{missingSkill || 'No missing-skill summary was returned.'}</p>
+                  <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-5 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-amber-500/50 rounded-r" />
+                    <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-[var(--muted)] mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-[14px]">psychology</span>Skill Gap</p>
+                    <p className="text-sm leading-relaxed text-[var(--text)]">{missingSkill || 'No missing-skill summary was returned.'}</p>
                   </div>
-                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4">
-                    <p className="app-field-label">Days required</p>
-                    <p className="mt-3 text-sm leading-7 text-[var(--text)]">{daysRequired ? `${daysRequired} days` : 'No estimate returned'}</p>
+                  <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-5 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-1 h-full bg-[var(--accent)]/50 rounded-r" />
+                    <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-[var(--muted)] mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-[14px]">calendar_month</span>Duration</p>
+                    <p className="text-sm leading-relaxed text-[var(--text)]">{daysRequired ? `${daysRequired} days estimated` : 'No estimate returned'}</p>
                   </div>
                 </div>
 
                 <div>
-                  <h4 className="app-field-label">References</h4>
-                  <div className="mt-3 grid gap-2">
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--accent)]/10 border border-[var(--accent)]/20"><span className="material-symbols-outlined text-[14px] text-[var(--accent-strong)]">link</span></span>
+                    <h4 className="text-[10px] uppercase tracking-[0.2em] font-bold text-[var(--muted)]">References</h4>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
                     {resources.length ? (
                       resources.map((resource, resourceIndex) => (
                         <a
@@ -599,14 +668,14 @@ function LearningPathView({ content }) {
                           href={resource.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="flex flex-col gap-1 rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 transition hover:border-[var(--accent)]"
+                          className="group/ref flex flex-col gap-2 rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-4 transition-all hover:border-[var(--accent)]/40 hover:shadow-[0_4px_15px_rgba(78,222,163,0.06)]"
                         >
                           <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="text-sm font-medium text-[var(--text)]">{resource.title || 'Untitled reference'}</p>
+                              <p className="text-sm font-bold text-[var(--text)] group-hover/ref:text-[var(--accent-strong)] transition-colors">{resource.title || 'Untitled reference'}</p>
                               <p className="mt-1 text-xs text-[var(--muted)]">{SOURCE_LABELS[resource.type] || resource.type || 'Reference'}</p>
                             </div>
-                            <span className={`rounded-full px-2 py-0.5 text-[9px] uppercase tracking-[0.15em] ${resource.free ? 'bg-emerald-500/10 text-emerald-300' : 'bg-amber-500/10 text-amber-300'}`}>
+                            <span className={`flex-shrink-0 rounded-full px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.15em] ${resource.free ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'}`}>
                               {resource.free ? 'Free' : 'Paid'}
                             </span>
                           </div>
@@ -620,27 +689,33 @@ function LearningPathView({ content }) {
                 </div>
 
                 <div>
-                  <h4 className="app-field-label">7 day bootcamp</h4>
-                  <div className="mt-3 grid gap-2">
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-500/10 border border-violet-500/20"><span className="material-symbols-outlined text-[14px] text-violet-400">fitness_center</span></span>
+                    <h4 className="text-[10px] uppercase tracking-[0.2em] font-bold text-[var(--muted)]">7 Day Bootcamp</h4>
+                  </div>
+                  <div className="grid gap-3">
                     {dayPlan.length ? (
                       dayPlan.map((day, dayIndex) => (
-                        <div key={`${day.day || dayIndex}-${dayIndex}`} className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3">
-                          <div className="flex items-start gap-3">
-                            <span className="rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--accent-strong)]">
-                              Day {day.day || dayIndex + 1}
+                        <div key={`${day.day || dayIndex}-${dayIndex}`} className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-4 transition-all hover:border-violet-500/20">
+                          <div className="flex items-start gap-4">
+                            <span className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-violet-500/10 border border-violet-500/20 font-mono text-[10px] font-black text-violet-400">
+                              D{day.day || dayIndex + 1}
                             </span>
-                            <div className="flex-1">
-                              <p className="text-sm font-medium text-[var(--text)]">{day.focus || day.goal || 'Study block'}</p>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-bold text-[var(--text)]">{day.focus || day.goal || 'Study block'}</p>
                               {day.tasks?.length ? (
-                                <div className="mt-2 space-y-1">
+                                <div className="mt-2 space-y-1.5">
                                   {day.tasks.map((task, taskIndex) => (
-                                    <p key={`${task}-${taskIndex}`} className="text-xs leading-5 text-[var(--muted-strong)]">{task}</p>
+                                    <p key={`${task}-${taskIndex}`} className="text-xs leading-5 text-[var(--muted-strong)] flex items-start gap-2">
+                                      <span className="text-[var(--accent)] mt-0.5">›</span>
+                                      {task}
+                                    </p>
                                   ))}
                                 </div>
                               ) : null}
-                              {day.practice_question ? <p className="mt-2 text-xs leading-5 text-[var(--accent-strong)]">{day.practice_question}</p> : null}
+                              {day.practice_question ? <p className="mt-2 text-xs leading-5 font-semibold text-[var(--accent-strong)]">{day.practice_question}</p> : null}
                             </div>
-                            {day.duration_minutes ? <span className="text-[10px] text-[var(--muted)]">{day.duration_minutes}m</span> : null}
+                            {day.duration_minutes ? <span className="text-[10px] font-bold text-[var(--muted)] bg-[var(--panel)] px-2 py-1 rounded-full">{day.duration_minutes}m</span> : null}
                           </div>
                         </div>
                       ))
@@ -651,21 +726,25 @@ function LearningPathView({ content }) {
                 </div>
 
                 <div>
-                  <h4 className="app-field-label">Project suggestions</h4>
-                  <div className="mt-3 grid gap-3">
+                  <div className="flex items-center gap-3 mb-4">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-sky-500/10 border border-sky-500/20"><span className="material-symbols-outlined text-[14px] text-sky-400">build</span></span>
+                    <h4 className="text-[10px] uppercase tracking-[0.2em] font-bold text-[var(--muted)]">Project Suggestions</h4>
+                  </div>
+                  <div className="grid gap-3">
                     {item.projects?.length ? (
                       item.projects.map((project, projectIndex) => (
-                        <div key={`${project.title}-${projectIndex}`} className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4">
-                          <p className="text-sm font-semibold text-[var(--text)]">{project.title}</p>
-                          <p className="mt-2 text-sm leading-6 text-[var(--muted-strong)]">{project.description}</p>
+                        <div key={`${project.title}-${projectIndex}`} className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-5 transition-all hover:border-sky-500/20">
+                          <p className="text-sm font-bold text-[var(--text)]">{project.title}</p>
+                          <p className="mt-2 text-sm leading-relaxed text-[var(--muted-strong)]">{project.description}</p>
                           {project.github_search ? (
                             <a
                               href={`https://github.com/search?q=${encodeURIComponent(project.github_search)}&type=repositories`}
                               target="_blank"
                               rel="noreferrer"
-                              className="mt-3 inline-flex rounded-full border border-[var(--border)] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--accent-strong)] transition hover:border-[var(--accent)]"
+                              className="mt-3 inline-flex items-center gap-2 rounded-full border border-[var(--border)] px-4 py-1.5 text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--accent-strong)] transition-all hover:border-[var(--accent)] hover:bg-[var(--accent)]/5"
                             >
-                              Open GitHub references
+                              <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                              GitHub References
                             </a>
                           ) : null}
                         </div>
@@ -677,12 +756,15 @@ function LearningPathView({ content }) {
                 </div>
 
                 <div>
-                  <div className="mb-3 flex items-center justify-between gap-3">
-                    <h4 className="app-field-label">AI tutor prompt</h4>
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--accent)]/10 border border-[var(--accent)]/20"><span className="material-symbols-outlined text-[14px] text-[var(--accent-strong)]">smart_toy</span></span>
+                      <h4 className="text-[10px] uppercase tracking-[0.2em] font-bold text-[var(--muted)]">AI Tutor Prompt</h4>
+                    </div>
                     {tutorPrompt ? <CopyButton text={tutorPrompt} label="Copy prompt" /> : null}
                   </div>
-                  <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4">
-                    <pre className="whitespace-pre-wrap text-xs leading-6 text-[var(--text)]">{tutorPrompt || 'No AI prompt was returned.'}</pre>
+                  <div className="rounded-xl border border-[var(--border)] bg-[#0d0e10] p-5 shadow-inner">
+                    <pre className="whitespace-pre-wrap text-xs leading-relaxed text-zinc-300 font-mono">{tutorPrompt || 'No AI prompt was returned.'}</pre>
                   </div>
                 </div>
               </div>
@@ -698,38 +780,47 @@ function OutreachView({ content }) {
   const [activeTab, setActiveTab] = useState('coldEmail');
   const { coldEmail, coverLetter } = parseOutreachContent(content);
   const tabs = [
-    { id: 'coldEmail', label: 'Cold email', value: coldEmail },
-    { id: 'coverLetter', label: 'Cover letter', value: coverLetter }
+    { id: 'coldEmail', label: 'Cold email', icon: 'mail', value: coldEmail },
+    { id: 'coverLetter', label: 'Cover letter', icon: 'draft', value: coverLetter }
   ].filter((tab) => tab.value);
   const activeValue = tabs.find((tab) => tab.id === activeTab)?.value || tabs[0]?.value || '';
+  const activeIcon = tabs.find((tab) => tab.id === activeTab)?.icon || tabs[0]?.icon || 'mail';
 
   if (!tabs.length) {
     return <EmptyState message="Cold email and cover letter content will appear here." />;
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-2">
+    <div className="space-y-5">
+      <div className="inline-flex gap-2 p-1.5 rounded-xl bg-[var(--panel-strong)] border border-[var(--border)]">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => setActiveTab(tab.id)}
-            className={`rounded-full border px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] ${activeTab === tab.id ? 'border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'border-[var(--border)] text-[var(--muted-strong)]'}`}
+            className={`inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-xs font-bold uppercase tracking-[0.18em] transition-all duration-300 ${activeTab === tab.id ? 'bg-[var(--accent)] text-[#003824] shadow-[0_0_15px_rgba(78,222,163,0.2)]' : 'text-[var(--muted-strong)] hover:text-[var(--text)] hover:bg-[var(--panel)]'}`}
           >
+            <span className="material-symbols-outlined text-[16px]">{tab.icon}</span>
             {tab.label}
           </button>
         ))}
       </div>
-      <div className="rounded-[1.5rem] border border-[var(--border)] bg-[#0f1011] p-5 text-zinc-200">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <p className="app-field-label">{activeTab === 'coverLetter' ? 'Cover letter' : 'Cold email'}</p>
-            <p className="mt-1 text-xs text-zinc-500">Showing the full backend response for this outreach asset.</p>
+      <div className="rounded-[2rem] border border-[var(--border)] bg-[#0d0e10] shadow-xl overflow-hidden">
+        <div className="flex items-center justify-between gap-4 border-b border-zinc-800 px-6 py-4">
+          <div className="flex items-center gap-3">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent)]/10 border border-[var(--accent)]/20">
+              <span className="material-symbols-outlined text-[16px] text-[var(--accent-strong)]">{activeIcon}</span>
+            </span>
+            <div>
+              <p className="text-sm font-bold text-zinc-200">{activeTab === 'coverLetter' ? 'Cover Letter' : 'Cold Email'}</p>
+              <p className="text-[10px] uppercase tracking-widest font-bold text-zinc-500">Generated output</p>
+            </div>
           </div>
           <CopyButton text={activeValue} label={`Copy ${activeTab === 'coverLetter' ? 'letter' : 'email'}`} />
         </div>
-        <pre className="whitespace-pre-wrap text-sm leading-7 text-zinc-200">{activeValue}</pre>
+        <div className="p-6">
+          <pre className="whitespace-pre-wrap text-sm leading-relaxed text-zinc-300 font-mono">{activeValue}</pre>
+        </div>
       </div>
     </div>
   );
@@ -798,98 +889,136 @@ function AnalysisHistoryCard({ analysis, isExpanded, onToggle, dispatch }) {
   const topMissingSkills = useMemo(() => (stage1?.keywordMismatches || []).map((item) => item.keyword).filter(Boolean).slice(0, 4), [stage1]);
 
   return (
-    <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel)] transition-all overflow-hidden flex flex-col">
-       <div className="flex flex-wrap items-center justify-between p-6 cursor-pointer hover:bg-[var(--panel-soft)]" onClick={onToggle}>
-         <div>
-            <p className="app-kicker">Saved analysis report</p>
-            <h3 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[var(--text)] transition-colors">{analysis.companyName || stage1?.companyName || 'Role analysis'}</h3>
-            <p className="mt-2 text-sm text-[var(--muted-strong)]">{stage1?.jobTitle || analysis.jobTitle || 'Analysis'} - {new Date(analysis.createdAt).toLocaleString()}</p>
-         </div>
-         <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-               <span className="text-[24px] font-bold text-[var(--accent)]">{scoreValue}%</span>
-               <span className="text-[10px] uppercase tracking-wider text-[var(--muted)]">Match</span>
+    <div className={`group rounded-[2rem] border transition-all overflow-hidden flex flex-col ${isExpanded ? 'border-[var(--accent)]/50 shadow-[0_0_40px_rgba(78,222,163,0.05)] bg-[var(--panel)]' : 'border-[var(--border)] bg-[var(--panel)] hover:border-[var(--accent)]/30 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] hover:-translate-y-0.5'}`}>
+       <div className="flex flex-col sm:flex-row sm:items-center justify-between p-6 sm:p-8 cursor-pointer relative" onClick={onToggle}>
+         <div className="absolute inset-0 bg-gradient-to-r from-[var(--accent)]/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none" />
+         <div className="relative z-10 flex-1 min-w-0 pr-4">
+            <div className="flex items-center gap-3 mb-2">
+               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)]">
+                  <span className="material-symbols-outlined text-[14px]">analytics</span>
+               </span>
+               <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-[var(--muted-strong)]">Saved sequence</p>
             </div>
-            <button type="button" onClick={(e) => { e.stopPropagation(); dispatch(removeAnalysisRecord({ id: analysis.id, localId: analysis.localId })); }} className="app-button-secondary !py-2 !px-4 !text-red-500 hover:!bg-red-500/10 hover:!border-red-500/20">Delete</button>
-            <button
-              type="button"
-              className="ml-1 flex h-10 w-10 items-center justify-center rounded-full hover:bg-[var(--panel-soft)] transition-colors focus:outline-none"
-              aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
-            >
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`transform transition-transform duration-300 text-[var(--muted-strong)] ${isExpanded ? 'rotate-180' : ''}`}>
-                <path d="m6 9 6 6 6-6"/>
-              </svg>
-            </button>
+            <h3 className="text-2xl font-black tracking-tight text-[var(--text)] truncate">{analysis.companyName || stage1?.companyName || 'Role Analysis'}</h3>
+            <p className="mt-1 text-sm font-medium text-[var(--muted-strong)] truncate">
+              <span className="text-[var(--text)]">{stage1?.jobTitle || analysis.jobTitle || 'Target Role'}</span>
+              <span className="mx-2 opacity-30">•</span>
+              <span className="font-mono text-xs">{new Date(analysis.createdAt).toLocaleString()}</span>
+            </p>
+         </div>
+         
+         <div className="relative z-10 flex items-center gap-6 mt-4 sm:mt-0 pl-4 sm:border-l border-[var(--border)]">
+            <div className="flex flex-col items-end justify-center">
+               <span className="text-[10px] uppercase tracking-wider text-[var(--muted)] font-bold mb-0.5">Match score</span>
+               <div className="flex items-baseline gap-1">
+                 <span className="text-3xl font-black text-[var(--accent)]">{scoreValue}</span>
+                 <span className="text-sm font-bold text-[var(--accent)]">%</span>
+               </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+               <button 
+                  type="button" 
+                  onClick={(e) => { e.stopPropagation(); dispatch(removeAnalysisRecord({ id: analysis.id, localId: analysis.localId })); }} 
+                  className="flex h-10 w-10 items-center justify-center rounded-full text-[var(--muted-strong)] hover:bg-rose-500/10 hover:text-rose-400 transition-colors opacity-0 group-hover:opacity-100 focus:opacity-100"
+                  aria-label="Delete record"
+               >
+                  <span className="material-symbols-outlined text-[18px]">delete</span>
+               </button>
+               
+               <div className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors ${isExpanded ? 'bg-[var(--accent)] text-[#003824]' : 'bg-[var(--panel-strong)] text-[var(--text)] group-hover:bg-[var(--accent-soft)] group-hover:text-[var(--accent-strong)]'}`}>
+                 <span className={`material-symbols-outlined transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
+                   expand_more
+                 </span>
+               </div>
+            </div>
          </div>
        </div>
 
        {isExpanded && (
-         <div className="border-t border-[var(--border)] p-8 bg-[var(--panel-soft)] space-y-8 animate-in fade-in zoom-in-95 duration-200">
-            <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
-              <div className="flex flex-col items-center justify-center">
-                <ScoreRing value={scoreValue} />
-              </div>
-
-              <div className="flex-1 space-y-5">
-                <div>
-                  <p className="app-kicker">Analysis summary</p>
-                  <h2 className="mt-2 text-2xl font-black tracking-[-0.03em] text-[var(--text)]">
-                    {stage1?.companyName || 'Target role'}
-                  </h2>
-                  <p className="mt-3 text-sm leading-7 text-[var(--muted-strong)]">
-                    {analysis.summary || stage1?.summary || 'No summary generated.'}
-                  </p>
+         <div className="relative border-t border-[var(--border)] p-6 sm:p-10 bg-[var(--panel-soft)] overflow-hidden animate-in slide-in-from-top-2 duration-300">
+            <div className="absolute top-0 right-0 p-32 bg-[radial-gradient(circle_at_top_right,rgba(78,222,163,0.08),transparent_60%)] pointer-events-none" />
+            
+            <div className="relative z-10 space-y-10">
+              <div className="flex flex-col lg:flex-row gap-10 lg:items-center">
+                <div className="flex-shrink-0 flex items-center justify-center">
+                  <ScoreRing value={scoreValue} />
                 </div>
 
-                <div className="space-y-4">
-                  <SummaryMetric label="Hard skills" value={skillsCoverage} />
-                  <SummaryMetric label="Experience" value={seniorityScore} tone={seniorityScore < 55 ? 'warning' : 'accent'} />
-                  <SummaryMetric label="Keywords" value={keywordScore} tone={keywordScore < 55 ? 'warning' : 'accent'} />
-                </div>
-
-                <div className="flex flex-wrap gap-2 border-t border-[var(--border)] pt-5">
-                  {(matchedSkills.length ? matchedSkills : topMissingSkills).slice(0, 6).map((skill) => (
-                    <span key={skill} className="rounded-md border border-[var(--border)] bg-[var(--panel)] px-3 py-1 font-mono text-[11px] text-[var(--accent-strong)]">
-                      {skill}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            {precheck && !precheck.canProceed ? (
-              <div className="rounded-[1.5rem] border border-[var(--danger-border)] bg-[var(--danger-soft)] p-6">
-                <p className="app-kicker">Compatibility check</p>
-                <h3 className="mt-2 text-xl font-bold text-[var(--text)]">{precheck.score}/100 compatibility</h3>
-                <p className="mt-3 text-sm leading-7 text-[var(--muted-strong)]">{precheck.reason}</p>
-              </div>
-            ) : null}
-
-            {precheck?.canProceed || stage1 || stage2 || stage3 ? (
-              <div className="mt-8">
-                <div className="flex flex-wrap gap-3">
-                  {INSIGHT_TABS.map((tab) => (
-                    <FeatureButton
-                      key={tab.id}
-                      active={selectedTab === tab.id}
-                      ready={readyTabs[tab.id]}
-                      label={tab.label}
-                      shortLabel={tab.shortLabel}
-                      onClick={() => setSelectedTab(tab.id)}
-                    />
-                  ))}
-                </div>
-
-                <div className="mt-6 rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel)] p-6">
-                  <div className="mb-6">
-                    <p className="app-kicker">Selected insight</p>
-                    <h3 className="mt-2 text-xl font-bold text-[var(--text)]">{INSIGHT_TABS.find((tab) => tab.id === selectedTab)?.label}</h3>
+                <div className="flex-1 min-w-0 space-y-6">
+                  <div>
+                    <p className="app-kicker flex items-center gap-2">
+                       <span className="material-symbols-outlined text-[16px]">summarize</span>
+                       Executive Brief
+                    </p>
+                    <h2 className="mt-2 text-3xl font-black tracking-tight text-[var(--text)]">
+                      {stage1?.companyName || 'Target Organization'}
+                    </h2>
+                    <p className="mt-3 text-base leading-relaxed text-[var(--muted-strong)] max-w-2xl">
+                      {analysis.summary || stage1?.summary || 'No summary generated.'}
+                    </p>
                   </div>
 
-                  <InsightContent selectedTab={selectedTab} stage1={stage1} stage2={stage2} stage3={stage3} loadingStates={loadingStates} />
+                  <div className="grid gap-6 sm:grid-cols-3 pt-6 border-t border-[var(--border)]">
+                    <SummaryMetric label="Hard skills" value={skillsCoverage} />
+                    <SummaryMetric label="Experience" value={seniorityScore} tone={seniorityScore < 55 ? 'warning' : 'accent'} />
+                    <SummaryMetric label="Keywords" value={keywordScore} tone={keywordScore < 55 ? 'warning' : 'accent'} />
+                  </div>
+
+                  {matchedSkills.length > 0 || topMissingSkills.length > 0 ? (
+                    <div className="flex flex-wrap gap-2 pt-2">
+                      {(matchedSkills.length ? matchedSkills : topMissingSkills).slice(0, 8).map((skill) => (
+                        <span key={skill} className="rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 font-mono text-[11px] font-semibold text-[var(--accent-strong)] shadow-sm">
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               </div>
-            ) : null}
+
+              {precheck && !precheck.canProceed ? (
+                <div className="rounded-[1.5rem] border border-[var(--danger-border)] bg-[var(--danger-soft)] p-6 shadow-inner">
+                  <p className="app-kicker flex items-center gap-2 text-rose-300">
+                     <span className="material-symbols-outlined text-[16px]">block</span>
+                     Compatibility check
+                  </p>
+                  <h3 className="mt-2 text-2xl font-bold text-[var(--text)]">{precheck.score}/100 compatibility</h3>
+                  <p className="mt-3 text-base leading-relaxed text-[var(--muted-strong)]">{precheck.reason}</p>
+                </div>
+              ) : null}
+
+              {precheck?.canProceed || stage1 || stage2 || stage3 ? (
+                <div className="pt-2">
+                  <div className="flex flex-wrap gap-3 p-1.5 rounded-2xl bg-[var(--panel-strong)]/50 backdrop-blur-sm border border-[var(--border)] mb-8 w-fit max-w-full overflow-x-auto">
+                    {INSIGHT_TABS.map((tab) => (
+                      <FeatureButton
+                        key={tab.id}
+                        active={selectedTab === tab.id}
+                        ready={readyTabs[tab.id]}
+                        label={tab.label}
+                        shortLabel={tab.shortLabel}
+                        onClick={() => setSelectedTab(tab.id)}
+                      />
+                    ))}
+                  </div>
+
+                  <div className="rounded-[2rem] border border-[var(--border)] bg-[var(--panel)] p-6 sm:p-8 shadow-xl">
+                    <div className="mb-8 border-b border-[var(--border)] pb-4 flex items-center gap-3">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)]">
+                         <span className="material-symbols-outlined text-[16px]">visibility</span>
+                      </span>
+                      <div>
+                        <h3 className="text-xl font-black text-[var(--text)] tracking-tight">{INSIGHT_TABS.find((tab) => tab.id === selectedTab)?.label}</h3>
+                        <p className="text-xs font-semibold uppercase tracking-widest text-[var(--muted)]">Active Module</p>
+                      </div>
+                    </div>
+
+                    <InsightContent selectedTab={selectedTab} stage1={stage1} stage2={stage2} stage3={stage3} loadingStates={loadingStates} />
+                  </div>
+                </div>
+              ) : null}
+            </div>
          </div>
        )}
     </div>
