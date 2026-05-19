@@ -328,7 +328,7 @@ export default function AuthPermanent() {
       await loginWithGoogleRequest(credential, store);
       navigate('/dashboard', { replace: true });
     } catch (error) {
-      setErrorMessage(error.response?.data?.message || 'Google login failed.');
+      setErrorMessage(error.response?.data?.message || error.message || 'Google login failed.');
     } finally {
       setIsSubmitting(false);
     }

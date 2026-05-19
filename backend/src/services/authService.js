@@ -430,18 +430,15 @@ export async function registerWithPassword({ db, email, password, name }) {
   const normalizedEmail = email.trim().toLowerCase();
   const existingUser = await findUserByEmail(db, normalizedEmail);
 
-  if (existingUser?.passwordHash) {
+  if (existingUser) {
     throw createAuthError('An account with this email already exists.', 409, 'EMAIL_ALREADY_EXISTS');
   }
 
-  const user =
-    existingUser && !existingUser.passwordHash
-      ? await updatePasswordUser(db, existingUser, password)
-      : await createPasswordUser(db, {
-          email: normalizedEmail,
-          password,
-          name
-        });
+  const user = await createPasswordUser(db, {
+    email: normalizedEmail,
+    password,
+    name
+  });
 
   const verificationResult = await sendEmailVerification({ db, user });
 
@@ -487,7 +484,7 @@ export async function loginWithGoogle({ db, credential, request }) {
 
   const payload = await response.json();
 
-  if (payload.email_verified !== 'true' || !payload.email || !isGoogleIssuer(payload)) {
+  if (String(payload.email_verified) !== 'true' || !payload.email || !isGoogleIssuer(payload)) {
     throw createAuthError('Google account email could not be verified.', 401, 'GOOGLE_EMAIL_NOT_VERIFIED');
   }
 
@@ -569,7 +566,7 @@ export async function requestPasswordReset({ db, email }) {
 
   const user = await findUserByEmail(db, email.trim().toLowerCase());
 
-  if (!user?.passwordHash) {
+  if (!user) {
     return {
       sent: true
     };
