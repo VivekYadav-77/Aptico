@@ -4,24 +4,44 @@ import React, { useState, useRef, useCallback } from 'react';
 function normalizeUrl(u) { return u && !u.startsWith('http') ? `https://${u}` : u || ''; }
 function strip(u) { return (u || '').replace(/^https?:\/\//, ''); }
 
+function pick(a, b) { return a?.length ? a : b?.length ? b : []; }
+
 function useResumeData(profile, educationEntries) {
-  const es = profile.enriched_settings || profile;
+  const es = profile.enriched_settings || {};
   const fullName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'Your Name';
+  const headline = profile.headline || profile.currentTitle || '';
   const contact = [profile.email, profile.phone, profile.location].filter(Boolean);
   const links = [
     profile.linkedin ? `LinkedIn: ${strip(profile.linkedin)}` : null,
     profile.github ? `GitHub: ${strip(profile.github)}` : null,
     profile.portfolio ? `Portfolio: ${strip(profile.portfolio)}` : null,
   ].filter(Boolean);
-  const experiences = (es.experiences || []).length ? es.experiences
+  const expRaw = pick(es.experiences, profile.experiences);
+  const experiences = expRaw.length ? expRaw
     : profile.currentCompany ? [{ title: profile.currentTitle, company: profile.currentCompany, endDate: 'Present', description: profile.achievements?.join('. ') || '' }] : [];
   const education = educationEntries?.length ? educationEntries
     : profile.school ? [{ school: profile.school, degree: profile.degree, field: profile.fieldOfStudy, endYear: profile.graduationYear }] : [];
-  const skills = [...new Set([...(es.topSkills || []), ...(es.tools || []), ...(es.languages || [])])];
-  const licenses = es.licenses || [];
-  const awards = es.honorsAwards || [];
+  const skills = [...new Set([
+    ...pick(es.topSkills, profile.topSkills),
+    ...pick(es.tools, profile.tools),
+    ...pick(es.languages, profile.languages),
+  ])];
+  const licenses = pick(es.licenses, profile.licenses);
+  const awards = pick(es.honorsAwards, profile.honorsAwards);
   const bio = es.bio || profile.bio || '';
-  return { fullName, contact, links, experiences, education, skills, licenses, awards, bio };
+  const featured = pick(es.featured, profile.featured);
+  return { fullName, headline, contact, links, experiences, education, skills, licenses, awards, bio, featured };
+}
+
+/* ── shared date range ── */
+function dateRange(start, end, isCurrent) {
+  return [start, isCurrent ? 'Present' : end].filter(Boolean).join(' \u2013 ');
+}
+
+/* ── bullet-split description lines ── */
+function bulletLines(desc) {
+  if (!desc) return [];
+  return desc.split('\n').filter(l => l.trim()).map(l => l.trim().replace(/^•\s*/, ''));
 }
 
 /* ─────────────────────────────────────────────
@@ -32,6 +52,7 @@ function ExecutiveTemplate({ data }) {
     page: { fontFamily: 'Arial, Helvetica, sans-serif', color: '#222', fontSize: '11pt', lineHeight: '1.45', padding: '40px 48px', maxWidth: '800px', margin: '0 auto', background: '#fff' },
     header: { background: '#1e293b', color: '#fff', margin: '-40px -48px 24px', padding: '32px 48px' },
     name: { fontSize: '22pt', fontWeight: 800, letterSpacing: '-0.02em', margin: 0 },
+    headline: { fontSize: '11pt', color: '#94a3b8', fontWeight: 400, margin: '4px 0 0' },
     contactRow: { marginTop: 8, fontSize: '9.5pt', color: '#cbd5e1', display: 'flex', flexWrap: 'wrap', gap: '6px 14px' },
     sectionTitle: { fontSize: '11pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', borderBottom: '2px solid #1e293b', paddingBottom: 4, marginTop: 22, marginBottom: 10, color: '#1e293b' },
     expTitle: { fontWeight: 700, fontSize: '11.5pt', margin: 0 },
@@ -46,6 +67,7 @@ function ExecutiveTemplate({ data }) {
     <div style={s.page}>
       <header style={s.header}>
         <h1 style={s.name}>{data.fullName}</h1>
+        {data.headline && <p style={s.headline}>{data.headline}</p>}
         <div style={s.contactRow}>
           {[...data.contact, ...data.links].map((c, i) => <span key={i}>{c}</span>)}
         </div>
@@ -59,11 +81,11 @@ function ExecutiveTemplate({ data }) {
             <div key={i} style={{ marginBottom: 16 }}>
               <div style={s.expMeta}>
                 <h3 style={s.expTitle}>{exp.title || 'Role'}</h3>
-                <span style={{ fontSize: '10pt', whiteSpace: 'nowrap' }}>{[exp.startDate, exp.isCurrent ? 'Present' : exp.endDate].filter(Boolean).join(' – ')}</span>
+                <span style={{ fontSize: '10pt', whiteSpace: 'nowrap' }}>{dateRange(exp.startDate, exp.endDate, exp.isCurrent)}</span>
               </div>
-              <p style={s.expCompany}>{exp.company}</p>
-              {exp.description && exp.description.split('\n').filter(l => l.trim()).map((line, j) => (
-                <p key={j} style={s.bullet}>• {line.trim().replace(/^•\s*/, '')}</p>
+              <p style={s.expCompany}>{exp.company || 'Company'}</p>
+              {bulletLines(exp.description).map((line, j) => (
+                <p key={j} style={s.bullet}>• {line}</p>
               ))}
             </div>
           ))}
@@ -71,7 +93,7 @@ function ExecutiveTemplate({ data }) {
       )}
 
       {data.skills.length > 0 && (
-        <><h2 style={s.sectionTitle}>Skills &amp; Expertise</h2>
+        <><h2 style={s.sectionTitle}>Skills & Expertise</h2>
           <div>{data.skills.map((sk, i) => <span key={i} style={s.skillPill}>{sk}</span>)}</div>
         </>
       )}
@@ -82,9 +104,9 @@ function ExecutiveTemplate({ data }) {
             <div key={i} style={{ marginBottom: 10, display: 'flex', justifyContent: 'space-between' }}>
               <div>
                 <h3 style={{ ...s.expTitle, fontSize: '11pt' }}>{ed.school || 'Institution'}</h3>
-                <p style={{ ...s.expCompany, margin: 0 }}>{[ed.degree, ed.field].filter(Boolean).join(' in ')}</p>
+                <p style={{ ...s.expCompany, margin: 0 }}>{[ed.degree, ed.field].filter(Boolean).join(' in ') || 'Degree'}</p>
               </div>
-              <span style={{ fontSize: '10pt', whiteSpace: 'nowrap' }}>{[ed.startYear, ed.endYear].filter(Boolean).join(' – ')}</span>
+              <span style={{ fontSize: '10pt', whiteSpace: 'nowrap' }}>{[ed.startYear, ed.endYear].filter(Boolean).join(' \u2013 ')}</span>
             </div>
           ))}
         </>
@@ -102,7 +124,7 @@ function ExecutiveTemplate({ data }) {
       )}
 
       {data.awards.length > 0 && (
-        <><h2 style={s.sectionTitle}>Honors &amp; Awards</h2>
+        <><h2 style={s.sectionTitle}>Honors & Awards</h2>
           {data.awards.map((a, i) => (
             <div key={i} style={{ marginBottom: 8 }}>
               <div style={s.expMeta}><h3 style={{ ...s.expTitle, fontSize: '11pt' }}>{a.title}</h3><span style={{ fontSize: '10pt' }}>{a.date}</span></div>
@@ -117,94 +139,160 @@ function ExecutiveTemplate({ data }) {
 }
 
 /* ─────────────────────────────────────────────
-   TEMPLATE 2 — MODERN (Two-Column)
+   TEMPLATE 2 — MODERN (Professional Two-Column)
+   Polished, recruiter-ready layout with refined
+   typography, warm neutrals, and elegant spacing.
+   Uses table for reliable PDF rendering.
    ───────────────────────────────────────────── */
 function ModernTemplate({ data }) {
-  const accent = '#0d9488';
+  const accent = '#2563eb';
+  const accentLight = '#3b82f6';
+  const sidebar = '#1e293b';
+  const sidebarText = '#e2e8f0';
+  const bodyText = '#1e293b';
+
   const s = {
-    page: { fontFamily: "'Segoe UI', system-ui, sans-serif", fontSize: '10.5pt', color: '#1e293b', display: 'flex', minHeight: '100%', background: '#fff' },
-    sidebar: { width: '32%', background: '#0f172a', color: '#e2e8f0', padding: '36px 24px', flexShrink: 0 },
-    main: { flex: 1, padding: '36px 32px' },
-    sidebarName: { fontSize: '18pt', fontWeight: 800, color: '#fff', marginBottom: 4 },
-    sidebarHeadline: { fontSize: '10pt', color: accent, fontWeight: 600, marginBottom: 20 },
-    sideLabel: { fontSize: '8.5pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', color: accent, marginTop: 20, marginBottom: 8 },
-    sideItem: { fontSize: '9.5pt', color: '#cbd5e1', marginBottom: 5, wordBreak: 'break-word' },
-    sideSkill: { display: 'inline-block', background: 'rgba(13,148,136,0.15)', border: '1px solid rgba(13,148,136,0.3)', borderRadius: 4, padding: '2px 8px', fontSize: '9pt', color: '#5eead4', marginRight: 5, marginBottom: 5 },
-    mainSection: { fontSize: '10.5pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: accent, borderBottom: `2px solid ${accent}`, paddingBottom: 4, marginTop: 22, marginBottom: 12 },
+    page: { fontFamily: "'Calibri', 'Segoe UI', system-ui, sans-serif", fontSize: '10.5pt', color: bodyText, background: '#fff', width: '100%' },
+    table: { width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' },
+
+    // ── Full-width header band ──
+    headerBand: { background: sidebar, color: '#fff', padding: '34px 40px 28px' },
+    headerTable: { width: '100%', borderCollapse: 'collapse' },
+    headerLeft: { verticalAlign: 'bottom' },
+    headerRight: { verticalAlign: 'bottom', textAlign: 'right', paddingLeft: 24 },
+    name: { fontSize: '24pt', fontWeight: 800, letterSpacing: '-0.02em', margin: '0 0 2px', color: '#fff' },
+    headline: { fontSize: '11pt', fontWeight: 500, color: '#93c5fd', margin: '0 0 8px' },
+    contactInline: { fontSize: '9pt', color: '#94a3b8', lineHeight: 1.8 },
+    contactP: { margin: 0, fontSize: '9pt', color: '#94a3b8' },
+    linkColor: { color: '#93c5fd' },
+
+    // ── Sidebar cell ──
+    sidebarCell: { width: '35%', background: '#f8fafc', padding: '28px 22px', verticalAlign: 'top', borderRight: '1px solid #e2e8f0' },
+    sideLabel: { fontSize: '8pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: accent, margin: '0 0 8px', paddingBottom: 5, borderBottom: `2px solid ${accent}` },
+    sideLabelSpaced: { fontSize: '8pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: accent, margin: '22px 0 8px', paddingBottom: 5, borderBottom: `2px solid ${accent}` },
+    sideItem: { fontSize: '9.5pt', color: '#475569', margin: '0 0 4px', wordBreak: 'break-word', lineHeight: 1.5 },
+    skillTag: { display: 'inline-block', background: '#fff', border: '1px solid #cbd5e1', borderRadius: 4, padding: '3px 9px', fontSize: '8.5pt', color: '#334155', fontWeight: 600, marginRight: 5, marginBottom: 5 },
+
+    // ── Main cell ──
+    mainCell: { width: '65%', padding: '28px 32px', verticalAlign: 'top' },
+    mainSection: { fontSize: '9pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: accent, borderBottom: `2px solid ${accent}`, paddingBottom: 5, marginTop: 24, marginBottom: 12 },
+    firstMainSection: { fontSize: '9pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: accent, borderBottom: `2px solid ${accent}`, paddingBottom: 5, marginTop: 0, marginBottom: 12 },
     entryTitle: { fontWeight: 700, fontSize: '11pt', margin: 0, color: '#0f172a' },
-    entryMeta: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 },
-    entryCompany: { fontSize: '10pt', color: '#475569', fontWeight: 600, margin: 0 },
-    text: { fontSize: '10.5pt', color: '#334155', margin: '0 0 4px', lineHeight: 1.5 },
+    entryMeta: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 2 },
+    entryCompany: { fontSize: '10pt', color: accent, fontWeight: 600, margin: '1px 0 4px' },
+    dateTxt: { fontSize: '9pt', color: '#64748b', whiteSpace: 'nowrap' },
+    text: { fontSize: '10.5pt', color: '#334155', margin: '0 0 4px', lineHeight: 1.6 },
+    bulletText: { fontSize: '10pt', color: '#334155', margin: '0 0 3px', paddingLeft: 6, lineHeight: 1.55 },
   };
+
+  let isFirst = true;
+  function secStyle() {
+    if (isFirst) { isFirst = false; return s.firstMainSection; }
+    return s.mainSection;
+  }
 
   return (
     <div style={s.page}>
-      <aside style={s.sidebar}>
-        <h1 style={s.sidebarName}>{data.fullName}</h1>
-        <p style={s.sidebarHeadline}>Professional Profile</p>
+      {/* ── Full-width header ── */}
+      <div style={s.headerBand}>
+        <table style={s.headerTable}>
+          <tbody>
+            <tr>
+              <td style={s.headerLeft}>
+                <h1 style={s.name}>{data.fullName}</h1>
+                {data.headline ? <p style={s.headline}>{data.headline}</p> : <p style={s.headline}>Professional Profile</p>}
+              </td>
+              <td style={s.headerRight}>
+                {data.contact.map((c, i) => <p key={i} style={s.contactP}>{c}</p>)}
+                {data.links.map((l, i) => <p key={`l${i}`} style={{ ...s.contactP, color: '#93c5fd' }}>{l}</p>)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
 
-        {data.contact.length > 0 && (<><p style={s.sideLabel}>Contact</p>{data.contact.map((c, i) => <p key={i} style={s.sideItem}>{c}</p>)}</>)}
-        {data.links.length > 0 && (<><p style={s.sideLabel}>Links</p>{data.links.map((l, i) => <p key={i} style={s.sideItem}>{l}</p>)}</>)}
+      {/* ── Two-column body ── */}
+      <table style={s.table}>
+        <tbody>
+          <tr>
+            {/* ── Sidebar ── */}
+            <td style={s.sidebarCell}>
+              {data.skills.length > 0 && (
+                <><p style={s.sideLabel}>Core Skills</p>
+                  <div>{data.skills.map((sk, i) => <span key={i} style={s.skillTag}>{sk}</span>)}</div>
+                </>
+              )}
+            </td>
 
-        {data.skills.length > 0 && (
-          <><p style={s.sideLabel}>Skills</p><div>{data.skills.map((sk, i) => <span key={i} style={s.sideSkill}>{sk}</span>)}</div></>
-        )}
+            {/* ── Main Content ── */}
+            <td style={s.mainCell}>
+              {data.bio && (
+                <><h2 style={secStyle()}>Professional Summary</h2><p style={s.text}>{data.bio}</p></>
+              )}
 
-        {data.education.length > 0 && (
-          <><p style={s.sideLabel}>Education</p>
-            {data.education.map((ed, i) => (
-              <div key={i} style={{ marginBottom: 12 }}>
-                <p style={{ ...s.sideItem, fontWeight: 700, color: '#fff', marginBottom: 2 }}>{ed.school}</p>
-                <p style={s.sideItem}>{[ed.degree, ed.field].filter(Boolean).join(' in ')}</p>
-                <p style={{ ...s.sideItem, fontSize: '9pt', color: '#94a3b8' }}>{[ed.startYear, ed.endYear].filter(Boolean).join(' – ')}</p>
-              </div>
-            ))}
-          </>
-        )}
-      </aside>
+              {data.experiences.length > 0 && (
+                <><h2 style={secStyle()}>Professional Experience</h2>
+                  {data.experiences.map((exp, i) => (
+                    <div key={i} style={{ marginBottom: 18 }}>
+                      <div style={s.entryMeta}>
+                        <h3 style={s.entryTitle}>{exp.title || 'Role'}</h3>
+                        <span style={s.dateTxt}>{dateRange(exp.startDate, exp.endDate, exp.isCurrent)}</span>
+                      </div>
+                      <p style={s.entryCompany}>{exp.company || 'Company'}</p>
+                      {bulletLines(exp.description).map((line, j) => (
+                        <p key={j} style={s.bulletText}>{`\u2022 `}{line}</p>
+                      ))}
+                    </div>
+                  ))}
+                </>
+              )}
 
-      <main style={s.main}>
-        {data.bio && (<><h2 style={s.mainSection}>Summary</h2><p style={s.text}>{data.bio}</p></>)}
+              {data.education.length > 0 && (
+                <><h2 style={secStyle()}>Education</h2>
+                  {data.education.map((ed, i) => (
+                    <div key={i} style={{ marginBottom: 14 }}>
+                      <div style={s.entryMeta}>
+                        <h3 style={s.entryTitle}>{ed.school || 'Institution'}</h3>
+                        <span style={s.dateTxt}>{[ed.startYear, ed.endYear].filter(Boolean).join(' \u2013 ')}</span>
+                      </div>
+                      <p style={s.entryCompany}>{[ed.degree, ed.field].filter(Boolean).join(' in ') || 'Degree'}</p>
+                    </div>
+                  ))}
+                </>
+              )}
 
-        {data.experiences.length > 0 && (
-          <><h2 style={s.mainSection}>Experience</h2>
-            {data.experiences.map((exp, i) => (
-              <div key={i} style={{ marginBottom: 16 }}>
-                <div style={s.entryMeta}>
-                  <h3 style={s.entryTitle}>{exp.title}</h3>
-                  <span style={{ fontSize: '9.5pt', color: '#64748b', whiteSpace: 'nowrap' }}>{[exp.startDate, exp.isCurrent ? 'Present' : exp.endDate].filter(Boolean).join(' – ')}</span>
-                </div>
-                <p style={s.entryCompany}>{exp.company}</p>
-                {exp.description && exp.description.split('\n').filter(l => l.trim()).map((line, j) => (
-                  <p key={j} style={{ ...s.text, paddingLeft: 4 }}>• {line.trim().replace(/^•\s*/, '')}</p>
-                ))}
-              </div>
-            ))}
-          </>
-        )}
+              {data.licenses.length > 0 && (
+                <><h2 style={secStyle()}>Certifications</h2>
+                  {data.licenses.map((l, i) => (
+                    <div key={i} style={{ marginBottom: 12 }}>
+                      <div style={s.entryMeta}>
+                        <h3 style={s.entryTitle}>{l.name}</h3>
+                        <span style={s.dateTxt}>{l.issueDate}</span>
+                      </div>
+                      {l.issuingOrg && <p style={s.entryCompany}>{l.issuingOrg}</p>}
+                    </div>
+                  ))}
+                </>
+              )}
 
-        {data.licenses.length > 0 && (
-          <><h2 style={s.mainSection}>Certifications</h2>
-            {data.licenses.map((l, i) => (
-              <div key={i} style={{ marginBottom: 8 }}>
-                <div style={s.entryMeta}><h3 style={{ ...s.entryTitle, fontSize: '10.5pt' }}>{l.name}</h3><span style={{ fontSize: '9.5pt', color: '#64748b' }}>{l.issueDate}</span></div>
-                {l.issuingOrg && <p style={s.entryCompany}>{l.issuingOrg}</p>}
-              </div>
-            ))}
-          </>
-        )}
-
-        {data.awards.length > 0 && (
-          <><h2 style={s.mainSection}>Awards</h2>
-            {data.awards.map((a, i) => (
-              <div key={i} style={{ marginBottom: 8 }}>
-                <h3 style={{ ...s.entryTitle, fontSize: '10.5pt' }}>{a.title} {a.issuer ? `— ${a.issuer}` : ''}</h3>
-                {a.description && <p style={s.text}>{a.description}</p>}
-              </div>
-            ))}
-          </>
-        )}
-      </main>
+              {data.awards.length > 0 && (
+                <><h2 style={secStyle()}>Honors & Awards</h2>
+                  {data.awards.map((a, i) => (
+                    <div key={i} style={{ marginBottom: 12 }}>
+                      <div style={s.entryMeta}>
+                        <h3 style={s.entryTitle}>{a.title}</h3>
+                        <span style={s.dateTxt}>{a.date}</span>
+                      </div>
+                      {a.issuer && <p style={s.entryCompany}>{a.issuer}</p>}
+                      {a.description && <p style={s.text}>{a.description}</p>}
+                    </div>
+                  ))}
+                </>
+              )}
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   );
 }
@@ -215,7 +303,8 @@ function ModernTemplate({ data }) {
 function MinimalTemplate({ data }) {
   const s = {
     page: { fontFamily: 'Georgia, "Times New Roman", serif', fontSize: '11pt', color: '#111', padding: '44px 52px', maxWidth: '800px', margin: '0 auto', background: '#fff', lineHeight: 1.55 },
-    name: { fontSize: '26pt', fontWeight: 400, letterSpacing: '-0.01em', margin: '0 0 6px', color: '#000' },
+    name: { fontSize: '26pt', fontWeight: 400, letterSpacing: '-0.01em', margin: '0 0 4px', color: '#000' },
+    headline: { fontSize: '11pt', color: '#666', fontWeight: 400, fontStyle: 'italic', margin: '0 0 6px' },
     contactRow: { display: 'flex', flexWrap: 'wrap', gap: '4px 16px', fontSize: '9.5pt', color: '#555', marginBottom: 6 },
     hr: { border: 'none', borderTop: '1px solid #d1d5db', margin: '18px 0 14px' },
     sectionTitle: { fontSize: '10pt', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.14em', color: '#000', marginBottom: 10, marginTop: 0 },
@@ -230,6 +319,7 @@ function MinimalTemplate({ data }) {
   return (
     <div style={s.page}>
       <h1 style={s.name}>{data.fullName}</h1>
+      {data.headline && <p style={s.headline}>{data.headline}</p>}
       <div style={s.contactRow}>
         {[...data.contact, ...data.links].map((c, i) => <span key={i}>{c}</span>)}
       </div>
@@ -241,12 +331,12 @@ function MinimalTemplate({ data }) {
           {data.experiences.map((exp, i) => (
             <div key={i} style={{ marginBottom: 14 }}>
               <div style={s.entryWrap}>
-                <h3 style={s.entryTitle}>{exp.title}</h3>
-                <span style={s.dateTxt}>{[exp.startDate, exp.isCurrent ? 'Present' : exp.endDate].filter(Boolean).join(' – ')}</span>
+                <h3 style={s.entryTitle}>{exp.title || 'Role'}</h3>
+                <span style={s.dateTxt}>{dateRange(exp.startDate, exp.endDate, exp.isCurrent)}</span>
               </div>
-              <p style={s.entryCompany}>{exp.company}</p>
-              {exp.description && exp.description.split('\n').filter(l => l.trim()).map((line, j) => (
-                <p key={j} style={{ ...s.text, paddingLeft: 4 }}>• {line.trim().replace(/^•\s*/, '')}</p>
+              <p style={s.entryCompany}>{exp.company || 'Company'}</p>
+              {bulletLines(exp.description).map((line, j) => (
+                <p key={j} style={{ ...s.text, paddingLeft: 4 }}>• {line}</p>
               ))}
             </div>
           ))}
@@ -260,10 +350,10 @@ function MinimalTemplate({ data }) {
           {data.education.map((ed, i) => (
             <div key={i} style={{ marginBottom: 10 }}>
               <div style={s.entryWrap}>
-                <h3 style={{ ...s.entryTitle, fontSize: '11pt' }}>{ed.school}</h3>
-                <span style={s.dateTxt}>{[ed.startYear, ed.endYear].filter(Boolean).join(' – ')}</span>
+                <h3 style={{ ...s.entryTitle, fontSize: '11pt' }}>{ed.school || 'Institution'}</h3>
+                <span style={s.dateTxt}>{[ed.startYear, ed.endYear].filter(Boolean).join(' \u2013 ')}</span>
               </div>
-              <p style={s.entryCompany}>{[ed.degree, ed.field].filter(Boolean).join(' in ')}</p>
+              <p style={s.entryCompany}>{[ed.degree, ed.field].filter(Boolean).join(' in ') || 'Degree'}</p>
             </div>
           ))}
         </>
@@ -281,11 +371,12 @@ function MinimalTemplate({ data }) {
       )}
 
       {data.awards.length > 0 && (
-        <><hr style={s.hr} /><h2 style={s.sectionTitle}>Honors &amp; Awards</h2>
+        <><hr style={s.hr} /><h2 style={s.sectionTitle}>Honors & Awards</h2>
           {data.awards.map((a, i) => (
             <div key={i} style={{ marginBottom: 8 }}>
               <div style={s.entryWrap}><h3 style={{ ...s.entryTitle, fontSize: '10.5pt' }}>{a.title}</h3><span style={s.dateTxt}>{a.date}</span></div>
               {a.issuer && <p style={s.entryCompany}>{a.issuer}</p>}
+              {a.description && <p style={s.text}>{a.description}</p>}
             </div>
           ))}
         </>
@@ -295,12 +386,307 @@ function MinimalTemplate({ data }) {
 }
 
 /* ─────────────────────────────────────────────
+   TEMPLATE 4 — CREATIVE (Bold Gradient Accent)
+   ───────────────────────────────────────────── */
+function CreativeTemplate({ data }) {
+  const primary = '#6d28d9';
+  const primaryLight = '#a78bfa';
+  const bg = '#faf7ff';
+
+  const s = {
+    page: { fontFamily: "'Segoe UI', system-ui, sans-serif", fontSize: '10.5pt', color: '#1e1b4b', padding: '0', maxWidth: '800px', margin: '0 auto', background: '#fff' },
+    header: { background: `linear-gradient(135deg, ${primary} 0%, #7c3aed 50%, #a855f7 100%)`, color: '#fff', padding: '40px 48px 32px', position: 'relative' },
+    headerOverlay: { position: 'absolute', top: 0, right: 0, width: '200px', height: '100%', background: 'radial-gradient(circle at top right, rgba(255,255,255,0.12), transparent 70%)' },
+    name: { fontSize: '26pt', fontWeight: 800, letterSpacing: '-0.02em', margin: '0 0 4px', position: 'relative', zIndex: 1 },
+    headline: { fontSize: '12pt', fontWeight: 500, color: '#e9d5ff', margin: '0 0 14px', position: 'relative', zIndex: 1 },
+    contactRow: { display: 'flex', flexWrap: 'wrap', gap: '6px 18px', fontSize: '9.5pt', color: '#ddd6fe', position: 'relative', zIndex: 1 },
+    body: { padding: '28px 48px 40px', background: bg },
+    sectionTitle: { fontSize: '11pt', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: primary, margin: '24px 0 12px', paddingBottom: 6, borderBottom: `3px solid ${primaryLight}40`, display: 'flex', alignItems: 'center', gap: '10px' },
+    firstSectionTitle: { fontSize: '11pt', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: primary, margin: '0 0 12px', paddingBottom: 6, borderBottom: `3px solid ${primaryLight}40`, display: 'flex', alignItems: 'center', gap: '10px' },
+    sectionDot: { display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: `linear-gradient(135deg, ${primary}, ${primaryLight})` },
+    entryCard: { background: '#fff', border: '1px solid #e9d5ff', borderRadius: 10, padding: '14px 18px', marginBottom: 14, boxShadow: '0 1px 4px rgba(109,40,217,0.06)' },
+    entryTitle: { fontWeight: 700, fontSize: '11.5pt', margin: 0, color: '#1e1b4b' },
+    entryMeta: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 4 },
+    entryCompany: { fontSize: '10pt', color: primary, fontWeight: 600, margin: '2px 0 4px' },
+    text: { fontSize: '10.5pt', color: '#374151', margin: '0 0 4px', lineHeight: 1.55 },
+    bulletText: { fontSize: '10.5pt', color: '#374151', margin: '0 0 3px', paddingLeft: 6, lineHeight: 1.5 },
+    skillPill: { display: 'inline-block', background: `linear-gradient(135deg, ${primary}12, ${primaryLight}18)`, border: `1px solid ${primaryLight}40`, borderRadius: 20, padding: '4px 12px', fontSize: '9pt', color: primary, fontWeight: 600, marginRight: 6, marginBottom: 6 },
+    eduCard: { background: '#fff', borderLeft: `4px solid ${primary}`, borderRadius: '0 8px 8px 0', padding: '12px 16px', marginBottom: 12, boxShadow: '0 1px 3px rgba(109,40,217,0.05)' },
+    dateTxt: { fontSize: '9.5pt', color: '#7c3aed', whiteSpace: 'nowrap', fontWeight: 600 },
+  };
+
+  let isFirst = true;
+
+  return (
+    <div style={s.page}>
+      <header style={s.header}>
+        <div style={s.headerOverlay} />
+        <h1 style={s.name}>{data.fullName}</h1>
+        {data.headline && <p style={s.headline}>{data.headline}</p>}
+        <div style={s.contactRow}>
+          {[...data.contact, ...data.links].map((c, i) => <span key={i}>{c}</span>)}
+        </div>
+      </header>
+
+      <div style={s.body}>
+        {data.bio && (
+          <><h2 style={(() => { if (isFirst) { isFirst = false; return s.firstSectionTitle; } return s.sectionTitle; })()}><span style={s.sectionDot} /> Summary</h2>
+            <p style={{ ...s.text, background: '#fff', borderRadius: 10, padding: '14px 18px', border: '1px solid #e9d5ff', boxShadow: '0 1px 4px rgba(109,40,217,0.06)' }}>{data.bio}</p>
+          </>
+        )}
+
+        {data.experiences.length > 0 && (
+          <><h2 style={(() => { if (isFirst) { isFirst = false; return s.firstSectionTitle; } return s.sectionTitle; })()}><span style={s.sectionDot} /> Experience</h2>
+            {data.experiences.map((exp, i) => (
+              <div key={i} style={s.entryCard}>
+                <div style={s.entryMeta}>
+                  <h3 style={s.entryTitle}>{exp.title || 'Role'}</h3>
+                  <span style={s.dateTxt}>{dateRange(exp.startDate, exp.endDate, exp.isCurrent)}</span>
+                </div>
+                <p style={s.entryCompany}>{exp.company || 'Company'}</p>
+                {bulletLines(exp.description).map((line, j) => (
+                  <p key={j} style={s.bulletText}>• {line}</p>
+                ))}
+              </div>
+            ))}
+          </>
+        )}
+
+        {data.skills.length > 0 && (
+          <><h2 style={(() => { if (isFirst) { isFirst = false; return s.firstSectionTitle; } return s.sectionTitle; })()}><span style={s.sectionDot} /> Skills & Expertise</h2>
+            <div>{data.skills.map((sk, i) => <span key={i} style={s.skillPill}>{sk}</span>)}</div>
+          </>
+        )}
+
+        {data.education.length > 0 && (
+          <><h2 style={(() => { if (isFirst) { isFirst = false; return s.firstSectionTitle; } return s.sectionTitle; })()}><span style={s.sectionDot} /> Education</h2>
+            {data.education.map((ed, i) => (
+              <div key={i} style={s.eduCard}>
+                <div style={s.entryMeta}>
+                  <h3 style={{ ...s.entryTitle, fontSize: '11pt' }}>{ed.school || 'Institution'}</h3>
+                  <span style={s.dateTxt}>{[ed.startYear, ed.endYear].filter(Boolean).join(' \u2013 ')}</span>
+                </div>
+                <p style={{ ...s.entryCompany, color: '#6d28d9', margin: 0 }}>{[ed.degree, ed.field].filter(Boolean).join(' in ') || 'Degree'}</p>
+              </div>
+            ))}
+          </>
+        )}
+
+        {data.licenses.length > 0 && (
+          <><h2 style={s.sectionTitle}><span style={s.sectionDot} /> Certifications</h2>
+            {data.licenses.map((l, i) => (
+              <div key={i} style={{ ...s.entryCard, padding: '12px 18px' }}>
+                <div style={s.entryMeta}>
+                  <h3 style={{ ...s.entryTitle, fontSize: '10.5pt' }}>{l.name}</h3>
+                  <span style={s.dateTxt}>{l.issueDate}</span>
+                </div>
+                {l.issuingOrg && <p style={{ ...s.entryCompany, margin: 0 }}>{l.issuingOrg}</p>}
+              </div>
+            ))}
+          </>
+        )}
+
+        {data.awards.length > 0 && (
+          <><h2 style={s.sectionTitle}><span style={s.sectionDot} /> Honors & Awards</h2>
+            {data.awards.map((a, i) => (
+              <div key={i} style={{ ...s.entryCard, padding: '12px 18px' }}>
+                <div style={s.entryMeta}>
+                  <h3 style={{ ...s.entryTitle, fontSize: '10.5pt' }}>{a.title}</h3>
+                  <span style={s.dateTxt}>{a.date}</span>
+                </div>
+                {a.issuer && <p style={{ ...s.entryCompany, margin: 0 }}>{a.issuer}</p>}
+                {a.description && <p style={{ ...s.text, marginTop: 4 }}>{a.description}</p>}
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
+   TEMPLATE 5 — TECHNICAL (Developer-Focused)
+   ───────────────────────────────────────────── */
+function TechnicalTemplate({ data }) {
+  const green = '#10b981';
+  const greenDark = '#059669';
+  const dark = '#111827';
+  const codeBg = '#f8fafc';
+
+  const s = {
+    page: { fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace", fontSize: '10pt', color: dark, padding: '36px 44px', maxWidth: '800px', margin: '0 auto', background: '#fff', lineHeight: 1.55 },
+    headerBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: `3px solid ${dark}`, paddingBottom: 16, marginBottom: 24 },
+    name: { fontSize: '22pt', fontWeight: 800, letterSpacing: '-0.02em', margin: '0 0 4px', color: dark },
+    headline: { fontSize: '10.5pt', color: greenDark, fontWeight: 600, margin: '0 0 8px', fontFamily: "'Segoe UI', system-ui, sans-serif" },
+    contactBlock: { textAlign: 'right', fontSize: '9pt', color: '#6b7280', lineHeight: 1.7 },
+    contactItem: { margin: 0, fontSize: '9pt', color: '#6b7280' },
+    sectionWrap: { marginBottom: 20 },
+    sectionHeader: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, marginTop: 22 },
+    firstSectionHeader: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, marginTop: 0 },
+    sectionComment: { fontSize: '10pt', color: '#9ca3af', fontWeight: 400 },
+    sectionLabel: { fontSize: '10.5pt', fontWeight: 700, color: dark, textTransform: 'uppercase', letterSpacing: '0.06em' },
+    codeBlock: { background: codeBg, border: '1px solid #e5e7eb', borderRadius: 6, padding: '14px 18px', marginBottom: 12, fontFamily: "'SF Mono', 'Fira Code', 'Consolas', monospace" },
+    entryTitle: { fontWeight: 700, fontSize: '11pt', margin: 0, color: dark },
+    entryMeta: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 },
+    entryCompany: { fontSize: '10pt', color: greenDark, fontWeight: 600, margin: '2px 0 6px', fontFamily: "'Segoe UI', system-ui, sans-serif" },
+    text: { fontSize: '10pt', color: '#374151', margin: '0 0 4px', lineHeight: 1.55, fontFamily: "'Segoe UI', system-ui, sans-serif" },
+    bulletText: { fontSize: '10pt', color: '#374151', margin: '0 0 3px', paddingLeft: 6, lineHeight: 1.5, fontFamily: "'Segoe UI', system-ui, sans-serif" },
+    dateTxt: { fontSize: '9pt', color: '#9ca3af', whiteSpace: 'nowrap', fontFamily: "'SF Mono', monospace" },
+    skillGrid: { display: 'flex', flexWrap: 'wrap', gap: 6 },
+    skillChip: { display: 'inline-block', background: `${green}10`, border: `1px solid ${green}30`, borderRadius: 4, padding: '3px 10px', fontSize: '8.5pt', color: greenDark, fontWeight: 600, fontFamily: "'SF Mono', monospace" },
+    tag: { fontSize: '8pt', color: '#9ca3af', fontFamily: "'SF Mono', monospace", margin: 0, marginTop: 4 },
+    lineNum: { display: 'inline-block', width: 24, color: '#d1d5db', fontSize: '9pt', textAlign: 'right', marginRight: 12, userSelect: 'none', fontFamily: "'SF Mono', monospace" },
+  };
+
+  let isFirst = true;
+  function headerStyle() {
+    if (isFirst) { isFirst = false; return s.firstSectionHeader; }
+    return s.sectionHeader;
+  }
+
+  return (
+    <div style={s.page}>
+      {/* Header */}
+      <div style={s.headerBar}>
+        <div>
+          <h1 style={s.name}>{data.fullName}</h1>
+          {data.headline && <p style={s.headline}>{data.headline}</p>}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 14px', marginTop: 4 }}>
+            {data.links.map((l, i) => <span key={i} style={{ fontSize: '9pt', color: green }}>{l}</span>)}
+          </div>
+        </div>
+        <div style={s.contactBlock}>
+          {data.contact.map((c, i) => <p key={i} style={s.contactItem}>{c}</p>)}
+        </div>
+      </div>
+
+      {/* Summary */}
+      {data.bio && (
+        <div style={s.sectionWrap}>
+          <div style={headerStyle()}>
+            <span style={s.sectionComment}>{'// '}</span>
+            <span style={s.sectionLabel}>About</span>
+          </div>
+          <div style={s.codeBlock}>
+            <p style={s.text}>{data.bio}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Skills */}
+      {data.skills.length > 0 && (
+        <div style={s.sectionWrap}>
+          <div style={headerStyle()}>
+            <span style={s.sectionComment}>{'// '}</span>
+            <span style={s.sectionLabel}>Tech Stack</span>
+          </div>
+          <div style={s.skillGrid}>
+            {data.skills.map((sk, i) => <span key={i} style={s.skillChip}>{sk}</span>)}
+          </div>
+        </div>
+      )}
+
+      {/* Experience */}
+      {data.experiences.length > 0 && (
+        <div style={s.sectionWrap}>
+          <div style={headerStyle()}>
+            <span style={s.sectionComment}>{'// '}</span>
+            <span style={s.sectionLabel}>Experience</span>
+          </div>
+          {data.experiences.map((exp, i) => (
+            <div key={i} style={s.codeBlock}>
+              <div style={s.entryMeta}>
+                <h3 style={s.entryTitle}>{exp.title || 'Role'}</h3>
+                <span style={s.dateTxt}>{dateRange(exp.startDate, exp.endDate, exp.isCurrent)}</span>
+              </div>
+              <p style={s.entryCompany}>{exp.company || 'Company'}</p>
+              {bulletLines(exp.description).map((line, j) => (
+                <p key={j} style={s.bulletText}>
+                  <span style={s.lineNum}>{j + 1}</span>
+                  {line}
+                </p>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Education */}
+      {data.education.length > 0 && (
+        <div style={s.sectionWrap}>
+          <div style={headerStyle()}>
+            <span style={s.sectionComment}>{'// '}</span>
+            <span style={s.sectionLabel}>Education</span>
+          </div>
+          {data.education.map((ed, i) => (
+            <div key={i} style={{ ...s.codeBlock, padding: '12px 18px' }}>
+              <div style={s.entryMeta}>
+                <h3 style={{ ...s.entryTitle, fontSize: '10.5pt' }}>{ed.school || 'Institution'}</h3>
+                <span style={s.dateTxt}>{[ed.startYear, ed.endYear].filter(Boolean).join(' \u2013 ')}</span>
+              </div>
+              <p style={{ ...s.entryCompany, margin: 0 }}>{[ed.degree, ed.field].filter(Boolean).join(' in ') || 'Degree'}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Certifications */}
+      {data.licenses.length > 0 && (
+        <div style={s.sectionWrap}>
+          <div style={headerStyle()}>
+            <span style={s.sectionComment}>{'// '}</span>
+            <span style={s.sectionLabel}>Certifications</span>
+          </div>
+          {data.licenses.map((l, i) => (
+            <div key={i} style={{ ...s.codeBlock, padding: '10px 18px' }}>
+              <div style={s.entryMeta}>
+                <h3 style={{ ...s.entryTitle, fontSize: '10pt' }}>{l.name}</h3>
+                <span style={s.dateTxt}>{l.issueDate}</span>
+              </div>
+              {l.issuingOrg && <p style={{ ...s.tag, color: '#6b7280' }}>{l.issuingOrg}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Awards */}
+      {data.awards.length > 0 && (
+        <div style={s.sectionWrap}>
+          <div style={headerStyle()}>
+            <span style={s.sectionComment}>{'// '}</span>
+            <span style={s.sectionLabel}>Honors & Awards</span>
+          </div>
+          {data.awards.map((a, i) => (
+            <div key={i} style={{ ...s.codeBlock, padding: '10px 18px' }}>
+              <div style={s.entryMeta}>
+                <h3 style={{ ...s.entryTitle, fontSize: '10pt' }}>{a.title}</h3>
+                <span style={s.dateTxt}>{a.date}</span>
+              </div>
+              {a.issuer && <p style={s.tag}>{a.issuer}</p>}
+              {a.description && <p style={{ ...s.text, marginTop: 4 }}>{a.description}</p>}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Footer */}
+      <div style={{ borderTop: `1px solid #e5e7eb`, paddingTop: 10, marginTop: 20, textAlign: 'center' }}>
+        <p style={{ ...s.tag, color: '#d1d5db' }}>{'/* Generated with Aptico Resume Builder */'}</p>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────────
    TEMPLATE CONFIG
    ───────────────────────────────────────────── */
 const TEMPLATES = [
-  { id: 'executive', label: 'Executive', desc: 'ATS-classic single column with navy header', icon: 'description', Component: ExecutiveTemplate },
-  { id: 'modern', label: 'Modern', desc: 'Two-column layout with teal sidebar', icon: 'dashboard', Component: ModernTemplate },
-  { id: 'minimal', label: 'Minimal', desc: 'Swiss-clean serif with generous whitespace', icon: 'article', Component: MinimalTemplate },
+  { id: 'executive', label: 'Executive', desc: 'ATS-optimized single-column with bold navy header. Best for traditional industries.', icon: 'description', color: '#1e293b', Component: ExecutiveTemplate },
+  { id: 'modern', label: 'Modern', desc: 'Professional two-column layout with full-width header and clean sidebar. Recruiter-ready and ATS-friendly.', icon: 'dashboard', color: '#2563eb', Component: ModernTemplate },
+  { id: 'minimal', label: 'Minimal', desc: 'Swiss-clean serif typography with generous whitespace. Ideal for academia and design roles.', icon: 'article', color: '#6b7280', Component: MinimalTemplate },
+  { id: 'creative', label: 'Creative', desc: 'Bold purple gradient header with card-based layout. Perfect for standing out in creative fields.', icon: 'palette', color: '#7c3aed', Component: CreativeTemplate },
+  { id: 'technical', label: 'Technical', desc: 'Developer-inspired layout with monospace accents and code-block styling. Built for tech roles.', icon: 'terminal', color: '#10b981', Component: TechnicalTemplate },
 ];
 
 /* ─────────────────────────────────────────────
@@ -346,7 +732,10 @@ export default function ResumeBuilderModal({ open, onClose, profile, educationEn
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/20">
             <span className="material-symbols-outlined text-[18px] text-[var(--accent-strong)]">description</span>
           </span>
-          <h2 className="text-lg font-black tracking-tight text-[var(--text)]">Resume Builder</h2>
+          <div>
+            <h2 className="text-lg font-black tracking-tight text-[var(--text)]">Resume Builder</h2>
+            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--muted)]">{TEMPLATES.length} templates available</p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -366,8 +755,8 @@ export default function ResumeBuilderModal({ open, onClose, profile, educationEn
       {/* ── Body ── */}
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar — template selector */}
-        <aside className="w-[280px] shrink-0 border-r border-[var(--border)] bg-[var(--panel)]/80 backdrop-blur-xl overflow-y-auto p-5 space-y-3">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--muted)] mb-2">Choose Template</p>
+        <aside className="w-[280px] shrink-0 border-r border-[var(--border)] bg-[var(--panel)]/80 backdrop-blur-xl overflow-y-auto p-5 space-y-2.5">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--muted)] mb-3">Choose Template</p>
           {TEMPLATES.map(t => (
             <button
               key={t.id}
@@ -379,19 +768,30 @@ export default function ResumeBuilderModal({ open, onClose, profile, educationEn
               }`}
             >
               <div className="flex items-center gap-3 mb-2">
-                <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${selectedId === t.id ? 'bg-[var(--accent)]/20' : 'bg-[var(--panel-soft)]'}`}>
-                  <span className={`material-symbols-outlined text-[16px] ${selectedId === t.id ? 'text-[var(--accent-strong)]' : 'text-[var(--muted)]'}`}>{t.icon}</span>
+                <span
+                  className="flex h-8 w-8 items-center justify-center rounded-lg"
+                  style={{ background: selectedId === t.id ? `${t.color}20` : 'var(--panel-soft)' }}
+                >
+                  <span
+                    className="material-symbols-outlined text-[16px]"
+                    style={{ color: selectedId === t.id ? t.color : 'var(--muted)' }}
+                  >{t.icon}</span>
                 </span>
                 <span className="text-sm font-black text-[var(--text)]">{t.label}</span>
+                {selectedId === t.id && (
+                  <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)] text-white">
+                    <span className="material-symbols-outlined text-[12px]">check</span>
+                  </span>
+                )}
               </div>
-              <p className="text-xs font-medium text-[var(--muted-strong)] leading-relaxed">{t.desc}</p>
+              <p className="text-[11px] font-medium text-[var(--muted-strong)] leading-relaxed">{t.desc}</p>
             </button>
           ))}
         </aside>
 
         {/* Preview area */}
         <div className="flex-1 overflow-auto bg-[var(--panel-strong)]/50 p-8 flex justify-center">
-          <div className="w-[210mm] min-h-[297mm] bg-white shadow-2xl rounded-lg overflow-hidden" style={{ transform: 'scale(0.72)', transformOrigin: 'top center' }}>
+          <div className="w-[210mm] min-h-[297mm] bg-white shadow-2xl rounded-lg" style={{ transform: 'scale(0.72)', transformOrigin: 'top center' }}>
             <div ref={previewRef}>
               <selected.Component data={data} />
             </div>
