@@ -40,8 +40,10 @@ export default function PortfolioGenerator() {
     try {
       await navigator.clipboard.writeText(readme.markdown);
       setCopyMessage('README markdown copied.');
+      setTimeout(() => setCopyMessage(''), 3000); // Clear after 3s
     } catch {
       setCopyMessage('Could not copy automatically.');
+      setTimeout(() => setCopyMessage(''), 3000);
     } finally {
       setCopying(false);
     }
@@ -53,111 +55,183 @@ export default function PortfolioGenerator() {
       description="Turn your Aptico profile into a GitHub README that starts with a live Aptico badge and routes inbound traffic back to your AI shadow resume."
       actions={
         readme ? (
-          <>
-            <a href={readme.badgeUrl} target="_blank" rel="noreferrer" className="app-button-secondary">
+          <div className="flex items-center gap-3 animate-fade-in-up">
+            <a href={readme.badgeUrl} target="_blank" rel="noreferrer" className="app-button-secondary transition-all hover:border-[var(--accent)] hover:text-[var(--accent)] group">
+              <span className="material-symbols-outlined text-[18px] transition-transform group-hover:scale-110">visibility</span>
               Preview badge
             </a>
-            <a href={readme.shadowResumeUrl} target="_blank" rel="noreferrer" className="app-button-secondary">
-              Open shadow resume
+            <a href={readme.shadowResumeUrl} target="_blank" rel="noreferrer" className="app-button-secondary transition-all hover:border-[var(--accent)] hover:text-[var(--accent)] group">
+              <span className="material-symbols-outlined text-[18px] transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5">open_in_new</span>
+              Shadow resume
             </a>
-            <button type="button" onClick={handleCopy} className="app-button" disabled={copying}>
-              {copying ? 'Copying...' : 'Copy markdown'}
+            <button type="button" onClick={handleCopy} className="app-button shadow-[0_0_15px_rgba(59,201,142,0.4)] hover:shadow-[0_0_25px_rgba(59,201,142,0.6)] group" disabled={copying}>
+              <span className="material-symbols-outlined text-[18px] transition-transform group-hover:scale-110">
+                {copying ? 'check' : 'content_copy'}
+              </span>
+              {copying ? 'Copied!' : 'Copy markdown'}
             </button>
-          </>
+          </div>
         ) : null
       }
     >
       {error ? (
-        <div className="rounded-2xl border border-[var(--warning-border)] bg-[var(--warning-soft)] px-4 py-3 text-sm text-[var(--warning-text)]">
-          {error}
+        <div className="rounded-2xl border border-[var(--warning-border)] bg-[var(--warning-soft)] px-4 py-3 text-sm text-[var(--warning-text)] animate-fade-in-up">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px]">error</span>
+            {error}
+          </div>
         </div>
       ) : null}
 
       {copyMessage ? (
-        <div className="mt-4 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent-soft)] px-4 py-3 text-sm font-semibold text-[var(--accent-strong)]">
+        <div className="mt-4 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent-soft)] px-4 py-3 text-sm font-semibold text-[var(--accent-strong)] animate-fade-in-up flex items-center gap-2 shadow-[0_0_15px_rgba(59,201,142,0.2)]">
+           <span className="material-symbols-outlined text-[18px]">check_circle</span>
           {copyMessage}
         </div>
       ) : null}
 
       {showExplainer ? (
-        <div className="mt-4 relative overflow-hidden rounded-[1.6rem] border border-purple-500/25 bg-[linear-gradient(135deg,rgba(168,85,247,0.10),rgba(59,130,246,0.08))] p-5 sm:p-6">
-          <button type="button" onClick={dismissExplainer} className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--panel)] text-[var(--muted-strong)] transition hover:text-[var(--text)]" aria-label="Dismiss explainer">
+        <div className="mt-6 relative overflow-hidden rounded-[1.6rem] border border-[var(--accent)]/20 bg-gradient-to-br from-[var(--panel-soft)] to-[var(--bg)] p-6 sm:p-8 shadow-lg animate-fade-in-up group">
+          <div className="absolute inset-0 bg-noise opacity-30 mix-blend-overlay pointer-events-none" />
+          <div className="absolute -top-24 -right-24 w-64 h-64 bg-[var(--accent)]/10 rounded-full blur-3xl group-hover:bg-[var(--accent)]/20 transition-all duration-700" />
+          
+          <button type="button" onClick={dismissExplainer} className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--panel)] text-[var(--muted-strong)] transition hover:text-[var(--text)] hover:bg-[var(--panel-strong)] z-10" aria-label="Dismiss explainer">
             <span className="material-symbols-outlined text-[18px]">close</span>
           </button>
-          <p className="text-xs font-black uppercase tracking-[0.24em] text-purple-400">{"\u{1F680}"} GitHub README + Live Badge Generator</p>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--text)]">
-            This tool creates a <strong>professional GitHub README</strong> using your Aptico profile data, and prepends it with a live badge that shows your current career level.
-          </p>
-          <p className="mt-2 max-w-2xl text-sm leading-7 text-[var(--muted-strong)]">
-            When recruiters visit your GitHub profile, they can click the badge and land directly on your <strong>AI-powered profile chatbot</strong> where they can ask questions about your experience.
-          </p>
+          
+          <div className="relative z-10">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/20 shadow-sm">
+                <span className="material-symbols-outlined">rocket_launch</span>
+              </div>
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-[var(--accent)]">GitHub README Generator</p>
+            </div>
+            <p className="max-w-2xl text-base leading-relaxed text-[var(--text)] font-medium">
+              Create a <strong>professional GitHub README</strong> fueled by your Aptico profile, starting with a live badge showcasing your career level.
+            </p>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-[var(--muted-strong)]">
+              Convert profile views into conversations. When recruiters click your badge, they land on your <strong>AI-powered chatbot</strong> to ask questions about your experience.
+            </p>
+          </div>
         </div>
       ) : null}
 
       {loading ? (
-        <div className="mt-6 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-          <div className="app-panel h-[320px]" />
-          <div className="app-panel h-[520px]" />
+        <div className="mt-8 grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="app-panel h-[400px] flex flex-col gap-4 shadow-lg border-[var(--border)]/50">
+            <div className="skeleton skeleton-text w-1/3" />
+            <div className="skeleton skeleton-text w-2/3 h-8" />
+            <div className="skeleton skeleton-text w-full mt-4" />
+            <div className="skeleton skeleton-text w-5/6" />
+            <div className="skeleton skeleton-card mt-6 flex-grow" />
+          </div>
+          <div className="app-panel h-[560px] flex flex-col gap-4 shadow-lg border-[var(--border)]/50">
+            <div className="flex justify-between items-center">
+               <div className="skeleton skeleton-text w-1/4 h-6" />
+               <div className="skeleton skeleton-text w-24 h-10 rounded-lg" />
+            </div>
+            <div className="skeleton h-full w-full rounded-xl mt-4" />
+          </div>
         </div>
       ) : readme ? (
-        <div className="mt-6 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-          <section className="app-panel relative overflow-hidden">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(78,222,163,0.18),transparent_36%),linear-gradient(145deg,rgba(255,255,255,0.06),transparent)]" />
+        <div className="mt-8 grid gap-8 lg:grid-cols-[0.9fr_1.1fr] animate-fade-in-up-delay-1">
+          <section className="app-panel relative overflow-hidden group border-[var(--border)] hover:border-[var(--accent)]/30 transition-colors duration-500 shadow-lg">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,201,142,0.08),transparent_40%),linear-gradient(145deg,rgba(255,255,255,0.02),transparent)]" />
+            <div className="absolute top-0 right-0 w-full h-1 bg-gradient-to-r from-transparent via-[var(--accent)]/40 to-transparent transform translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+            
             <div className="relative">
-              <p className="app-kicker">Generated funnel</p>
-              <h2 className="mt-3 text-3xl font-black tracking-[-0.05em] text-[var(--text)]">{readme.suggestedTitle}</h2>
-              <p className="mt-3 text-sm leading-7 text-[var(--muted-strong)]">{readme.headline}</p>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="material-symbols-outlined text-[16px] text-[var(--accent)]">hub</span>
+                <p className="app-kicker !mb-0 text-[var(--accent)]">Generated funnel</p>
+              </div>
+              <h2 className="mt-2 text-3xl font-black tracking-tight text-[var(--text)]">{readme.suggestedTitle}</h2>
+              <p className="mt-3 text-sm leading-relaxed text-[var(--muted-strong)]">{readme.headline}</p>
 
-              <div className="mt-8 space-y-4">
-                <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] p-4">
-                  <p className="app-kicker">Badge markdown</p>
-                  <code className="mt-3 block break-all text-xs leading-6 text-[var(--text)]">{readme.badgeMarkdown}</code>
+              <div className="mt-8 space-y-5">
+                <div className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] p-5 transition-all hover:border-[var(--accent)]/40 hover:shadow-[0_4px_20px_rgba(59,201,142,0.08)] group/card">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="app-kicker !mb-0">Badge markdown</p>
+                    <span className="material-symbols-outlined text-[16px] text-[var(--muted)] group-hover/card:text-[var(--accent)] transition-colors">code</span>
+                  </div>
+                  <code className="block break-all text-[13px] leading-relaxed text-[var(--text)] font-mono bg-[var(--bg)] p-3 rounded-lg border border-[var(--border)]/50 shadow-inner">
+                    {readme.badgeMarkdown}
+                  </code>
                 </div>
 
-                <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] p-4">
-                  <p className="app-kicker">Secure destination</p>
+                <div className="relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] p-5 transition-all hover:border-[var(--accent)]/40 hover:shadow-[0_4px_20px_rgba(59,201,142,0.08)] group/card">
+                  <div className="flex items-center justify-between mb-3">
+                     <p className="app-kicker !mb-0">Secure destination</p>
+                     <span className="material-symbols-outlined text-[16px] text-[var(--muted)] group-hover/card:text-[var(--accent)] transition-colors">lock</span>
+                  </div>
                   <a
                     href={readme.shadowResumeUrl}
                     target="_blank"
                     rel="noreferrer"
-                    className="mt-3 block break-all text-sm font-semibold text-[var(--accent-strong)] hover:underline"
+                    className="group/link flex items-center gap-2 break-all text-sm font-semibold text-[var(--accent-strong)] hover:text-[var(--accent)] transition-colors"
                   >
-                    {readme.shadowResumeUrl}
+                    <span className="truncate">{readme.shadowResumeUrl}</span>
+                    <span className="material-symbols-outlined text-[16px] opacity-0 -translate-x-2 transition-all group-hover/link:opacity-100 group-hover/link:translate-x-0">arrow_forward</span>
                   </a>
-                  <p className="mt-3 text-sm text-[var(--muted-strong)]">
+                  <p className="mt-3 text-sm text-[var(--muted-strong)] leading-relaxed">
                     The generated markdown always links badge clicks back to your AI-powered profile page where recruiters can chat with your profile assistant.
                   </p>
                 </div>
 
                 {!readme.isPublic ? (
-                  <div className="rounded-2xl border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4 text-sm text-[var(--warning-text)]">
-                    Your profile is currently private, so the badge will render a private state and the shadow resume route will not be publicly useful until you enable public visibility in settings.
+                  <div className="rounded-2xl border border-[var(--warning-border)] bg-[var(--warning-soft)] p-4 text-sm text-[var(--warning-text)] flex gap-3 items-start shadow-sm">
+                    <span className="material-symbols-outlined text-[20px] mt-0.5">lock_person</span>
+                    <p className="leading-relaxed">Your profile is currently private. The badge will render a private state and the shadow resume route will not be publicly useful until you enable public visibility in settings.</p>
                   </div>
                 ) : null}
 
-                <Link to="/settings" className="app-button-secondary">
-                  Update profile data
-                </Link>
+                <div className="pt-2">
+                  <Link to="/settings" className="app-button-secondary w-full justify-center group/btn hover:border-[var(--text)] shadow-sm hover:shadow-md transition-all">
+                    <span className="material-symbols-outlined text-[18px] transition-transform group-hover/btn:-rotate-12">manage_accounts</span>
+                    Update profile data
+                  </Link>
+                </div>
               </div>
             </div>
           </section>
 
-          <section className="app-panel">
-            <div className="flex items-start justify-between gap-4">
+          <section className="app-panel flex flex-col border-[var(--border)] shadow-lg relative bg-gradient-to-b from-[var(--panel)] to-[var(--panel-soft)]">
+             <div className="absolute top-0 inset-x-0 h-px bg-gradient-to-r from-transparent via-[var(--border)] to-transparent" />
+            <div className="flex items-start justify-between gap-4 mb-6 relative z-10">
               <div>
-                <p className="app-kicker">GitHub README output</p>
-                <h2 className="mt-3 text-2xl font-black tracking-[-0.04em] text-[var(--text)]">Copy-ready markdown</h2>
+                <div className="flex items-center gap-2 mb-2">
+                   <span className="material-symbols-outlined text-[16px] text-[var(--muted-strong)]">terminal</span>
+                   <p className="app-kicker !mb-0">GitHub README output</p>
+                </div>
+                <h2 className="mt-1 text-2xl font-black tracking-tight text-[var(--text)]">Copy-ready markdown</h2>
               </div>
-              <button type="button" onClick={handleCopy} className="app-button-secondary" disabled={copying}>
-                {copying ? 'Copying...' : 'Copy'}
+              <button 
+                type="button" 
+                onClick={handleCopy} 
+                className={`app-button-secondary relative overflow-hidden transition-all duration-300 shadow-sm hover:shadow-md ${copying ? 'bg-[var(--accent-soft)] border-[var(--accent)] text-[var(--accent-strong)]' : 'hover:border-[var(--accent)] hover:text-[var(--accent)]'} group/copy`}
+                disabled={copying}
+              >
+                <div className="relative z-10 flex items-center gap-2">
+                   <span className={`material-symbols-outlined text-[18px] transition-transform ${copying ? 'scale-110' : 'group-hover/copy:scale-110'}`}>
+                     {copying ? 'check_circle' : 'content_copy'}
+                   </span>
+                   {copying ? 'Copied!' : 'Copy'}
+                </div>
               </button>
             </div>
 
-            <textarea
-              readOnly
-              value={readme.markdown}
-              className="app-input mt-6 min-h-[520px] font-mono text-xs leading-6"
-            />
+            <div className="relative flex-grow group/editor rounded-xl shadow-2xl overflow-hidden border border-[#333]">
+              <div className="absolute inset-0 bg-[var(--accent)]/5 blur-md opacity-0 transition-opacity duration-500 group-hover/editor:opacity-100 pointer-events-none z-0" />
+              <textarea
+                readOnly
+                value={readme.markdown}
+                className="relative z-10 w-full h-full min-h-[480px] font-mono text-[13px] leading-relaxed resize-none bg-[#1e1e1e] text-[#d4d4d4] p-5 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/40 transition-shadow"
+                style={{ colorScheme: 'dark' }}
+                spellCheck={false}
+              />
+              <div className="absolute top-3 right-4 px-2 py-1 rounded bg-[#2d2d2d] border border-[#404040] text-[#858585] text-[10px] font-mono font-bold uppercase tracking-wider select-none pointer-events-none z-20 shadow-sm backdrop-blur-md">
+                markdown
+              </div>
+            </div>
           </section>
         </div>
       ) : null}
