@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from '@/lib/router-compat.jsx';
 
 function initials(name) {
   return String(name || 'A').trim().charAt(0).toUpperCase() || 'A';

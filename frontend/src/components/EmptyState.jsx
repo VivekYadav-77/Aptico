@@ -2,7 +2,7 @@
 // EmptyState — Standardized "nothing here yet" component
 // Every list/table uses this for a consistent empty experience.
 // ─────────────────────────────────────────────────────────────
-import { Link } from 'react-router-dom';
+import { Link } from '@/lib/router-compat.jsx';
 
 /**
  * @param {string}  icon    — Material Symbols icon name

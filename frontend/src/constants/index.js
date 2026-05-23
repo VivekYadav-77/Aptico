@@ -12,8 +12,8 @@ export const APP_DESCRIPTION =
 export const APP_COPYRIGHT = `© ${new Date().getFullYear()} Aptico. All rights reserved.`;
 
 // ── API ──────────────────────────────────────────────────────
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/';
-export const API_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS || 10000);
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '/';
+export const API_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS || 10000);
 
 // ── Navigation ───────────────────────────────────────────────
 export const NAV_ITEMS = [

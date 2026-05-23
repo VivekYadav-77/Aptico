@@ -1,0 +1,331 @@
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from '@/lib/router-compat.jsx';
+import { useSelector } from 'react-redux';
+import { getWins, likeWin, postWin } from '../api/socialApi.js';
+import { selectAuth } from '../store/authSlice.js';
+
+const durationOptions = [
+  ['< 1 week', 1],
+  ['1-4 weeks', 3],
+  ['1-3 months', 8],
+  ['3-6 months', 20],
+  ['6+ months', 30]
+];
+
+function initials(name) {
+  return String(name || 'A').trim().charAt(0).toUpperCase() || 'A';
+}
+
+function timeAgo(value) {
+  if (!value) return 'recently';
+  const diff = Date.now() - new Date(value).getTime();
+  const minutes = Math.max(1, Math.floor(diff / 60000));
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hr ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? '' : 's'} ago`;
+}
+
+export default function CommunityWins() {
+  const auth = useSelector(selectAuth);
+  const navigate = useNavigate();
+  const [wins, setWins] = useState([]);
+  const [offset, setOffset] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [toast, setToast] = useState('');
+  const [form, setForm] = useState({ role_title: '', company_name: '', search_duration_weeks: 3, message: '' });
+  const [hideCompany, setHideCompany] = useState(false);
+
+  useEffect(() => {
+    getWins({ limit: 20, offset: 0 }).then((result) => {
+      setWins(result.wins || []);
+      setTotal(result.total || 0);
+      setOffset(20);
+    }).catch(() => null);
+  }, []);
+
+  async function loadMore() {
+    const result = await getWins({ limit: 20, offset });
+    setWins((current) => [...current, ...(result.wins || [])]);
+    setTotal(result.total || total);
+    setOffset((current) => current + 20);
+  }
+
+  async function handleLike(winId) {
+    if (!auth.isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+
+    const result = await likeWin(winId);
+    setWins((current) => current.map((win) => win.id === winId ? { ...win, likes_count: result.newLikesCount } : win));
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    const created = await postWin({
+      ...form,
+      company_name: hideCompany ? null : form.company_name || null
+    });
+    setWins((current) => [created, ...current]);
+    setModalOpen(false);
+    setToast('Congratulations! Your win has been shared.');
+    setForm({ role_title: '', company_name: '', search_duration_weeks: 3, message: '' });
+  }
+
+  return (
+    <main className="min-h-screen bg-[var(--bg)] relative overflow-hidden">
+      {/* Dynamic Background Effects */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[1000px] h-[500px] bg-[radial-gradient(ellipse_at_top,rgba(78,222,163,0.15),transparent_70%)] pointer-events-none" />
+      
+      <div className="mx-auto max-w-6xl px-4 py-16 relative z-10">
+        <header className="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between border-b border-[var(--border)] pb-8 mb-12">
+          <div>
+            <Link to="/" className="inline-flex items-center gap-2 text-sm font-bold tracking-widest uppercase text-[var(--accent-strong)] hover:text-[var(--text)] transition-colors">
+              <span className="material-symbols-outlined text-[16px]">arrow_back</span>
+              Return to Hub
+            </Link>
+            <h1 className="mt-6 text-5xl font-black text-[var(--text)] tracking-tight">Community Wins</h1>
+            <p className="mt-4 max-w-xl text-lg text-[var(--muted-strong)] leading-relaxed">
+              Real people. Real hires. Real stories. Explore the successful alignments achieved by the Aptico network.
+            </p>
+          </div>
+          {auth.isAuthenticated ? (
+            <button type="button" onClick={() => setModalOpen(true)} className="group relative flex items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-8 py-3.5 text-sm font-black uppercase tracking-widest text-[#003824] shadow-[0_0_20px_rgba(78,222,163,0.3)] transition-transform hover:scale-[1.02] active:scale-[0.98]">
+              Share Your Win
+              <span className="material-symbols-outlined text-[18px] transition-transform group-hover:translate-x-1">add</span>
+            </button>
+          ) : (
+            <Link to="/login" className="group flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--panel)] px-8 py-3.5 text-sm font-bold uppercase tracking-widest text-[var(--text)] hover:border-[var(--accent)] hover:text-[var(--accent-strong)] transition-all">
+              Sign in to share
+              <span className="material-symbols-outlined text-[18px]">login</span>
+            </Link>
+          )}
+        </header>
+
+        {toast ? (
+           <div className="mb-8 flex items-center gap-3 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 p-5 text-sm font-medium text-[var(--accent-strong)] animate-in fade-in slide-in-from-top-4">
+             <span className="material-symbols-outlined">celebration</span>
+             {toast}
+           </div>
+        ) : null}
+
+        <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {wins.map((win) => (
+            <article key={win.id} className="group flex flex-col rounded-[2rem] border border-[var(--border)] bg-[var(--panel)] p-6 shadow-xl transition-all hover:border-[var(--accent)]/50 hover:shadow-[0_8px_30px_rgba(78,222,163,0.1)] hover:-translate-y-1">
+              <div className="flex items-start justify-between mb-6">
+                <div className="flex gap-3 items-center">
+                  {win.user?.avatar_url ? (
+                    <img src={win.user.avatar_url} alt="" className="h-10 w-10 rounded-full object-cover ring-2 ring-[var(--panel-strong)]" />
+                  ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--accent-soft)] text-sm font-black text-[var(--accent-strong)] ring-2 ring-[var(--panel-strong)]">
+                      {initials(win.user?.name)}
+                    </div>
+                  )}
+                  <div>
+                    {win.user?.username ? (
+                      <Link to={`/u/${win.user.username}`} className="font-bold text-[var(--text)] hover:text-[var(--accent-strong)] transition-colors">{win.user?.name || 'Aptico member'}</Link>
+                    ) : (
+                      <p className="font-bold text-[var(--text)]">{win.user?.name || 'Aptico member'}</p>
+                    )}
+                    <p className="text-xs font-mono text-[var(--muted)]">{timeAgo(win.created_at)}</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex-1">
+                <h2 className="text-xl font-black text-[var(--text)] leading-snug group-hover:text-[var(--accent-strong)] transition-colors">{win.role_title}</h2>
+                <p className="mt-1 text-sm font-medium text-[var(--muted-strong)]">
+                  at <span className="text-[var(--text)]">{win.company_name || 'Confidential'}</span>
+                </p>
+                
+                {win.message ? (
+                  <div className="mt-4 relative">
+                    <span className="absolute -top-2 -left-2 text-4xl text-[var(--border)] font-serif select-none pointer-events-none">"</span>
+                    <p className="relative z-10 text-sm leading-relaxed text-[var(--muted-strong)] italic">
+                      {win.message}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="mt-6 pt-6 border-t border-[var(--border)] flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  {win.search_duration_weeks ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--panel-strong)] px-3 py-1 text-xs font-bold uppercase tracking-wider text-[var(--muted-strong)]">
+                      <span className="material-symbols-outlined text-[14px]">schedule</span>
+                      {win.search_duration_weeks} wks
+                    </span>
+                  ) : null}
+                </div>
+                
+                <button 
+                  type="button" 
+                  onClick={() => handleLike(win.id)} 
+                  className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[var(--muted-strong)] hover:text-[var(--accent-strong)] transition-colors group/like"
+                >
+                  <span className={`material-symbols-outlined text-[18px] transition-transform group-hover/like:scale-110 ${win.likes_count > 0 ? 'text-[var(--accent-strong)]' : ''}`}>
+                    favorite
+                  </span>
+                  {win.likes_count || 0}
+                </button>
+              </div>
+            </article>
+          ))}
+        </section>
+
+        {wins.length === 0 && !total ? (
+           <div className="flex flex-col items-center justify-center py-20 text-center">
+             <span className="material-symbols-outlined text-6xl text-[var(--muted)] mb-4">search_off</span>
+             <h3 className="text-xl font-bold text-[var(--text)]">No wins recorded yet</h3>
+             <p className="text-[var(--muted-strong)] mt-2">Be the first to share your success story.</p>
+           </div>
+        ) : wins.length < total ? (
+          <div className="mt-12 text-center">
+            <button 
+              type="button" 
+              onClick={loadMore} 
+              className="inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--panel)] px-8 py-3 text-sm font-bold uppercase tracking-widest text-[var(--muted-strong)] hover:border-[var(--accent)] hover:text-[var(--text)] transition-colors"
+            >
+              Load More Sequences
+              <span className="material-symbols-outlined text-[18px]">expand_more</span>
+            </button>
+          </div>
+        ) : null}
+      </div>
+
+      {modalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
+          <form 
+            onSubmit={handleSubmit} 
+            className="w-full max-w-xl rounded-[2.5rem] border border-[var(--border)] bg-[var(--panel)] p-8 shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-200"
+          >
+            <div className="flex items-center justify-between mb-8">
+              <div>
+                <h2 className="text-2xl font-black text-[var(--text)] tracking-tight">Share Your Win</h2>
+                <p className="text-sm text-[var(--muted-strong)] mt-1">Broadcast your success to the Aptico network.</p>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setModalOpen(false)} 
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-[var(--panel-strong)] text-[var(--muted-strong)] hover:bg-[var(--accent)] hover:text-[#003824] transition-colors"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="space-y-6">
+              <label className="block group">
+                <span className="app-field-label flex items-center gap-2 mb-2">
+                  <span className="material-symbols-outlined text-[16px] text-[var(--muted)]">work</span>
+                  Role Acquired
+                </span>
+                <input 
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-4 py-3 text-sm font-medium text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]" 
+                  placeholder="e.g. Senior Frontend Engineer"
+                  required 
+                  value={form.role_title} 
+                  onChange={(event) => setForm({ ...form, role_title: event.target.value })} 
+                />
+              </label>
+
+              <div className="grid gap-6 sm:grid-cols-2">
+                <label className="block group">
+                  <span className="app-field-label flex items-center gap-2 mb-2">
+                    <span className="material-symbols-outlined text-[16px] text-[var(--muted)]">business</span>
+                    Company
+                  </span>
+                  <input 
+                    className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-4 py-3 text-sm font-medium text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed" 
+                    placeholder="e.g. Acme Corp"
+                    disabled={hideCompany} 
+                    value={form.company_name} 
+                    onChange={(event) => setForm({ ...form, company_name: event.target.value })} 
+                  />
+                </label>
+                
+                <div className="flex flex-col justify-end pb-3">
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <div className={`relative flex h-6 w-11 items-center rounded-full transition-colors ${hideCompany ? 'bg-[var(--accent)]' : 'bg-[var(--panel-strong)]'}`}>
+                      <input 
+                        type="checkbox" 
+                        className="sr-only"
+                        checked={hideCompany} 
+                        onChange={(event) => { 
+                          setHideCompany(event.target.checked); 
+                          if (event.target.checked) setForm({ ...form, company_name: '' }); 
+                        }} 
+                      />
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${hideCompany ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </div>
+                    <span className="text-sm font-semibold text-[var(--muted-strong)] group-hover:text-[var(--text)] transition-colors">Keep confidential</span>
+                  </label>
+                </div>
+              </div>
+
+              <div>
+                <p className="app-field-label flex items-center gap-2 mb-3">
+                  <span className="material-symbols-outlined text-[16px] text-[var(--muted)]">timer</span>
+                  Search Duration
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {durationOptions.map(([label, weeks]) => {
+                    const isSelected = form.search_duration_weeks === weeks;
+                    return (
+                      <button 
+                        key={label} 
+                        type="button" 
+                        onClick={() => setForm({ ...form, search_duration_weeks: weeks })} 
+                        className={`rounded-lg px-4 py-2 text-sm font-bold transition-all ${isSelected ? 'bg-[var(--accent)] text-[#003824] shadow-[0_0_15px_rgba(78,222,163,0.3)]' : 'border border-[var(--border)] bg-[var(--panel)] text-[var(--muted-strong)] hover:border-[var(--accent)]/50 hover:text-[var(--text)]'}`}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <label className="block group">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="app-field-label flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[16px] text-[var(--muted)]">format_quote</span>
+                    Field Report (Optional)
+                  </span>
+                  <span className={`text-xs font-mono ${form.message.length > 250 ? 'text-rose-400' : 'text-[var(--muted)]'}`}>
+                    {form.message.length}/280
+                  </span>
+                </div>
+                <textarea 
+                  className="w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--bg)] px-4 py-3 text-sm font-medium leading-relaxed text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)] min-h-[100px]" 
+                  placeholder="Share any advice, interview tips, or thoughts on your journey..."
+                  maxLength={280} 
+                  value={form.message} 
+                  onChange={(event) => setForm({ ...form, message: event.target.value })} 
+                />
+              </label>
+            </div>
+
+            <div className="mt-8 flex gap-4">
+              <button 
+                type="button" 
+                onClick={() => setModalOpen(false)} 
+                className="flex-1 rounded-xl border border-[var(--border)] bg-transparent px-4 py-3.5 text-sm font-bold uppercase tracking-widest text-[var(--muted-strong)] hover:bg-[var(--panel-strong)] hover:text-[var(--text)] transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                type="submit" 
+                className="group relative flex-[2] flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-3.5 text-sm font-black uppercase tracking-widest text-[#003824] shadow-[0_0_20px_rgba(78,222,163,0.3)] transition-transform hover:scale-[1.02] active:scale-[0.98]"
+              >
+                Broadcast Win
+                <span className="material-symbols-outlined text-[18px] transition-transform group-hover:translate-x-1">send</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+    </main>
+  );
+}

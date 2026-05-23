@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "db:push": "drizzle-kit push --config=src/config/drizzleConfig.js",
-    "db:migrate:comms": "node scripts/applySquadCommsMigration.js"
+    "db:push": "drizzle-kit push --config=src/config/drizzle.config.js",
+    "db:migrate:comms": "node scripts/migrations/apply-squad-comms-migration.js"
   },
   "dependencies": {
     "@fastify/helmet": "^13.0.2",

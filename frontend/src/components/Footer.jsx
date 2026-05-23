@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from '@/lib/router-compat.jsx';
 import ApticoLogo from './ApticoLogo.jsx';
 import ContactModal from './ContactModal.jsx';
 import { APP_NAME, APP_COPYRIGHT, FOOTER_LINKS, SOCIAL_LINKS } from '../constants/index.js';

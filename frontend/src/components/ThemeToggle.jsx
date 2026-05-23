@@ -1,4 +1,4 @@
-import { useTheme } from './theme.jsx';
+import { useTheme } from '../app/theme.jsx';
 
 export default function ThemeToggle({ compact = false }) {
   const { theme, toggleTheme } = useTheme();
