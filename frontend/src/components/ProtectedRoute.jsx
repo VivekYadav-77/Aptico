@@ -1,4 +1,4 @@
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation } from '@/lib/router-compat.jsx';
 import { useSelector } from 'react-redux';
 import { selectAuth } from '../store/authSlice.js';
 

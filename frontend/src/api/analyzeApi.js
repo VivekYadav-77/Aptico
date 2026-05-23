@@ -1,7 +1,7 @@
 import api from './axios.js';
 import { clearAuthSession, setAuthSession, store } from '../store/authSlice.js';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '';
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
 function getAuthHeaders() {
   const token = store.getState()?.auth?.accessToken;

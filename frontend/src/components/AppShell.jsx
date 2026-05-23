@@ -4,7 +4,7 @@
 // desktop sidebar, and page content container.
 // ─────────────────────────────────────────────────────────────
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from '@/lib/router-compat.jsx';
 import { useDispatch, useSelector } from 'react-redux';
 import { logoutRequest } from '../api/authApi.js';
 import { getMyProfile } from '../api/socialApi.js';

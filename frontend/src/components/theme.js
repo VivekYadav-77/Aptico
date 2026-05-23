@@ -1,1 +1,1 @@
-export { ThemeProvider, useTheme } from './theme.jsx';
+export { ThemeProvider, useTheme } from '../app/theme.jsx';

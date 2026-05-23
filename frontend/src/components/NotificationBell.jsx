@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from '@/lib/router-compat.jsx';
 import { getNotifications, getUnreadNotificationCount, markNotificationsRead } from '../api/socialApi.js';
 
 function initials(name) {
