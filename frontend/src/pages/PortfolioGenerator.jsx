@@ -12,6 +12,7 @@ export default function PortfolioGenerator() {
   const [error, setError] = useState('');
   const [copyMessage, setCopyMessage] = useState('');
   const [showExplainer, setShowExplainer] = useState(() => localStorage.getItem(PORTFOLIO_EXPLAINER_KEY) !== 'true');
+  const [showBadgePreview, setShowBadgePreview] = useState(false);
 
   function dismissExplainer() {
     setShowExplainer(false);
@@ -56,10 +57,10 @@ export default function PortfolioGenerator() {
       actions={
         readme ? (
           <div className="flex items-center gap-3 animate-fade-in-up">
-            <a href={readme.badgeUrl} target="_blank" rel="noreferrer" className="app-button-secondary transition-all hover:border-[var(--accent)] hover:text-[var(--accent)] group">
+            <button type="button" onClick={() => setShowBadgePreview(true)} className="app-button-secondary transition-all hover:border-[var(--accent)] hover:text-[var(--accent)] group">
               <span className="material-symbols-outlined text-[18px] transition-transform group-hover:scale-110">visibility</span>
               Preview badge
-            </a>
+            </button>
             <a href={readme.shadowResumeUrl} target="_blank" rel="noreferrer" className="app-button-secondary transition-all hover:border-[var(--accent)] hover:text-[var(--accent)] group">
               <span className="material-symbols-outlined text-[18px] transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5">open_in_new</span>
               Shadow resume
@@ -233,6 +234,60 @@ export default function PortfolioGenerator() {
               </div>
             </div>
           </section>
+        </div>
+      ) : null}
+
+      {showBadgePreview && readme ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6 animate-fade-in">
+          <div className="absolute inset-0 bg-[#000000]/80 backdrop-blur-md" onClick={() => setShowBadgePreview(false)} />
+          <div className="relative w-full max-w-4xl bg-[#0d1117] rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.6)] border border-[#30363d] overflow-hidden flex flex-col max-h-[90vh] animate-fade-in-up">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#30363d] bg-[#161b22] shrink-0">
+              <div className="flex items-center gap-3">
+                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#238636]/10 text-[#238636] border border-[#238636]/20">
+                    <span className="material-symbols-outlined text-[18px]">verified</span>
+                 </div>
+                 <div>
+                   <h3 className="text-[#c9d1d9] font-bold text-sm leading-tight">Live Badge Showcase</h3>
+                   <p className="text-[#8b949e] text-xs">GitHub Dark Mode Preview</p>
+                 </div>
+              </div>
+              <button onClick={() => setShowBadgePreview(false)} className="flex h-8 w-8 items-center justify-center rounded-lg text-[#8b949e] hover:bg-[#21262d] hover:text-[#c9d1d9] transition-colors border border-transparent hover:border-[#30363d]">
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+            
+            {/* Body */}
+            <div className="p-6 sm:p-10 overflow-y-auto bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] bg-blend-overlay" style={{ backgroundColor: '#0d1117' }}>
+               <div className="max-w-3xl mx-auto space-y-8 bg-[#0d1117]/80 p-8 sm:p-12 rounded-xl border border-[#21262d] backdrop-blur-sm shadow-2xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-64 h-64 bg-[#238636]/5 rounded-full blur-3xl" />
+                  
+                  <div className="relative z-10 border-b border-[#21262d] pb-5 flex items-center gap-4">
+                    <span className="text-4xl">👋</span>
+                    <h1 className="text-[#c9d1d9] text-3xl font-black tracking-tight">{readme.suggestedTitle || "Hi there"}</h1>
+                  </div>
+                  
+                  <p className="relative z-10 text-[#8b949e] text-base leading-relaxed max-w-2xl">
+                    This is a simulation of how your Aptico badge will render on a GitHub profile README. 
+                    The badge acts as a dynamic live-widget that routes inbound traffic back to your interactive shadow resume.
+                  </p>
+                  
+                  <div className="relative z-10 mt-8 p-8 sm:p-12 bg-[#161b22] border border-[#30363d] rounded-xl flex justify-center items-center shadow-inner relative overflow-hidden group/badge cursor-crosshair">
+                     <div className="absolute inset-0 bg-gradient-to-br from-[#238636]/5 to-transparent pointer-events-none" />
+                     <a href={readme.shadowResumeUrl} target="_blank" rel="noreferrer" className="relative z-20 transition-all duration-500 hover:scale-[1.03] hover:-translate-y-1 block outline-none">
+                       <img src={readme.badgeUrl} alt="Aptico Profile" className="max-w-full drop-shadow-2xl" />
+                     </a>
+                     
+                     <div className="absolute bottom-6 left-0 right-0 flex justify-center opacity-0 group-hover/badge:opacity-100 transition-opacity duration-300 pointer-events-none z-10">
+                        <span className="bg-[#0d1117]/90 text-[#8b949e] text-[11px] px-4 py-2 rounded-full border border-[#30363d] font-mono shadow-[0_4px_20px_rgba(0,0,0,0.5)] backdrop-blur-md flex items-center gap-2">
+                          <span className="material-symbols-outlined text-[14px]">touch_app</span>
+                          Click badge to test routing
+                        </span>
+                     </div>
+                  </div>
+               </div>
+            </div>
+          </div>
         </div>
       ) : null}
     </AppShell>

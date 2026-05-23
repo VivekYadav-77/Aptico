@@ -38,7 +38,7 @@ function createDefaults(auth, analysis) {
   return {
     firstName: nameParts.firstName,
     lastName: nameParts.lastName,
-    headline: analysis?.jobTitle || user.role || 'Aspiring product-focused professional',
+    headline: analysis?.jobTitle || 'Aspiring product-focused professional',
     email: user.email || 'you@example.com',
     phone: '',
     location: '',
