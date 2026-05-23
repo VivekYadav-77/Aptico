@@ -68,12 +68,21 @@ export default function Footer() {
             <ul className="space-y-3">
               {FOOTER_LINKS.company.map((link) => (
                 <li key={link.label}>
-                  <a
-                    href={link.href}
-                    className="text-sm font-medium text-[var(--muted-strong)] transition hover:text-[var(--text)]"
-                  >
-                    {link.label}
-                  </a>
+                  {link.to ? (
+                    <Link
+                      to={link.to}
+                      className="text-sm font-medium text-[var(--muted-strong)] transition hover:text-[var(--text)]"
+                    >
+                      {link.label}
+                    </Link>
+                  ) : (
+                    <a
+                      href={link.href}
+                      className="text-sm font-medium text-[var(--muted-strong)] transition hover:text-[var(--text)]"
+                    >
+                      {link.label}
+                    </a>
+                  )}
                 </li>
               ))}
             </ul>

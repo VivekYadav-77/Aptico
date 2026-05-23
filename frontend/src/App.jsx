@@ -12,6 +12,8 @@ import AnalysisWorkspace from './pages/AnalysisWorkspace.jsx';
 import AuthPermanent from './pages/AuthPermanent.jsx';
 import CommunityWins from './pages/CommunityWins.jsx';
 import ControlCenter from './pages/ControlCenter.jsx';
+import DocArticlePage from './pages/DocArticlePage.jsx';
+import DocsHubPage from './pages/DocsHubPage.jsx';
 import GuestDashboard from './pages/GuestDashboard.jsx';
 import InterviewPrepPage from './pages/InterviewPrepPage.jsx';
 import LatestAnalysisPage from './pages/LatestAnalysisPage.jsx';
@@ -78,6 +80,8 @@ export default function App() {
         <Route path="/u/:username/resilience" element={<ResilienceDetailsPage />} />
         <Route path="/hire/:username" element={<ShadowResume />} />
         <Route path="/wins" element={<CommunityWins />} />
+        <Route path="/docs" element={<DocsHubPage />} />
+        <Route path="/docs/:slug" element={<DocArticlePage />} />
         <Route path="/privacy" element={<LegalPage />} />
         <Route path="/terms" element={<LegalPage />} />
         <Route

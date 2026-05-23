@@ -215,6 +215,7 @@ export default function GuestDashboard() {
           <div className="flex flex-1 items-center justify-end gap-6">
             <nav className="hidden items-center gap-6 md:flex">
               <a href="#features" className="text-sm font-bold text-[var(--muted-strong)] transition hover:text-[var(--text)]">Features</a>
+              <Link to="/docs" className="text-sm font-bold text-[var(--muted-strong)] transition hover:text-[var(--text)]">Docs</Link>
               <Link to="/login" className="text-sm font-bold text-[var(--muted-strong)] transition hover:text-[var(--text)]">Log in</Link>
             </nav>
             
@@ -241,6 +242,9 @@ export default function GuestDashboard() {
                   {label}
                 </a>
               ))}
+              <Link to="/docs" onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-3 text-sm font-semibold text-[var(--muted-strong)] transition hover:bg-[var(--panel-soft)] hover:text-[var(--text)]">
+                Docs
+              </Link>
             </nav>
           </div>
         )}

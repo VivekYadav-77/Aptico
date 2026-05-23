@@ -23,6 +23,7 @@ export const NAV_ITEMS = [
   { to: '/analysis', label: 'Analysis', icon: 'analytics', description: 'Resume and job match analysis' },
   { to: '/portfolio-generator', label: 'Portfolio', icon: 'code_blocks', description: 'Generate a GitHub README and live Aptico badge' },
   { to: '/jobs', label: 'Job Search', icon: 'work', description: 'Discover and filter roles' },
+  { to: '/docs', label: 'Docs', icon: 'menu_book', description: 'Platform guides and feature documentation' },
   { to: '/wins', label: 'Community', icon: 'groups', description: 'Community wins and career stories' },
   { to: '/profile', label: 'Profile', icon: 'person', description: 'Edit your professional profile' },
   { to: '/settings', label: 'Settings', icon: 'settings', description: 'Account, career, and theme settings' },
@@ -52,6 +53,9 @@ export const SEARCHABLE_INSIGHTS = [
   { label: 'Matched skills from resume', icon: 'star', to: '/analysis', category: 'Analysis' },
   { label: 'High pay job search', icon: 'payments', to: '/jobs', category: 'Job Search' },
   { label: 'Verified listings only', icon: 'verified', to: '/jobs', category: 'Job Search' },
+  { label: 'Read platform docs', icon: 'menu_book', to: '/docs', category: 'Docs' },
+  { label: 'Learn resume analysis', icon: 'analytics', to: '/docs/resume-analysis', category: 'Docs' },
+  { label: 'Learn anonymous squads', icon: 'groups', to: '/docs/anonymous-squads', category: 'Docs' },
 ];
 
 // ── Landing page content ─────────────────────────────────────
@@ -134,7 +138,7 @@ export const FOOTER_LINKS = {
   ],
   company: [
     { label: 'About', href: '#' },
-    { label: 'Blog', href: '#' },
+    { label: 'Blog', to: '/docs' },
   ],
   legal: [
     { label: 'Privacy Policy', to: '/privacy' },
