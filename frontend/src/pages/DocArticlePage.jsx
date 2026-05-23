@@ -64,6 +64,32 @@ function CodeTerminal({ code }) {
   );
 }
 
+function DocOverview({ overview }) {
+  if (!overview) return null;
+
+  const items = [
+    ['Best for', overview.bestFor, 'person_search'],
+    ['Plain summary', overview.plainSummary, 'notes'],
+    ['What you will achieve', overview.outcome, 'flag'],
+  ].filter(([, value]) => Boolean(value));
+
+  return (
+    <section className="mt-6 grid gap-3 sm:grid-cols-3">
+      {items.map(([label, text, icon]) => (
+        <article key={label} className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-strong)]">
+              <span className="material-symbols-outlined text-[18px]">{icon}</span>
+            </span>
+            <p className="app-kicker">{label}</p>
+          </div>
+          <p className="text-sm leading-7 text-[var(--muted-strong)]">{text}</p>
+        </article>
+      ))}
+    </section>
+  );
+}
+
 function ArticleSection({ section, index }) {
   return (
     <section id={section.id} className="scroll-mt-28 border-t border-[var(--border)] pt-10 first:border-t-0 first:pt-0">
@@ -191,6 +217,8 @@ export default function DocArticlePage() {
                 <p className="mt-5 max-w-3xl text-lg leading-8 text-[var(--muted-strong)]">{doc.intro}</p>
               </div>
             </header>
+
+            <DocOverview overview={doc.overview} />
 
             <nav className="app-panel-soft mt-6 xl:hidden">
               <p className="app-kicker mb-3">On this page</p>

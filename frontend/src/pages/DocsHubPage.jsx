@@ -63,7 +63,10 @@ export default function DocsHubPage() {
     const normalized = query.trim().toLowerCase();
     return DOCS.filter((doc) => {
       const matchesCategory = category === 'All' || doc.category === category;
-      const haystack = `${doc.title} ${doc.category} ${doc.excerpt}`.toLowerCase();
+      const sectionText = doc.sections
+        .map((section) => `${section.title} ${(section.body || []).join(' ')} ${(section.steps || []).join(' ')}`)
+        .join(' ');
+      const haystack = `${doc.title} ${doc.category} ${doc.excerpt} ${doc.intro} ${doc.overview?.plainSummary || ''} ${sectionText}`.toLowerCase();
       return matchesCategory && (!normalized || haystack.includes(normalized));
     });
   }, [category, query]);

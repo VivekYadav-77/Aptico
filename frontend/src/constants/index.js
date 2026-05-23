@@ -56,6 +56,9 @@ export const SEARCHABLE_INSIGHTS = [
   { label: 'Read platform docs', icon: 'menu_book', to: '/docs', category: 'Docs' },
   { label: 'Learn resume analysis', icon: 'analytics', to: '/docs/resume-analysis', category: 'Docs' },
   { label: 'Learn anonymous squads', icon: 'groups', to: '/docs/anonymous-squads', category: 'Docs' },
+  { label: 'Understand dashboard widgets', icon: 'dashboard', to: '/docs/command-center-dashboard', category: 'Docs' },
+  { label: 'Learn rejection logging', icon: 'military_tech', to: '/docs/rejection-logging', category: 'Docs' },
+  { label: 'Understand stickers and streaks', icon: 'token', to: '/docs/rewards-stickers', category: 'Docs' },
 ];
 
 // ── Landing page content ─────────────────────────────────────
