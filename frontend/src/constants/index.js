@@ -17,14 +17,18 @@ export const API_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS || 1
 
 // ── Navigation ───────────────────────────────────────────────
 export const NAV_ITEMS = [
-  { to: '/squads', label: 'Squad', icon: 'groups', description: 'Anonymous squad progress and weekly goal' },
-  { to: '/people', label: 'People', icon: 'diversity_3', description: 'Find people to connect with' },
   { to: '/dashboard', label: 'Dashboard', icon: 'dashboard', description: 'Your career overview and activity' },
   { to: '/analysis', label: 'Analysis', icon: 'analytics', description: 'Resume and job match analysis' },
-  { to: '/portfolio-generator', label: 'Portfolio', icon: 'code_blocks', description: 'Generate a GitHub README and live Aptico badge' },
   { to: '/jobs', label: 'Job Search', icon: 'work', description: 'Discover and filter roles' },
+  { to: '/squads', label: 'Squad', icon: 'groups', description: 'Anonymous squad progress and weekly goal' },
+  { to: '/people', label: 'People', icon: 'diversity_3', description: 'Find people to connect with' },
+  { to: '/wins', label: 'Community', icon: 'military_tech', description: 'Community wins and career stories' },
+  { to: '/portfolio-generator', label: 'Portfolio', icon: 'code_blocks', description: 'Generate a GitHub README and live Aptico badge' },
+  { to: '/interview-prep', label: 'Interview Prep', icon: 'psychology', description: 'Practice with AI-driven coaching sessions' },
+  { to: '/rewards', label: 'Rewards', icon: 'token', description: 'Earn and showcase digital stickers' },
+  { to: '/saved-jobs', label: 'Saved Jobs', icon: 'bookmark', description: 'View and manage your bookmarked roles' },
+  { to: '/analysis-history', label: 'Analysis History', icon: 'history', description: 'Review your past resume analyses' },
   { to: '/docs', label: 'Docs', icon: 'menu_book', description: 'Platform guides and feature documentation' },
-  { to: '/wins', label: 'Community', icon: 'groups', description: 'Community wins and career stories' },
   { to: '/profile', label: 'Profile', icon: 'person', description: 'Edit your professional profile' },
   { to: '/settings', label: 'Settings', icon: 'settings', description: 'Account, career, and theme settings' },
 ];

@@ -181,6 +181,7 @@ export default function AppShell({ title, description, actions, children, banner
   const auth = useSelector(selectAuth);
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const [socialProfile, setSocialProfile] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -312,12 +313,12 @@ export default function AppShell({ title, description, actions, children, banner
                 <button
                   type="button"
                   className={`group relative flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-widest rounded-xl transition-all duration-300 cursor-pointer ${
-                    ['/squads', '/people', '/wins', '/portfolio-generator'].some(path => location.pathname === path)
+                    ['/squads', '/people', '/wins', '/portfolio-generator', '/interview-prep', '/rewards', '/saved-jobs', '/analysis-history'].some(path => location.pathname === path)
                       ? 'bg-[var(--accent)]/10 text-[var(--accent-strong)] border border-[var(--accent)]/20 shadow-[0_0_15px_rgba(78,222,163,0.1)]'
                       : 'text-[var(--muted-strong)] hover:text-[var(--text)] hover:bg-[var(--panel-soft)] border border-transparent'
                   }`}
                 >
-                  <span className={`material-symbols-outlined text-[16px] transition-all duration-300 ${['/squads', '/people', '/wins', '/portfolio-generator'].some(path => location.pathname === path) ? 'drop-shadow-[0_0_8px_rgba(78,222,163,0.6)]' : 'group-hover:-translate-y-0.5'}`}>hub</span>
+                  <span className={`material-symbols-outlined text-[16px] transition-all duration-300 ${['/squads', '/people', '/wins', '/portfolio-generator', '/interview-prep', '/rewards', '/saved-jobs', '/analysis-history'].some(path => location.pathname === path) ? 'drop-shadow-[0_0_8px_rgba(78,222,163,0.6)]' : 'group-hover:-translate-y-0.5'}`}>hub</span>
                   <span className="relative z-10">Hub</span>
                   <span className="material-symbols-outlined text-[14px] -ml-1 transition-transform duration-300 group-hover:translate-y-0.5">keyboard_arrow_down</span>
                 </button>
@@ -328,7 +329,11 @@ export default function AppShell({ title, description, actions, children, banner
                       { to: '/squads', label: 'Squads', icon: 'groups' },
                       { to: '/people', label: 'People', icon: 'diversity_3' },
                       { to: '/wins', label: 'Wins', icon: 'military_tech' },
-                      { to: '/portfolio-generator', label: 'Portfolio', icon: 'code_blocks' }
+                      { to: '/portfolio-generator', label: 'Portfolio', icon: 'code_blocks' },
+                      { to: '/interview-prep', label: 'Interviews', icon: 'psychology' },
+                      { to: '/rewards', label: 'Rewards', icon: 'token' },
+                      { to: '/saved-jobs', label: 'Saved Jobs', icon: 'bookmark' },
+                      { to: '/analysis-history', label: 'History', icon: 'history' }
                     ].map((subTab) => {
                       const isSubActive = location.pathname === subTab.to;
                       return (
@@ -496,7 +501,7 @@ export default function AppShell({ title, description, actions, children, banner
       {/* ── MOBILE OVERLAY ─────────────────────────────────── */}
       {mobileMenuOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 transition-opacity duration-300"
+          className="fixed inset-0 z-40 bg-black/40 transition-opacity duration-300 lg:hidden"
           style={{ backdropFilter: 'blur(4px)' }}
           onClick={() => setMobileMenuOpen(false)}
           aria-hidden="true"
@@ -505,7 +510,7 @@ export default function AppShell({ title, description, actions, children, banner
 
       {/* ── MOBILE SLIDE-IN DRAWER ─────────────────────────── */}
       <div
-        className={`fixed left-0 top-0 z-[45] flex h-full w-72 flex-col border-r border-[var(--border)] bg-[var(--shell)] transition-transform duration-300 ease-out ${
+        className={`fixed left-0 top-0 z-[45] flex h-full w-72 flex-col border-r border-[var(--border)] bg-[var(--shell)] transition-transform duration-300 ease-out lg:hidden ${
           mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         style={{ backdropFilter: 'blur(20px)' }}
@@ -616,7 +621,7 @@ export default function AppShell({ title, description, actions, children, banner
       </div>
 
       {/* ── MAIN CONTENT ───────────────────────────────────── */}
-      <main className="px-4 pb-8 sm:px-6 lg:pb-10" style={{ paddingTop: `calc(${NAVBAR_HEIGHT}px + 1.5rem)` }}>
+      <main className="px-4 pb-8 sm:px-6 lg:px-8 lg:pb-10" style={{ paddingTop: `calc(${NAVBAR_HEIGHT}px + 1.5rem)` }}>
         <section className="mx-auto mb-8 flex max-w-7xl flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl space-y-3">
             <p className="app-kicker">Aptico workspace</p>
