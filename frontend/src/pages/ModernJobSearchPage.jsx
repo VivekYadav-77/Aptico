@@ -134,7 +134,7 @@ function getSignalClasses(color) {
 }
 
 function getStatCardClasses(color) {
-  return `rounded-[1.35rem] border px-4 py-4 ${getSignalClasses(color)}`;
+  return `group rounded-[2rem] border px-5 py-5 transition-all hover:shadow-lg ${getSignalClasses(color)}`;
 }
 
 function getProgressBarClasses(color) {
@@ -161,7 +161,7 @@ export default function ModernJobSearchPage() {
     location: persistedJobSearchState?.formState?.location || 'India',
     useAnalysis: persistedJobSearchState?.formState?.useAnalysis || false
   });
-  const [submittedSearch, setSubmittedSearch] = useState(null);
+  const [submittedSearch, setSubmittedSearch] = useState(persistedJobSearchState?.submittedSearch || null);
   const [activeFocus, setActiveFocus] = useState(persistedJobSearchState?.activeFocus || 'best-match');
   const [localSearch, setLocalSearch] = useState(persistedJobSearchState?.localSearch || '');
   const [selectedJobId, setSelectedJobId] = useState(persistedJobSearchState?.selectedJobId || null);
@@ -484,29 +484,38 @@ export default function ModernJobSearchPage() {
         </>
       }
     >
-      <section className="app-panel relative overflow-hidden mb-6 py-6 px-6">
-        <div className="absolute inset-x-0 top-0 h-24 bg-[linear-gradient(135deg,rgba(78,222,163,0.15),rgba(113,161,255,0.05),transparent)]" />
-        <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-          <div className="space-y-2 max-w-2xl">
-            <h2 className="text-xl md:text-2xl font-black tracking-[-0.03em] text-[var(--text)]">
+      <section className="app-panel relative overflow-hidden mb-6 py-8 px-6 sm:px-8">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(78,222,163,0.12),transparent_55%),radial-gradient(ellipse_at_bottom_right,rgba(113,161,255,0.06),transparent_55%)] pointer-events-none" />
+        <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-8">
+          <div className="space-y-3 max-w-2xl">
+            <div className="flex items-center gap-3 mb-1">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/20">
+                <span className="material-symbols-outlined text-[20px] text-[var(--accent-strong)]">travel_explore</span>
+              </span>
+              <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-[var(--muted-strong)]">Discovery Engine</p>
+            </div>
+            <h2 className="text-xl md:text-2xl font-black tracking-tight text-[var(--text)]">
               Discover roles with stronger context, less scrolling, and faster decision-making.
             </h2>
             <div className="flex flex-wrap gap-2 mt-3">
               {(analysisHighlights.length ? analysisHighlights : ['Analysis-guided search', 'Remote-aware filtering', 'Source transparency']).map((item) => (
-                <span key={item} className="app-chip">{item}</span>
+                <span key={item} className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--panel-soft)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--muted-strong)]">{item}</span>
               ))}
             </div>
           </div>
           
-          <div className="flex shrink-0 gap-3">
+          <div className="flex shrink-0 gap-4">
             {[
-              ['Live sources', String(sourceCount || 0)],
-              ['Visible roles', String(filteredJobs.length || 0)],
-              ['Avg. fit', averageMatch ? `${averageMatch}%` : '--']
-            ].map(([label, value]) => (
-              <div key={label} className="min-w-[5.5rem] rounded-[1rem] border border-[var(--border)] bg-[var(--panel-soft)] px-3 py-2">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--muted-strong)] whitespace-nowrap">{label}</p>
-                <p className="mt-1 text-xl font-black tracking-[-0.04em] text-[var(--text)]">{value}</p>
+              ['Live sources', String(sourceCount || 0), 'cloud_sync'],
+              ['Visible roles', String(filteredJobs.length || 0), 'work'],
+              ['Avg. fit', averageMatch ? `${averageMatch}%` : '--', 'speed']
+            ].map(([label, value, icon]) => (
+              <div key={label} className="min-w-[6rem] rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-3 transition-all hover:border-[var(--accent)]/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="material-symbols-outlined text-[14px] text-[var(--muted)]">{icon}</span>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--muted)] whitespace-nowrap">{label}</p>
+                </div>
+                <p className="text-2xl font-black tracking-tight text-[var(--text)]">{value}</p>
               </div>
             ))}
           </div>
@@ -514,14 +523,17 @@ export default function ModernJobSearchPage() {
       </section>
 
       <div className="space-y-6">
-        <form className="app-panel py-5 px-6 space-y-5" onSubmit={handleSubmit}>
+        <form className="app-panel py-6 px-6 sm:px-8 space-y-6" onSubmit={handleSubmit}>
           <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-[17px] font-bold tracking-[-0.02em] text-[var(--text)]">Search criteria</h3>
+            <div className="flex items-center gap-3">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--panel-strong)] border border-[var(--border)]">
+                <span className="material-symbols-outlined text-[16px] text-[var(--accent-strong)]">tune</span>
+              </span>
+              <h3 className="text-lg font-black tracking-tight text-[var(--text)]">Search Criteria</h3>
             </div>
             {analysisSearchText ? (
-              <label className="flex items-center gap-3 cursor-pointer select-none">
-                <span className="text-sm font-medium text-[var(--text)]">Use analysis context</span>
+              <label className="flex items-center gap-3 cursor-pointer select-none group">
+                <span className="text-sm font-bold text-[var(--text)] group-hover:text-[var(--accent-strong)] transition-colors">Use analysis context</span>
                 <button
                   type="button"
                   onClick={() => updateField('useAnalysis', !formState.useAnalysis)}
@@ -621,18 +633,18 @@ export default function ModernJobSearchPage() {
             </div>
           ) : null}
 
-          <section className="app-panel space-y-4">
+          <section className="app-panel space-y-5">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex flex-wrap gap-2">
+              <div className="inline-flex gap-2 p-1.5 rounded-xl bg-[var(--panel-strong)]/50 border border-[var(--border)]">
                 {FOCUS_TAGS.map((option) => (
                   <button
                     key={option.value}
                     type="button"
                     onClick={() => setActiveFocus(option.value)}
-                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                    className={`rounded-lg px-4 py-2 text-sm font-bold tracking-wide transition-all duration-300 ${
                       activeFocus === option.value
-                        ? 'bg-[var(--accent)] text-slate-950'
-                        : 'border border-[var(--border)] bg-[var(--panel-soft)] text-[var(--text)] hover:border-[var(--accent)]/40'
+                        ? 'bg-[var(--accent)] text-[#003824] shadow-[0_0_15px_rgba(78,222,163,0.2)]'
+                        : 'text-[var(--muted-strong)] hover:text-[var(--text)] hover:bg-[var(--panel)]'
                     }`}
                   >
                     {option.label}
@@ -640,13 +652,13 @@ export default function ModernJobSearchPage() {
                 ))}
               </div>
 
-              <div className="relative w-full md:max-w-[14rem]">
-                <span className="material-symbols-outlined pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted)] text-[18px]">manage_search</span>
+              <div className="relative w-full md:max-w-[15rem]">
+                <span className="material-symbols-outlined pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--muted)] text-[18px]">manage_search</span>
                 <input
                   value={localSearch}
                   onChange={(event) => setLocalSearch(event.target.value)}
-                  className="app-input text-sm py-2 w-full"
-                  style={{ paddingLeft: '2.25rem' }}
+                  className="app-input text-sm py-2.5 w-full"
+                  style={{ paddingLeft: '2.5rem' }}
                   placeholder="Refine visible results"
                 />
               </div>
@@ -657,32 +669,44 @@ export default function ModernJobSearchPage() {
             filteredJobs.length ? (
               <>
                 {result.jobs.length ? (
-                  <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <div className={getStatCardClasses('green')}>
-                      <p className="app-field-label">Fresh Listings</p>
-                      <p className="mt-2 text-2xl font-black tracking-[-0.04em]">{dashboardStats.freshJobs}</p>
-                      <p className="mt-1 text-xs">Posted in last 7 days</p>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-500/15"><span className="material-symbols-outlined text-[16px] text-emerald-400">fiber_new</span></span>
+                        <p className="text-[10px] uppercase tracking-[0.2em] font-bold">Fresh Listings</p>
+                      </div>
+                      <p className="text-3xl font-black tracking-tight">{dashboardStats.freshJobs}</p>
+                      <p className="mt-1 text-xs opacity-80">Posted in last 7 days</p>
                     </div>
 
                     <div className={getStatCardClasses(dashboardStats.averageGhostRisk >= 50 ? 'red' : 'amber')}>
-                      <p className="app-field-label">Ghost Risk</p>
-                      <p className="mt-2 text-2xl font-black tracking-[-0.04em]">{dashboardStats.averageGhostRisk}%</p>
-                      <p className="mt-1 text-xs">{dashboardStats.ghostAlertCount} listings flagged as high risk</p>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-current/10"><span className="material-symbols-outlined text-[16px]">visibility_off</span></span>
+                        <p className="text-[10px] uppercase tracking-[0.2em] font-bold">Ghost Risk</p>
+                      </div>
+                      <p className="text-3xl font-black tracking-tight">{dashboardStats.averageGhostRisk}%</p>
+                      <p className="mt-1 text-xs opacity-80">{dashboardStats.ghostAlertCount} listings flagged</p>
                     </div>
 
                     {submittedSearch.useAnalysis ? (
                       <div className={getStatCardClasses('purple')}>
-                        <p className="app-field-label">Strong Matches</p>
-                        <p className="mt-2 text-2xl font-black tracking-[-0.04em]">{dashboardStats.strongMatchCount}</p>
-                        <p className="mt-1 text-xs">Jobs matching your profile 70%+</p>
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-fuchsia-500/15"><span className="material-symbols-outlined text-[16px] text-fuchsia-300">auto_awesome</span></span>
+                          <p className="text-[10px] uppercase tracking-[0.2em] font-bold">Strong Matches</p>
+                        </div>
+                        <p className="text-3xl font-black tracking-tight">{dashboardStats.strongMatchCount}</p>
+                        <p className="mt-1 text-xs opacity-80">Profile fit 70%+</p>
                       </div>
                     ) : null}
 
                     {isInternshipSearch ? (
                       <div className={getStatCardClasses('red')}>
-                        <p className="app-field-label">Exploitation Alerts</p>
-                        <p className="mt-2 text-2xl font-black tracking-[-0.04em]">{dashboardStats.exploitationCount}</p>
-                        <p className="mt-1 text-xs">Internships with unfair stipends</p>
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-500/15"><span className="material-symbols-outlined text-[16px] text-rose-300">warning</span></span>
+                          <p className="text-[10px] uppercase tracking-[0.2em] font-bold">Exploitation Alerts</p>
+                        </div>
+                        <p className="text-3xl font-black tracking-tight">{dashboardStats.exploitationCount}</p>
+                        <p className="mt-1 text-xs opacity-80">Unfair stipend detected</p>
                       </div>
                     ) : null}
                   </section>
@@ -703,30 +727,35 @@ export default function ModernJobSearchPage() {
                           key={job.id}
                           type="button"
                           onClick={() => setSelectedJobId(job.id)}
-                          className={`w-full rounded-[1.25rem] border p-4 text-left transition ${
+                          className={`group/card w-full rounded-[2rem] border p-5 text-left transition-all duration-200 ${
                             isSelected
-                              ? 'border-[var(--accent)] bg-[var(--accent-soft)] shadow-[0_8px_20px_rgba(0,0,0,0.06)] ring-1 ring-[var(--accent)]'
-                              : 'border-[var(--border)] bg-[var(--panel)] hover:bg-[var(--panel-soft)] hover:border-[var(--accent)]/30'
+                              ? 'border-[var(--accent)]/50 bg-[var(--accent-soft)] shadow-[0_8px_30px_rgba(78,222,163,0.08)] ring-1 ring-[var(--accent)]'
+                              : 'border-[var(--border)] bg-[var(--panel)] hover:bg-[var(--panel-soft)] hover:border-[var(--accent)]/30 hover:-translate-y-0.5 hover:shadow-lg'
                           }`}
                         >
                           {job.isScam ? (
                             <div
                               title="Shows patterns common in fraudulent job postings"
-                              className="mb-3 rounded-[0.75rem] border border-rose-500/30 bg-rose-500/15 px-3 py-2 text-xs font-medium text-rose-200"
+                              className="mb-3 flex items-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/10 px-3.5 py-2 text-xs font-bold text-rose-400"
                             >
-                              ⚠ Unverified listing - verify before applying
+                              <span className="material-symbols-outlined text-[16px]">shield</span>
+                              Unverified listing - verify before applying
                             </div>
                           ) : null}
 
                           <div className="flex items-center justify-between gap-4">
                             <div className="space-y-1.5 flex-1 min-w-0">
-                              <div className="flex items-center gap-3">
-                                <div className="min-w-[48px] shrink-0 rounded-[0.5rem] border border-[var(--border)] bg-[var(--panel-soft)] px-2 py-1.5 text-center flex flex-col justify-center items-center">
-                                  <p className="text-base font-black tracking-[-0.04em] text-[var(--text)]">{job.matchScore}</p>
-                                  <p className="text-[9px] uppercase font-bold text-[var(--muted-strong)] tracking-wider">Fit</p>
+                              <div className="flex items-center gap-4">
+                                <div className={`min-w-[52px] shrink-0 rounded-xl border px-2.5 py-2 text-center flex flex-col justify-center items-center transition-colors ${
+                                  job.matchScore >= 85 ? 'border-emerald-500/25 bg-emerald-500/10' : job.matchScore >= 70 ? 'border-cyan-500/25 bg-cyan-500/10' : 'border-amber-500/25 bg-amber-500/10'
+                                }`}>
+                                  <p className={`text-lg font-black tracking-tight ${
+                                    job.matchScore >= 85 ? 'text-emerald-400' : job.matchScore >= 70 ? 'text-cyan-400' : 'text-amber-400'
+                                  }`}>{job.matchScore}</p>
+                                  <p className="text-[9px] uppercase font-bold text-[var(--muted)] tracking-wider">Fit</p>
                                 </div>
                                 <div className="min-w-0">
-                                  <h4 className="text-base font-bold tracking-[-0.02em] text-[var(--text)] truncate">{job.title}</h4>
+                                  <h4 className="text-base font-black tracking-tight text-[var(--text)] truncate group-hover/card:text-[var(--accent-strong)] transition-colors">{job.title}</h4>
                                   <p className="text-sm font-medium text-[var(--muted-strong)] truncate mt-0.5">
                                     {job.company} · {job.location}
                                   </p>
@@ -735,15 +764,22 @@ export default function ModernJobSearchPage() {
                             </div>
                             <div className="flex shrink-0 items-center justify-end gap-3">
                                <div className="hidden md:flex flex-wrap items-center justify-end gap-2 max-w-[400px]">
-                                 <span className="app-chip py-1 px-2.5 text-[11px] whitespace-nowrap">{job.compensation}</span>
-                                 <span className="app-chip py-1 px-2.5 text-[11px] whitespace-nowrap">{job.postedLabel}</span>
+                                 <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--panel-soft)] py-1 px-2.5 text-[10px] font-bold text-[var(--muted-strong)]">
+                                   <span className="material-symbols-outlined text-[12px]">payments</span>
+                                   {job.compensation}
+                                 </span>
+                                 <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--panel-soft)] py-1 px-2.5 text-[10px] font-bold text-[var(--muted-strong)]">
+                                   <span className="material-symbols-outlined text-[12px]">schedule</span>
+                                   {job.postedLabel}
+                                 </span>
                                  {job.isScam ? (
-                                   <span className="rounded-full border border-[var(--danger-border)] bg-[var(--danger-soft)] px-2 py-1 text-[11px] font-medium text-rose-300">
-                                     Verify carefully
+                                   <span className="inline-flex items-center gap-1 rounded-full border border-rose-500/20 bg-rose-500/10 px-2 py-1 text-[10px] font-bold text-rose-400">
+                                     <span className="material-symbols-outlined text-[12px]">error</span>
+                                     Verify
                                    </span>
                                  ) : null}
                                </div>
-                               <span className="material-symbols-outlined text-[var(--muted)]">chevron_right</span>
+                               <span className="material-symbols-outlined text-[var(--muted)] transition-transform group-hover/card:translate-x-1">chevron_right</span>
                             </div>
                           </div>
                         </button>
@@ -751,25 +787,27 @@ export default function ModernJobSearchPage() {
                     })}
 
                     {totalPages > 1 && (
-                      <div className="flex items-center justify-between mt-6 rounded-[1.25rem] border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-3">
+                      <div className="flex items-center justify-between mt-6 rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] px-5 py-3">
                         <button
                           type="button"
-                          className="app-button-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="inline-flex items-center gap-1.5 app-button-secondary text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                           disabled={currentPage === 1}
                           onClick={() => setCurrentPage((prev) => prev - 1)}
                         >
+                          <span className="material-symbols-outlined text-[16px]">chevron_left</span>
                           Previous
                         </button>
-                        <span className="text-sm font-medium text-[var(--muted-strong)]">
-                          Page {currentPage} of {totalPages}
+                        <span className="text-sm font-bold text-[var(--muted-strong)]">
+                          Page <span className="text-[var(--text)]">{currentPage}</span> of <span className="text-[var(--text)]">{totalPages}</span>
                         </span>
                         <button
                           type="button"
-                          className="app-button-secondary text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="inline-flex items-center gap-1.5 app-button-secondary text-sm disabled:opacity-40 disabled:cursor-not-allowed"
                           disabled={currentPage === totalPages}
                           onClick={() => setCurrentPage((prev) => prev + 1)}
                         >
                           Next
+                          <span className="material-symbols-outlined text-[16px]">chevron_right</span>
                         </button>
                       </div>
                     )}
@@ -777,18 +815,25 @@ export default function ModernJobSearchPage() {
 
                 {selectedJobId && selectedJob ? (
                   <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 sm:p-6">
-                    <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity" onClick={() => setSelectedJobId(null)} />
-                    <div className="relative w-full max-w-2xl max-h-[90vh] bg-[var(--bg)] rounded-[1.5rem] border border-[var(--border)] shadow-2xl flex flex-col overflow-hidden z-10">
-                      <header className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] bg-[var(--panel-soft)] shrink-0">
-                        <h3 className="text-[15px] font-bold tracking-[-0.01em] text-[var(--text)] truncate pr-4">Role Details</h3>
-                        <button type="button" onClick={() => setSelectedJobId(null)} className="flex items-center justify-center hover:bg-[var(--border)]/50 rounded-full p-1.5 transition text-[var(--muted-strong)] hover:text-[var(--text)]">
+                    <div className="absolute inset-0 bg-black/50 backdrop-blur-md transition-opacity" onClick={() => setSelectedJobId(null)} />
+                    <div className="relative w-full max-w-2xl max-h-[90vh] bg-[var(--bg)] rounded-[2rem] border border-[var(--border)] shadow-[0_20px_60px_rgba(0,0,0,0.3)] flex flex-col overflow-hidden z-10">
+                      <header className="flex items-center justify-between px-6 py-5 border-b border-[var(--border)] bg-[var(--panel-soft)] shrink-0 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(78,222,163,0.06),transparent_60%)] pointer-events-none" />
+                        <div className="relative flex items-center gap-3">
+                          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/20">
+                            <span className="material-symbols-outlined text-[16px] text-[var(--accent-strong)]">work</span>
+                          </span>
+                          <h3 className="text-lg font-black tracking-tight text-[var(--text)] truncate pr-4">Role Details</h3>
+                        </div>
+                        <button type="button" onClick={() => setSelectedJobId(null)} className="relative flex items-center justify-center h-9 w-9 rounded-xl hover:bg-[var(--panel-strong)] transition text-[var(--muted-strong)] hover:text-[var(--text)]">
                           <span className="material-symbols-outlined text-[20px]">close</span>
                         </button>
                       </header>
                       <div className="flex-1 overflow-y-auto p-6 custom-scrollbar space-y-6">
                         {selectedJob.isScam ? (
-                          <div title="Shows patterns common in fraudulent job postings" className="rounded-[1rem] border border-rose-500/30 bg-rose-500/15 px-4 py-3 text-sm font-medium text-rose-200">
-                            ⚠ Unverified listing - verify before applying
+                          <div title="Shows patterns common in fraudulent job postings" className="flex items-center gap-3 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm font-bold text-rose-400">
+                            <span className="material-symbols-outlined text-[18px]">shield</span>
+                            Unverified listing - verify before applying
                           </div>
                         ) : null}
 
@@ -796,27 +841,29 @@ export default function ModernJobSearchPage() {
                           <div className="space-y-3">
                             <div className="flex flex-wrap gap-2">
                               {renderSourceTone(selectedJob.source) && (
-                                <span className="rounded-full border border-[var(--border)] bg-[var(--panel-soft)] px-2.5 py-1 text-[10px] uppercase tracking-[0.15em] text-[var(--muted-strong)] font-semibold">
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--panel-soft)] px-3 py-1 text-[10px] uppercase tracking-[0.15em] text-[var(--muted-strong)] font-bold">
+                                  <span className="material-symbols-outlined text-[12px]">language</span>
                                   {renderSourceTone(selectedJob.source)}
                                 </span>
                               )}
-                              <span className={`rounded-full border px-2.5 py-1 text-[10px] uppercase tracking-[0.15em] font-semibold ${selectedJob.tone.className}`}>
+                              <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.15em] font-bold ${selectedJob.tone.className}`}>
+                                <span className="h-1.5 w-1.5 rounded-full bg-current opacity-70" />
                                 {selectedJob.tone.label}
                               </span>
                             </div>
                             <div>
-                              <h3 className="text-xl font-black tracking-[-0.03em] text-[var(--text)]">{selectedJob.title}</h3>
-                              <p className="text-sm font-medium text-[var(--muted-strong)] mt-1">
+                              <h3 className="text-xl font-black tracking-tight text-[var(--text)]">{selectedJob.title}</h3>
+                              <p className="text-sm font-medium text-[var(--muted-strong)] mt-1.5">
                                 {selectedJob.company} · {selectedJob.location}
                               </p>
                             </div>
                           </div>
 
-                          <div className="min-w-[72px] shrink-0 rounded-[1rem] border border-[var(--border)] bg-[var(--panel-soft)] px-3 py-3 text-center">
-                            <p className={`text-2xl font-black tracking-[-0.05em] ${selectedJob.match?.matchColor === 'green' ? 'text-emerald-300' : selectedJob.match?.matchColor === 'amber' ? 'text-amber-300' : 'text-rose-300'}`}>
+                          <div className={`min-w-[72px] shrink-0 rounded-2xl border px-3 py-3 text-center ${selectedJob.match?.matchColor === 'green' ? 'border-emerald-500/25 bg-emerald-500/10' : selectedJob.match?.matchColor === 'amber' ? 'border-amber-500/25 bg-amber-500/10' : 'border-rose-500/25 bg-rose-500/10'}`}>
+                            <p className={`text-3xl font-black tracking-tight ${selectedJob.match?.matchColor === 'green' ? 'text-emerald-400' : selectedJob.match?.matchColor === 'amber' ? 'text-amber-400' : 'text-rose-400'}`}>
                               {selectedJob.matchScore}%
                             </p>
-                            <p className="app-field-label mt-1">Match</p>
+                            <p className="text-[10px] uppercase tracking-[0.18em] font-bold text-[var(--muted)] mt-1">Match</p>
                           </div>
                         </div>
 
@@ -971,27 +1018,41 @@ export default function ModernJobSearchPage() {
                 ) : null}
               </>
             ) : jobsQuery.isFetching ? (
-              <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] px-6 py-12 text-center flex flex-col items-center justify-center space-y-4">
-                <span className="material-symbols-outlined animate-spin text-3xl text-[var(--accent)]">progress_activity</span>
-                <p className="text-sm font-medium text-[var(--text)]">Searching active sources...</p>
+              <div className="rounded-[2rem] border border-[var(--border)] bg-[var(--panel-soft)] px-6 py-16 text-center flex flex-col items-center justify-center space-y-5">
+                <span className="material-symbols-outlined animate-spin text-4xl text-[var(--accent)]">progress_activity</span>
+                <div>
+                  <p className="text-base font-bold text-[var(--text)]">Searching active sources...</p>
+                  <p className="text-sm text-[var(--muted-strong)] mt-1">This may take a moment</p>
+                </div>
               </div>
             ) : (
-              <div className="rounded-[1.5rem] border border-dashed border-[var(--border)] px-6 py-12 text-center text-sm text-[var(--muted-strong)]">
+              <div className="rounded-[2rem] border border-dashed border-[var(--border)] px-6 py-16 text-center flex flex-col items-center justify-center">
                 {result.exhausted ? (
                   <div className="space-y-4">
-                    <p>All sources are temporarily limited. Please retry in a few minutes.</p>
-                    <button type="button" onClick={handleRetry} className="app-button-secondary mx-auto">
+                    <span className="material-symbols-outlined text-4xl text-[var(--muted)]">cloud_off</span>
+                    <p className="text-base font-bold text-[var(--text)]">Sources temporarily limited</p>
+                    <p className="text-sm text-[var(--muted-strong)]">Please retry in a few minutes.</p>
+                    <button type="button" onClick={handleRetry} className="app-button-secondary mx-auto mt-2">
+                      <span className="material-symbols-outlined text-[16px]">refresh</span>
                       Retry search
                     </button>
                   </div>
                 ) : (
-                  'No roles matched your current search and filter combination. Try a broader title, a different focus, or clear the local refinement box.'
+                  <div className="space-y-3">
+                    <span className="material-symbols-outlined text-4xl text-[var(--muted)]">search_off</span>
+                    <p className="text-base font-bold text-[var(--text)]">No results found</p>
+                    <p className="text-sm text-[var(--muted-strong)] max-w-md">Try a broader title, a different focus, or clear the local refinement box.</p>
+                  </div>
                 )}
               </div>
             )
           ) : (
-            <div className="rounded-[1.5rem] border border-dashed border-[var(--border)] px-6 py-12 text-center text-sm text-[var(--muted-strong)]">
-              Start a search to pull jobs from the routed Aptico sources.
+            <div className="rounded-[2rem] border border-dashed border-[var(--border)] px-6 py-16 text-center flex flex-col items-center justify-center space-y-4">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-[var(--panel)] border border-[var(--border)] shadow-xl">
+                <span className="material-symbols-outlined text-3xl text-[var(--muted)]">explore</span>
+              </div>
+              <p className="text-base font-bold text-[var(--text)]">Ready to Discover</p>
+              <p className="text-sm text-[var(--muted-strong)] max-w-md">Start a search to pull jobs from the routed Aptico sources.</p>
             </div>
           )}
 

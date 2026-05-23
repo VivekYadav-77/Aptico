@@ -52,7 +52,7 @@ function AnimatedFadeIn({ children, id }) {
   }, [id]);
 
   return (
-    <div className={`transition-all duration-500 transform ${show ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
+    <div className={`transition-all duration-700 ease-out transform ${show ? 'opacity-100 translate-y-0 blur-none scale-100' : 'opacity-0 translate-y-6 blur-[2px] scale-[0.98]'}`}>
       {children}
     </div>
   );
@@ -63,15 +63,15 @@ function ToggleRow({ title, description, checked, onToggle }) {
     <button
       type="button"
       onClick={onToggle}
-      className={`group flex w-full items-center justify-between rounded-2xl border p-5 text-left transition-all duration-300 ${
-        checked ? 'border-[var(--accent)]/30 bg-[var(--accent-soft)] hover:border-[var(--accent)]/50' : 'border-[var(--border)] bg-[var(--panel-soft)] hover:border-[var(--muted-strong)]'
+      className={`group flex w-full items-center justify-between gap-4 rounded-3xl border p-4 sm:p-5 text-left transition-all duration-500 hover:shadow-lg hover:shadow-[var(--accent)]/5 hover:-translate-y-1 ${
+        checked ? 'border-[var(--accent)]/60 bg-gradient-to-r from-[var(--accent-soft)] via-transparent to-transparent shadow-[var(--accent)]/15' : 'border-[var(--border)] bg-[var(--panel-soft)] hover:border-[var(--muted-strong)] hover:bg-[var(--panel)]'
       }`}
     >
-      <div className="pr-4">
+      <div className="pr-4 flex-1">
         <p className={`font-bold transition-colors ${checked ? 'text-[var(--text)]' : 'text-[var(--text)]'}`}>{title}</p>
         <p className="mt-1 text-sm text-[var(--muted-strong)] group-hover:text-[var(--muted-strong-hover)]">{description}</p>
       </div>
-      <div className={`app-switch shrink-0 ${checked ? 'is-on shadow-md shadow-[var(--accent)]/20' : ''}`} />
+      <div className={`app-switch shrink-0 ${checked ? 'is-on shadow-lg shadow-[var(--accent)]/30 scale-105' : ''}`} />
     </button>
   );
 }
@@ -81,7 +81,7 @@ function SelectField({ label, value, onChange, options }) {
     <label className="space-y-2 block">
       <span className="app-field-label ml-1">{label}</span>
       <select 
-        className="app-input w-full cursor-pointer focus:ring-2 focus:ring-[var(--accent)]/20 transition-shadow" 
+        className="app-input w-full cursor-pointer focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]/60 shadow-sm focus:shadow-md hover:border-[var(--accent)]/40 focus:bg-[var(--accent-soft)]/5 transition-shadow" 
         value={value} 
         onChange={onChange}
       >
@@ -101,7 +101,7 @@ function InputField({ label, value, onChange, type = "text", placeholder }) {
       <span className="app-field-label ml-1">{label}</span>
       <input 
         type={type} 
-        className="app-input w-full focus:ring-2 focus:ring-[var(--accent)]/20 transition-all font-medium" 
+        className="app-input w-full focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]/60 shadow-sm focus:shadow-md hover:border-[var(--accent)]/40 focus:bg-[var(--accent-soft)]/5 transition-all font-medium" 
         value={value || ''} 
         onChange={onChange}
         placeholder={placeholder}
@@ -115,7 +115,7 @@ function TextAreaField({ label, value, onChange, placeholder, minHeight = "min-h
     <label className="space-y-2 block">
       <span className="app-field-label ml-1">{label}</span>
       <textarea 
-        className={`app-input w-full focus:ring-2 focus:ring-[var(--accent)]/20 transition-all font-medium resize-y ${minHeight}`} 
+        className={`app-input w-full focus:ring-2 focus:ring-[var(--accent)]/40 focus:border-[var(--accent)]/60 shadow-sm focus:shadow-md hover:border-[var(--accent)]/40 focus:bg-[var(--accent-soft)]/5 transition-all font-medium resize-y ${minHeight}`} 
         value={value || ''} 
         onChange={onChange}
         placeholder={placeholder}
@@ -218,7 +218,7 @@ export default function SettingsWorkspace() {
         <div className="flex gap-3">
           <button 
             type="button" 
-            className="app-button shadow-lg shadow-[var(--accent)]/20 hover:shadow-[var(--accent)]/40 transition-shadow flex items-center gap-2" 
+            className="app-button bg-gradient-to-r from-[var(--accent)] via-[var(--accent-strong)] to-[var(--accent)] bg-[length:200%_auto] hover:bg-[position:right_center] text-white border-0 shadow-lg shadow-[var(--accent)]/30 hover:shadow-xl hover:shadow-[var(--accent)]/50 hover:-translate-y-0.5 transition-all duration-500 flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold" 
             onClick={() => void handleSave()} 
             disabled={isSaving}
           >
@@ -249,34 +249,35 @@ export default function SettingsWorkspace() {
         </div>
       )}
 
-      <section className="mx-auto max-w-6xl grid gap-8 xl:grid-cols-[280px_1fr]">
+      <section className="mx-auto w-full max-w-6xl grid gap-6 lg:gap-8 lg:grid-cols-[280px_1fr]">
         {/* Navigation Sidebar */}
         <aside className="space-y-4">
-          <div className="app-panel border border-[var(--border)] shadow-sm sticky top-24 p-4">
-            <p className="text-xs font-black uppercase tracking-widest text-[var(--muted-strong)] mb-4 px-2">Configuration</p>
-            <nav className="space-y-1.5">
+          <div className="app-panel border border-[var(--border)] shadow-sm lg:sticky top-24 p-4">
+            <p className="text-xs font-black uppercase tracking-widest text-[var(--muted-strong)] mb-4 px-2 hidden lg:block">Configuration</p>
+            <nav className="flex gap-2 overflow-x-auto pb-2 lg:pb-0 lg:flex-col hide-scrollbar snap-x">
               {settingSections.map(({ id, icon: Icon, description }) => (
                 <button
                   key={id}
                   type="button"
                   onClick={() => setActiveSection(id)}
-                  className={`group w-full flex items-center gap-4 rounded-xl px-4 py-3.5 transition-all duration-300 outline-none focus:ring-2 focus:ring-[var(--accent)]/50 ${
+                  className={`group shrink-0 lg:w-full flex items-center gap-3 lg:gap-4 rounded-xl px-4 py-3.5 transition-all duration-300 outline-none focus:ring-2 focus:ring-[var(--accent)]/50 snap-start relative overflow-hidden ${
                     activeSection === id
-                      ? 'bg-[var(--accent)] text-white shadow-md'
-                      : 'hover:bg-[var(--panel-soft)] text-[var(--muted-strong)] hover:text-[var(--text)]'
+                      ? 'bg-gradient-to-r from-[var(--accent)] to-[var(--accent-strong)] text-white shadow-lg shadow-[var(--accent)]/30 border-transparent scale-[1.02] lg:scale-100'
+                      : 'hover:bg-[var(--panel-soft)] text-[var(--muted-strong)] hover:text-[var(--text)] border border-[var(--border)] lg:border-transparent hover:shadow-sm hover:border-[var(--accent)]/30'
                   }`}
                 >
-                  <Icon className={`w-5 h-5 ${activeSection === id ? 'text-white' : 'text-[var(--muted-strong)] group-hover:text-[var(--text)]'}`} />
-                  <div className="text-left flex-1">
+                  <Icon className={`w-5 h-5 shrink-0 transition-transform duration-300 ${activeSection === id ? 'text-white scale-110' : 'text-[var(--muted-strong)] group-hover:text-[var(--text)] group-hover:scale-110'}`} />
+                  <div className="text-left hidden lg:block flex-1">
                     <p className={`text-sm font-bold ${activeSection === id ? 'text-white' : 'text-[var(--text)]'}`}>{id}</p>
                     <p className={`text-xs mt-0.5 ${activeSection === id ? 'text-white/80' : 'text-[var(--muted-strong)]'}`}>{description}</p>
                   </div>
-                  {activeSection === id && <span className="w-1.5 h-1.5 rounded-full bg-white shadow-sm" />}
+                  <span className={`text-sm font-bold block lg:hidden ${activeSection === id ? 'text-white' : 'text-[var(--text)]'}`}>{id}</span>
+                  {activeSection === id && <span className="hidden lg:block w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_2px_rgba(255,255,255,0.8)] animate-pulse" />}
                 </button>
               ))}
             </nav>
             
-            <div className="mt-8 pt-6 border-t border-[var(--border)] px-2">
+            <div className="mt-4 lg:mt-8 pt-4 lg:pt-6 border-t border-[var(--border)] px-2">
               <button 
                 type="button" 
                 className="w-full flex items-center justify-center gap-2 text-sm font-bold text-[var(--warning-text)] hover:text-[var(--warning-strong)] hover:bg-[var(--warning-soft)] py-2 rounded-lg transition-colors" 
@@ -291,14 +292,17 @@ export default function SettingsWorkspace() {
         </aside>
 
         {/* Main Content Area */}
-        <div className="space-y-6">
-          <article className="app-panel border border-[var(--border)] shadow-sm overflow-hidden p-0 relative">
-            <div className="h-1 bg-gradient-to-r from-[var(--accent)] to-[var(--accent-strong)] w-full block"></div>
+        <div className="space-y-6 min-w-0">
+          <article className="app-panel border border-[var(--border)]/60 shadow-2xl shadow-[var(--accent)]/5 overflow-hidden p-0 relative bg-gradient-to-b from-[var(--panel)] to-[var(--panel-soft)] backdrop-blur-xl transition-all duration-500">
+            <div className="h-1.5 bg-gradient-to-r from-[var(--accent)] via-purple-500 to-[var(--accent-strong)] w-full block opacity-90 animate-gradient-x bg-[length:200%_auto]"></div>
             
-            <div className="p-8">
-              <div className="flex items-center gap-4 mb-8 pb-6 border-b border-[var(--border)]">
-                <div className="p-3 bg-[var(--accent-soft)] text-[var(--accent)] rounded-2xl w-14 h-14 flex items-center justify-center">
-                  <ActiveIcon className="w-7 h-7" />
+            <div className="p-5 sm:p-6 lg:p-8 relative">
+              {/* Subtle decorative background glow */}
+              <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--accent)]/5 rounded-full blur-3xl pointer-events-none -translate-y-1/2 translate-x-1/3"></div>
+              
+              <div className="flex flex-col sm:flex-row sm:items-center gap-5 mb-6 lg:mb-8 pb-6 border-b border-[var(--border)]/60 relative z-10 group">
+                <div className="p-3 bg-gradient-to-br from-[var(--accent-soft)] to-[var(--panel)] text-[var(--accent)] rounded-2xl w-14 h-14 flex items-center justify-center shrink-0 shadow-inner border border-[var(--accent)]/10 ring-1 ring-white/20 group-hover:scale-110 group-hover:rotate-3 transition-transform duration-500 ease-out">
+                  <ActiveIcon className="w-7 h-7 drop-shadow-sm" />
                 </div>
                 <div>
                   <h2 className="text-2xl font-black text-[var(--text)] tracking-tight">{activeSection} Configuration</h2>
@@ -331,7 +335,7 @@ export default function SettingsWorkspace() {
                   {/* --- PROFILE SECTION --- */}
                   {activeSection === 'Profile' && (
                     <div className="space-y-8">
-                      <div className="grid gap-6 md:grid-cols-2 bg-[var(--panel-soft)]/50 p-6 rounded-2xl border border-[var(--border)]/50">
+                      <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 bg-gradient-to-br from-[var(--panel-soft)] to-[var(--panel)] p-5 sm:p-7 rounded-3xl border border-[var(--border)]/60 shadow-sm hover:shadow-lg hover:shadow-[var(--accent)]/5 hover:border-[var(--accent)]/20 transition-all duration-500">
                         <InputField label="First Name" value={draft.firstName} onChange={(e) => updateField('firstName', e.target.value)} />
                         <InputField label="Last Name" value={draft.lastName} onChange={(e) => updateField('lastName', e.target.value)} />
                         <div className="md:col-span-2">
@@ -339,7 +343,7 @@ export default function SettingsWorkspace() {
                         </div>
                       </div>
 
-                      <div className="grid gap-6 md:grid-cols-2">
+                      <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
                         <InputField type="email" label="Primary Email" value={draft.email} onChange={(e) => updateField('email', e.target.value)} />
                         <InputField type="tel" label="Phone Number" value={draft.phone} onChange={(e) => updateField('phone', e.target.value)} />
                         <InputField label="Location" value={draft.location} onChange={(e) => updateField('location', e.target.value)} placeholder="e.g. San Francisco, CA (or Remote)" />
@@ -347,7 +351,7 @@ export default function SettingsWorkspace() {
 
                       <div className="pt-6 border-t border-[var(--border)]">
                         <h3 className="text-sm font-bold text-[var(--text)] mb-4">Digital Links</h3>
-                        <div className="grid gap-6 md:grid-cols-2">
+                        <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
                           <InputField type="url" label="Personal Website" value={draft.website} onChange={(e) => updateField('website', e.target.value)} placeholder="https://" />
                           <InputField type="url" label="Portfolio URL" value={draft.portfolio} onChange={(e) => updateField('portfolio', e.target.value)} placeholder="https://" />
                           <InputField type="url" label="LinkedIn URL" value={draft.linkedin} onChange={(e) => updateField('linkedin', e.target.value)} placeholder="https://linkedin.com/in/..." />
@@ -370,7 +374,7 @@ export default function SettingsWorkspace() {
                   {/* --- CAREER SECTION --- */}
                   {activeSection === 'Career' && (
                     <div className="space-y-8">
-                      <div className="grid gap-6 md:grid-cols-3 bg-[var(--panel-soft)]/50 p-6 rounded-2xl border border-[var(--border)]/50">
+                      <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-3 bg-gradient-to-br from-[var(--panel-soft)] to-[var(--panel)] p-5 sm:p-7 rounded-3xl border border-[var(--border)]/60 shadow-sm hover:shadow-lg hover:shadow-[var(--accent)]/5 hover:border-[var(--accent)]/20 transition-all duration-500">
                         <SelectField
                           label="Current Status"
                           value={draft.currentStatus}
@@ -386,7 +390,7 @@ export default function SettingsWorkspace() {
                         <InputField type="number" label="Years of Experience" value={draft.yearsExperience} onChange={(e) => updateField('yearsExperience', e.target.value)} />
                       </div>
 
-                      <div className="grid gap-6 md:grid-cols-2">
+                      <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
                         <InputField label="Current Title" value={draft.currentTitle} onChange={(e) => updateField('currentTitle', e.target.value)} placeholder="e.g. Software Engineer" />
                         <InputField label="Current Company" value={draft.currentCompany} onChange={(e) => updateField('currentCompany', e.target.value)} placeholder="e.g. Tech Corp" />
                         <InputField label="Industry" value={draft.industry} onChange={(e) => updateField('industry', e.target.value)} placeholder="e.g. Computer Software" />
@@ -424,11 +428,11 @@ export default function SettingsWorkspace() {
 
                       <div className="pt-6 border-t border-[var(--border)]">
                         <h3 className="text-sm font-bold text-[var(--text)] mb-4">Expertise & Accomplishments</h3>
-                        <div className="grid gap-6 md:grid-cols-2">
+                        <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
                           <TextAreaField label="Top Skills (Comma separated)" value={formatList(draft.topSkills)} onChange={(e) => updateListField('topSkills', e.target.value)} placeholder="e.g. React, Node.js, Frontend Architecture" />
                           <TextAreaField label="Tools & Stack (Comma separated)" value={formatList(draft.tools)} onChange={(e) => updateListField('tools', e.target.value)} placeholder="e.g. VS Code, Figma, AWS, Next.js" />
                         </div>
-                        <div className="grid gap-6 md:grid-cols-2 mt-6">
+                        <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 mt-6">
                           <TextAreaField label="Languages (Comma separated)" value={formatList(draft.languages)} onChange={(e) => updateListField('languages', e.target.value)} placeholder="e.g. English (Native), Spanish (Basic)" />
                           <TextAreaField label="Key Achievements (Comma separated)" value={formatList(draft.achievements)} onChange={(e) => updateListField('achievements', e.target.value)} placeholder="e.g. Increased conversion by 20%, Led team of 5" minHeight="min-h-[120px]" />
                         </div>
@@ -439,7 +443,7 @@ export default function SettingsWorkspace() {
                   {/* --- EDUCATION SECTION --- */}
                   {activeSection === 'Education' && (
                     <div className="space-y-8">
-                      <div className="grid gap-6 md:grid-cols-2 bg-[var(--panel-soft)]/50 p-6 rounded-2xl border border-[var(--border)]/50">
+                      <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2 bg-gradient-to-br from-[var(--panel-soft)] to-[var(--panel)] p-5 sm:p-7 rounded-3xl border border-[var(--border)]/60 shadow-sm hover:shadow-lg hover:shadow-[var(--accent)]/5 hover:border-[var(--accent)]/20 transition-all duration-500">
                         <InputField label="School or University" value={draft.school} onChange={(e) => updateField('school', e.target.value)} placeholder="e.g. University of Example" />
                         <InputField label="Degree" value={draft.degree} onChange={(e) => updateField('degree', e.target.value)} placeholder="e.g. Bachelor of Science" />
                         <InputField label="Field of Study" value={draft.fieldOfStudy} onChange={(e) => updateField('fieldOfStudy', e.target.value)} placeholder="e.g. Computer Science" />
@@ -460,22 +464,22 @@ export default function SettingsWorkspace() {
                     <div className="space-y-6">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium text-[var(--muted-strong)]">Add your work history entries. Most recent first.</p>
-                        <button type="button" className="app-button text-sm py-2 px-4" onClick={() => updateField('experiences', [...(draft.experiences || []), createEmptyExperience()])}>+ Add Experience</button>
+                        <button type="button" className="app-button text-sm py-2 px-5 bg-[var(--panel)] border border-[var(--border)] hover:border-[var(--accent)] hover:text-[var(--accent)] hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 font-bold rounded-xl shadow-sm" onClick={() => updateField('experiences', [...(draft.experiences || []), createEmptyExperience()])}>+ Add Experience</button>
                       </div>
                       {(draft.experiences || []).length === 0 && (
-                        <div className="p-8 rounded-2xl border border-dashed border-[var(--border)] text-center text-[var(--muted-strong)] bg-[var(--panel-soft)]">
+                        <div className="p-10 rounded-3xl border-2 border-dashed border-[var(--border)] text-center text-[var(--muted-strong)] bg-gradient-to-b from-[var(--panel-soft)] to-transparent hover:border-[var(--accent)]/50 hover:shadow-lg hover:shadow-[var(--accent)]/5 transition-all duration-500 group cursor-pointer">
                           <Icons.Career className="w-8 h-8 mx-auto mb-3 opacity-40" />
                           <p className="font-bold text-sm">No experience added yet</p>
                           <p className="text-xs mt-1">Click "Add Experience" to start building your work history.</p>
                         </div>
                       )}
                       {(draft.experiences || []).map((exp, idx) => (
-                        <div key={exp.id || idx} className="p-6 rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] space-y-4 relative group">
+                        <div key={exp.id || idx} className="p-6 rounded-3xl border border-[var(--border)] bg-gradient-to-br from-[var(--panel)] to-[var(--panel-soft)] shadow-sm hover:shadow-xl hover:shadow-[var(--accent)]/10 hover:-translate-y-1 hover:border-[var(--accent)]/40 transition-all duration-500 space-y-4 relative group before:absolute before:inset-0 before:bg-gradient-to-r before:from-[var(--accent)]/5 before:to-transparent before:opacity-0 hover:before:opacity-100 before:transition-opacity before:duration-500 before:rounded-3xl overflow-hidden">
                           <button type="button" onClick={() => updateField('experiences', draft.experiences.filter((_, i) => i !== idx))} className="absolute top-3 right-3 text-xs font-bold text-[var(--warning-text)] opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[var(--warning-soft)] px-2 py-1 rounded-lg">Remove</button>
-                          <div className="grid gap-4 md:grid-cols-2">
+                          <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
                             <InputField label="Job Title" value={exp.title} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], title: e.target.value }; updateField('experiences', next); }} placeholder="e.g. Software Engineer" />
                             <InputField label="Company" value={exp.company} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], company: e.target.value }; updateField('experiences', next); }} placeholder="e.g. Google" />
-                            <div className="grid grid-cols-2 gap-3">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <InputField type="date" label="Start Date" value={exp.startDate} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], startDate: e.target.value }; updateField('experiences', next); }} />
                               <InputField type="date" label="End Date" value={exp.endDate} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], endDate: e.target.value }; updateField('experiences', next); }} />
                             </div>
@@ -495,19 +499,19 @@ export default function SettingsWorkspace() {
                     <div className="space-y-6">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium text-[var(--muted-strong)]">Add professional licenses and certifications.</p>
-                        <button type="button" className="app-button text-sm py-2 px-4" onClick={() => updateField('licenses', [...(draft.licenses || []), { name: '', issuingOrg: '', issueDate: '', expiryDate: '', credentialId: '', credentialUrl: '' }])}>+ Add License</button>
+                        <button type="button" className="app-button text-sm py-2 px-5 bg-[var(--panel)] border border-[var(--border)] hover:border-[var(--accent)] hover:text-[var(--accent)] hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 font-bold rounded-xl shadow-sm" onClick={() => updateField('licenses', [...(draft.licenses || []), { name: '', issuingOrg: '', issueDate: '', expiryDate: '', credentialId: '', credentialUrl: '' }])}>+ Add License</button>
                       </div>
                       {(draft.licenses || []).length === 0 && (
-                        <div className="p-8 rounded-2xl border border-dashed border-[var(--border)] text-center text-[var(--muted-strong)] bg-[var(--panel-soft)]">
+                        <div className="p-10 rounded-3xl border-2 border-dashed border-[var(--border)] text-center text-[var(--muted-strong)] bg-gradient-to-b from-[var(--panel-soft)] to-transparent hover:border-[var(--accent)]/50 hover:shadow-lg hover:shadow-[var(--accent)]/5 transition-all duration-500 group cursor-pointer">
                           <Icons.Certificate className="w-8 h-8 mx-auto mb-3 opacity-40" />
                           <p className="font-bold text-sm">No licenses or certifications added yet</p>
                           <p className="text-xs mt-1">Click "Add License" to showcase your credentials.</p>
                         </div>
                       )}
                       {(draft.licenses || []).map((lic, idx) => (
-                        <div key={idx} className="p-6 rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] space-y-4 relative group">
+                        <div key={idx} className="p-6 rounded-3xl border border-[var(--border)] bg-gradient-to-br from-[var(--panel)] to-[var(--panel-soft)] shadow-sm hover:shadow-xl hover:shadow-[var(--accent)]/10 hover:-translate-y-1 hover:border-[var(--accent)]/40 transition-all duration-500 space-y-4 relative group before:absolute before:inset-0 before:bg-gradient-to-r before:from-[var(--accent)]/5 before:to-transparent before:opacity-0 hover:before:opacity-100 before:transition-opacity before:duration-500 before:rounded-3xl overflow-hidden">
                           <button type="button" onClick={() => updateField('licenses', draft.licenses.filter((_, i) => i !== idx))} className="absolute top-3 right-3 text-xs font-bold text-[var(--warning-text)] opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[var(--warning-soft)] px-2 py-1 rounded-lg">Remove</button>
-                          <div className="grid gap-4 md:grid-cols-2">
+                          <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
                             <InputField label="Certificate / License Name" value={lic.name} onChange={(e) => { const next = [...draft.licenses]; next[idx] = { ...next[idx], name: e.target.value }; updateField('licenses', next); }} placeholder="e.g. AWS Solutions Architect" />
                             <InputField label="Issuing Organization" value={lic.issuingOrg} onChange={(e) => { const next = [...draft.licenses]; next[idx] = { ...next[idx], issuingOrg: e.target.value }; updateField('licenses', next); }} placeholder="e.g. Amazon Web Services" />
                             <InputField label="Issue Date" value={lic.issueDate} onChange={(e) => { const next = [...draft.licenses]; next[idx] = { ...next[idx], issueDate: e.target.value }; updateField('licenses', next); }} placeholder="e.g. March 2024" />
@@ -525,19 +529,19 @@ export default function SettingsWorkspace() {
                     <div className="space-y-6">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium text-[var(--muted-strong)]">Showcase projects, articles, or achievements visitors should see first.</p>
-                        <button type="button" className="app-button text-sm py-2 px-4" onClick={() => updateField('featured', [...(draft.featured || []), { title: '', description: '', link: '', type: 'project' }])}>+ Add Item</button>
+                        <button type="button" className="app-button text-sm py-2 px-5 bg-[var(--panel)] border border-[var(--border)] hover:border-[var(--accent)] hover:text-[var(--accent)] hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 font-bold rounded-xl shadow-sm" onClick={() => updateField('featured', [...(draft.featured || []), { title: '', description: '', link: '', type: 'project' }])}>+ Add Item</button>
                       </div>
                       {(draft.featured || []).length === 0 && (
-                        <div className="p-8 rounded-2xl border border-dashed border-[var(--border)] text-center text-[var(--muted-strong)] bg-[var(--panel-soft)]">
+                        <div className="p-10 rounded-3xl border-2 border-dashed border-[var(--border)] text-center text-[var(--muted-strong)] bg-gradient-to-b from-[var(--panel-soft)] to-transparent hover:border-[var(--accent)]/50 hover:shadow-lg hover:shadow-[var(--accent)]/5 transition-all duration-500 group cursor-pointer">
                           <Icons.Featured className="w-8 h-8 mx-auto mb-3 opacity-40" />
                           <p className="font-bold text-sm">No featured items yet</p>
                           <p className="text-xs mt-1">Add projects, articles, or posts to highlight on your profile.</p>
                         </div>
                       )}
                       {(draft.featured || []).map((item, idx) => (
-                        <div key={idx} className="p-6 rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] space-y-4 relative group">
+                        <div key={idx} className="p-6 rounded-3xl border border-[var(--border)] bg-gradient-to-br from-[var(--panel)] to-[var(--panel-soft)] shadow-sm hover:shadow-xl hover:shadow-[var(--accent)]/10 hover:-translate-y-1 hover:border-[var(--accent)]/40 transition-all duration-500 space-y-4 relative group before:absolute before:inset-0 before:bg-gradient-to-r before:from-[var(--accent)]/5 before:to-transparent before:opacity-0 hover:before:opacity-100 before:transition-opacity before:duration-500 before:rounded-3xl overflow-hidden">
                           <button type="button" onClick={() => updateField('featured', draft.featured.filter((_, i) => i !== idx))} className="absolute top-3 right-3 text-xs font-bold text-[var(--warning-text)] opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[var(--warning-soft)] px-2 py-1 rounded-lg">Remove</button>
-                          <div className="grid gap-4 md:grid-cols-2">
+                          <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
                             <InputField label="Title" value={item.title} onChange={(e) => { const next = [...draft.featured]; next[idx] = { ...next[idx], title: e.target.value }; updateField('featured', next); }} placeholder="e.g. E-Commerce Platform" />
                             <SelectField label="Type" value={item.type} onChange={(e) => { const next = [...draft.featured]; next[idx] = { ...next[idx], type: e.target.value }; updateField('featured', next); }} options={[{ value: 'project', label: 'Project' }, { value: 'article', label: 'Article' }, { value: 'post', label: 'Post' }, { value: 'link', label: 'External Link' }]} />
                           </div>
@@ -553,19 +557,19 @@ export default function SettingsWorkspace() {
                     <div className="space-y-6">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-medium text-[var(--muted-strong)]">Highlight recognitions, awards, and accomplishments.</p>
-                        <button type="button" className="app-button text-sm py-2 px-4" onClick={() => updateField('honorsAwards', [...(draft.honorsAwards || []), { title: '', issuer: '', date: '', description: '' }])}>+ Add Award</button>
+                        <button type="button" className="app-button text-sm py-2 px-5 bg-[var(--panel)] border border-[var(--border)] hover:border-[var(--accent)] hover:text-[var(--accent)] hover:shadow-md hover:-translate-y-0.5 transition-all duration-300 font-bold rounded-xl shadow-sm" onClick={() => updateField('honorsAwards', [...(draft.honorsAwards || []), { title: '', issuer: '', date: '', description: '' }])}>+ Add Award</button>
                       </div>
                       {(draft.honorsAwards || []).length === 0 && (
-                        <div className="p-8 rounded-2xl border border-dashed border-[var(--border)] text-center text-[var(--muted-strong)] bg-[var(--panel-soft)]">
+                        <div className="p-10 rounded-3xl border-2 border-dashed border-[var(--border)] text-center text-[var(--muted-strong)] bg-gradient-to-b from-[var(--panel-soft)] to-transparent hover:border-[var(--accent)]/50 hover:shadow-lg hover:shadow-[var(--accent)]/5 transition-all duration-500 group cursor-pointer">
                           <Icons.Award className="w-8 h-8 mx-auto mb-3 opacity-40" />
                           <p className="font-bold text-sm">No honors or awards added yet</p>
                           <p className="text-xs mt-1">Click "Add Award" to showcase your recognitions.</p>
                         </div>
                       )}
                       {(draft.honorsAwards || []).map((award, idx) => (
-                        <div key={idx} className="p-6 rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] space-y-4 relative group">
+                        <div key={idx} className="p-6 rounded-3xl border border-[var(--border)] bg-gradient-to-br from-[var(--panel)] to-[var(--panel-soft)] shadow-sm hover:shadow-xl hover:shadow-[var(--accent)]/10 hover:-translate-y-1 hover:border-[var(--accent)]/40 transition-all duration-500 space-y-4 relative group before:absolute before:inset-0 before:bg-gradient-to-r before:from-[var(--accent)]/5 before:to-transparent before:opacity-0 hover:before:opacity-100 before:transition-opacity before:duration-500 before:rounded-3xl overflow-hidden">
                           <button type="button" onClick={() => updateField('honorsAwards', draft.honorsAwards.filter((_, i) => i !== idx))} className="absolute top-3 right-3 text-xs font-bold text-[var(--warning-text)] opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[var(--warning-soft)] px-2 py-1 rounded-lg">Remove</button>
-                          <div className="grid gap-4 md:grid-cols-2">
+                          <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
                             <InputField label="Award Title" value={award.title} onChange={(e) => { const next = [...draft.honorsAwards]; next[idx] = { ...next[idx], title: e.target.value }; updateField('honorsAwards', next); }} placeholder="e.g. Dean's List" />
                             <InputField label="Issuer" value={award.issuer} onChange={(e) => { const next = [...draft.honorsAwards]; next[idx] = { ...next[idx], issuer: e.target.value }; updateField('honorsAwards', next); }} placeholder="e.g. University of Example" />
                             <InputField label="Date" value={award.date} onChange={(e) => { const next = [...draft.honorsAwards]; next[idx] = { ...next[idx], date: e.target.value }; updateField('honorsAwards', next); }} placeholder="e.g. 2024" />
@@ -606,7 +610,7 @@ export default function SettingsWorkspace() {
                           onToggle={() => updateField('allowRecruiterMessages', !draft.allowRecruiterMessages)}
                         />
                         
-                        <div className="grid gap-5 lg:grid-cols-2 mt-4">
+                        <div className="grid gap-5 grid-cols-1 lg:grid-cols-2 mt-4">
                           <ToggleRow
                             title="Display Email"
                             description="Show email address publicly."
@@ -642,9 +646,9 @@ export default function SettingsWorkspace() {
                           ].map(({ key, label }) => {
                             const currentValue = draft.sectionVisibility?.[key] || 'everyone';
                             return (
-                              <div key={key} className="flex items-center justify-between gap-4 p-4 rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] hover:border-[var(--muted-strong)] transition-colors">
+                              <div key={key} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] hover:border-[var(--muted-strong)] transition-colors">
                                 <span className="text-sm font-bold text-[var(--text)]">{label}</span>
-                                <div className="flex rounded-lg border border-[var(--border)] overflow-hidden">
+                                <div className="flex flex-wrap rounded-lg border border-[var(--border)] overflow-hidden w-full sm:w-auto">
                                   {[
                                     { value: 'everyone', icon: '🌐', tip: 'Everyone' },
                                     { value: 'connections', icon: '🤝', tip: 'Connections' },
@@ -658,9 +662,9 @@ export default function SettingsWorkspace() {
                                         const next = { ...(draft.sectionVisibility || {}), [key]: opt.value };
                                         updateField('sectionVisibility', next);
                                       }}
-                                      className={`px-3 py-1.5 text-xs font-bold transition-all ${currentValue === opt.value ? 'bg-[var(--accent)] text-white' : 'bg-[var(--panel)] text-[var(--muted-strong)] hover:text-[var(--text)] hover:bg-[var(--panel-soft)]'}`}
+                                      className={`flex-1 sm:flex-none px-3 py-2 text-xs font-bold transition-all ${currentValue === opt.value ? 'bg-[var(--accent)] text-white' : 'bg-[var(--panel)] text-[var(--muted-strong)] hover:text-[var(--text)] hover:bg-[var(--panel-soft)]'}`}
                                     >
-                                      {opt.icon} {opt.tip}
+                                      {opt.icon} <span className="ml-1">{opt.tip}</span>
                                     </button>
                                   ))}
                                 </div>
@@ -721,42 +725,57 @@ export default function SettingsWorkspace() {
                         <p className="text-sm mt-1 font-medium text-[var(--muted-strong)]">Customize the look and feel of the platform interface.</p>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-6 max-w-lg">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 max-w-lg">
                         <button
                           type="button"
                           onClick={() => setTheme('light')}
-                          className={`relative rounded-2xl border-[3px] overflow-hidden transition-all duration-300 h-32 ${
-                            theme === 'light' ? 'border-[var(--accent)] shadow-md shadow-[var(--accent)]/20 shadow-inner' : 'border-transparent bg-[var(--panel-soft)] hover:border-[var(--border)]'
+                          className={`relative rounded-3xl border-[3px] overflow-hidden transition-all duration-500 h-32 hover:-translate-y-1 hover:shadow-xl ${
+                            theme === 'light' ? 'border-[var(--accent)] shadow-lg shadow-[var(--accent)]/30' : 'border-[var(--border)] bg-[var(--panel-soft)] hover:border-[var(--muted-strong)]'
                           }`}
                         >
                           <div className="absolute inset-0 bg-white"></div>
-                          <div className="absolute top-4 left-4 right-4 h-4 rounded bg-gray-200"></div>
-                          <div className="absolute top-10 left-4 w-1/2 h-16 rounded bg-gray-100"></div>
+                          <div className="absolute top-4 left-4 right-4 h-4 rounded-lg bg-gray-200"></div>
+                          <div className="absolute top-10 left-4 w-1/2 h-16 rounded-xl bg-gray-100"></div>
                           {theme === 'light' && (
                             <div className="absolute inset-0 flex items-center justify-center bg-white/50 backdrop-blur-[2px]">
-                              <Icons.Check className="w-10 h-10 text-[var(--accent)] drop-shadow-md" />
+                              <Icons.Check className="w-10 h-10 text-[var(--accent)] drop-shadow-md scale-110" />
                             </div>
                           )}
-                          <div className="absolute bottom-3 right-3 font-bold text-gray-800 text-sm">Light</div>
+                          <div className="absolute bottom-3 right-3 font-bold text-gray-800 text-sm bg-white/80 px-2 py-1 rounded-md backdrop-blur-sm">Light</div>
                         </button>
 
                         <button
                           type="button"
                           onClick={() => setTheme('dark')}
-                          className={`relative rounded-2xl border-[3px] overflow-hidden transition-all duration-300 h-32 ${
-                            theme === 'dark' ? 'border-[var(--accent)] shadow-md shadow-[var(--accent)]/20 shadow-inner' : 'border-transparent bg-gray-900 hover:border-gray-700'
+                          className={`relative rounded-3xl border-[3px] overflow-hidden transition-all duration-500 h-32 hover:-translate-y-1 hover:shadow-xl ${
+                            theme === 'dark' ? 'border-[var(--accent)] shadow-lg shadow-[var(--accent)]/30' : 'border-gray-800 bg-gray-900 hover:border-gray-600'
                           }`}
                         >
                           <div className="absolute inset-0 bg-gray-900"></div>
-                          <div className="absolute top-4 left-4 right-4 h-4 rounded bg-gray-800"></div>
-                          <div className="absolute top-10 left-4 w-1/2 h-16 rounded bg-gray-800"></div>
+                          <div className="absolute top-4 left-4 right-4 h-4 rounded-lg bg-gray-800"></div>
+                          <div className="absolute top-10 left-4 w-1/2 h-16 rounded-xl bg-gray-800"></div>
                           {theme === 'dark' && (
                             <div className="absolute inset-0 flex items-center justify-center bg-gray-900/50 backdrop-blur-[2px]">
-                              <Icons.Check className="w-10 h-10 text-[var(--accent)] drop-shadow-md" />
+                              <Icons.Check className="w-10 h-10 text-[var(--accent)] drop-shadow-md scale-110" />
                             </div>
                           )}
-                           <div className="absolute bottom-3 right-3 font-bold text-white text-sm">Dark</div>
+                           <div className="absolute bottom-3 right-3 font-bold text-white text-sm bg-gray-900/80 px-2 py-1 rounded-md backdrop-blur-sm">Dark</div>
                         </button>
+                      </div>
+
+                      <div className="mt-8 pt-6 border-t border-[var(--border)]">
+                        <SelectField
+                          label="Default Resume Template"
+                          value={draft.resumeTemplate || 'executive'}
+                          onChange={(e) => updateField('resumeTemplate', e.target.value)}
+                          options={[
+                            { value: 'executive', label: 'Executive (ATS Classic)' },
+                            { value: 'modern', label: 'Modern (Professional Two-Column)' },
+                            { value: 'minimal', label: 'Minimal (Swiss Clean)' },
+                            { value: 'creative', label: 'Creative (Bold Gradient)' },
+                            { value: 'technical', label: 'Technical (Developer-Focused)' }
+                          ]}
+                        />
                       </div>
 
                       <div className="flex items-center gap-4 mt-8 pt-6 border-t border-[var(--border)]">

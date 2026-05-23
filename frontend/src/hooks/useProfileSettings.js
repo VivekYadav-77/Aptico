@@ -38,7 +38,7 @@ function createDefaults(auth, analysis) {
   return {
     firstName: nameParts.firstName,
     lastName: nameParts.lastName,
-    headline: analysis?.jobTitle || user.role || 'Aspiring product-focused professional',
+    headline: analysis?.jobTitle || 'Aspiring product-focused professional',
     email: user.email || 'you@example.com',
     phone: '',
     location: '',
@@ -79,6 +79,7 @@ function createDefaults(auth, analysis) {
     notificationAnalysisUpdates: true,
     notificationOpportunityNudges: true,
     notificationSecurityAlerts: true,
+    resumeTemplate: 'executive',
     // Section visibility (everyone / connections / only_me)
     sectionVisibility: {
       about: 'everyone',
@@ -138,6 +139,7 @@ function mergeWithDefaults(defaults, incoming) {
     tools: parseList(nextValue.tools || defaults.tools),
     languages: parseList(nextValue.languages || defaults.languages),
     achievements: parseList(nextValue.achievements || defaults.achievements),
+    resumeTemplate: nextValue.resumeTemplate || defaults.resumeTemplate,
     sectionVisibility: { ...defaults.sectionVisibility, ...(nextValue.sectionVisibility || {}) },
     featured: parseArrayField(nextValue.featured, defaults.featured),
     experiences: parseArrayField(nextValue.experiences, defaults.experiences).map(normalizeExperienceEntry),

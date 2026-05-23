@@ -1,9 +1,11 @@
 import crypto from 'node:crypto';
+import util from 'node:util';
 import jwt from 'jsonwebtoken';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import { env } from '../config/env.js';
 import { authTokens, refreshTokens, users } from '../db/schema.js';
 import { ensureUserProfile } from './profileService.js';
+import { sendAuthEmail } from './emailService.js';
 
 const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
@@ -57,20 +59,22 @@ function createOpaqueToken() {
   return crypto.randomBytes(32).toString('hex');
 }
 
-function createPasswordHash(password) {
-  const salt = crypto.randomBytes(16).toString('hex');
-  const derivedKey = crypto
-    .scryptSync(password, salt, PASSWORD_KEY_LENGTH, {
-      N: PASSWORD_SCRYPT_COST,
-      r: PASSWORD_SCRYPT_BLOCK_SIZE,
-      p: PASSWORD_SCRYPT_PARALLELIZATION
-    })
-    .toString('hex');
+const scryptAsync = util.promisify(crypto.scrypt);
 
-  return `scrypt$${PASSWORD_SCRYPT_COST}$${PASSWORD_SCRYPT_BLOCK_SIZE}$${PASSWORD_SCRYPT_PARALLELIZATION}$${salt}$${derivedKey}`;
+async function createPasswordHash(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derivedKeyBuffer = await scryptAsync(password, salt, PASSWORD_KEY_LENGTH, {
+    N: PASSWORD_SCRYPT_COST,
+    r: PASSWORD_SCRYPT_BLOCK_SIZE,
+    p: PASSWORD_SCRYPT_PARALLELIZATION
+  });
+  
+  const derivedKeyHex = derivedKeyBuffer.toString('hex');
+
+  return `scrypt$${PASSWORD_SCRYPT_COST}$${PASSWORD_SCRYPT_BLOCK_SIZE}$${PASSWORD_SCRYPT_PARALLELIZATION}$${salt}$${derivedKeyHex}`;
 }
 
-function verifyPasswordHash(password, storedHash) {
+async function verifyPasswordHash(password, storedHash) {
   if (!storedHash) {
     return false;
   }
@@ -81,13 +85,13 @@ function verifyPasswordHash(password, storedHash) {
     return false;
   }
 
-  const derivedKey = crypto.scryptSync(password, salt, Buffer.from(derivedKeyHex, 'hex').length, {
+  const derivedKeyBuffer = await scryptAsync(password, salt, Buffer.from(derivedKeyHex, 'hex').length, {
     N: Number(cost),
     r: Number(blockSize),
     p: Number(parallelization)
   });
 
-  return crypto.timingSafeEqual(derivedKey, Buffer.from(derivedKeyHex, 'hex'));
+  return crypto.timingSafeEqual(derivedKeyBuffer, Buffer.from(derivedKeyHex, 'hex'));
 }
 
 function signAccessToken(user) {
@@ -196,13 +200,14 @@ async function upsertGoogleUser(db, payload) {
 }
 
 async function createPasswordUser(db, { email, password, name }) {
+  const passwordHash = await createPasswordHash(password);
   const createdUsers = await db
     .insert(users)
     .values({
       email,
       name: name || null,
       authProvider: 'password',
-      passwordHash: createPasswordHash(password),
+      passwordHash,
       role: 'user'
     })
     .returning(AUTH_USER_FIELDS);
@@ -211,10 +216,11 @@ async function createPasswordUser(db, { email, password, name }) {
 }
 
 async function updatePasswordUser(db, user, password) {
+  const passwordHash = await createPasswordHash(password);
   const updatedUsers = await db
     .update(users)
     .set({
-      passwordHash: createPasswordHash(password),
+      passwordHash,
       authProvider: resolveAuthProvider(user, 'password')
     })
     .where(eq(users.id, user.id))
@@ -323,40 +329,39 @@ function buildFrontendActionUrl(mode, token) {
   return url.toString();
 }
 
-async function sendEmailDispatch({ url, payload }) {
-  if (!url) {
-    throw createAuthError('Email delivery is not configured yet.', 503, 'EMAIL_NOT_CONFIGURED');
-  }
-
-  const headers = {
-    'Content-Type': 'application/json'
-  };
-
-  if (env.gasEmailDispatchToken) {
-    headers.Authorization = `Bearer ${env.gasEmailDispatchToken}`;
-    headers['X-Aptico-Email-Token'] = env.gasEmailDispatchToken;
-  }
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(payload)
-  }).catch(() => null);
-
-  if (response?.ok) {
-    return true;
-  }
-
-  throw createAuthError('Email delivery failed.', 502, 'EMAIL_SEND_FAILED');
-}
+// Email dispatch is now handled by the dedicated emailService abstraction.
+// See src/services/emailService.js for transport logic and template rendering.
 
 async function deleteOutstandingAuthTokens(db, userId, tokenType) {
+  // Instead of hard-deleting, we mark them consumed to maintain an audit trail for the daily limit
   await db
-    .delete(authTokens)
+    .update(authTokens)
+    .set({ consumedAt: new Date() })
     .where(and(eq(authTokens.userId, userId), eq(authTokens.tokenType, tokenType), isNull(authTokens.consumedAt)));
 }
 
+async function checkDailyEmailLimit(db, userId) {
+  const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const result = await db
+    .select({ count: sql`count(*)` })
+    .from(authTokens)
+    .where(
+      and(
+        eq(authTokens.userId, userId),
+        gt(authTokens.createdAt, oneDayAgo)
+      )
+    );
+    
+  const count = Number(result[0].count);
+  // Max 5 transactional emails per user per 24h to prevent GAS quota exhaustion
+  if (count >= 5) {
+    throw createAuthError('Daily email limit reached. Please try again tomorrow.', 429, 'DAILY_EMAIL_LIMIT_REACHED');
+  }
+}
+
 async function createOneTimeToken(db, { userId, tokenType, ttlSeconds }) {
+  await checkDailyEmailLimit(db, userId);
+
   const rawToken = createOpaqueToken();
   const expiresAt = new Date(Date.now() + ttlSeconds * 1000);
 
@@ -425,18 +430,15 @@ export async function registerWithPassword({ db, email, password, name }) {
   const normalizedEmail = email.trim().toLowerCase();
   const existingUser = await findUserByEmail(db, normalizedEmail);
 
-  if (existingUser?.passwordHash) {
+  if (existingUser) {
     throw createAuthError('An account with this email already exists.', 409, 'EMAIL_ALREADY_EXISTS');
   }
 
-  const user =
-    existingUser && !existingUser.passwordHash
-      ? await updatePasswordUser(db, existingUser, password)
-      : await createPasswordUser(db, {
-          email: normalizedEmail,
-          password,
-          name
-        });
+  const user = await createPasswordUser(db, {
+    email: normalizedEmail,
+    password,
+    name
+  });
 
   const verificationResult = await sendEmailVerification({ db, user });
 
@@ -452,7 +454,12 @@ export async function loginWithPassword({ db, email, password, request }) {
 
   const user = await findUserByEmail(db, email.trim().toLowerCase());
 
-  if (!user?.passwordHash || !verifyPasswordHash(password, user.passwordHash)) {
+  if (!user?.passwordHash) {
+    throw createAuthError('Email or password is incorrect.', 401, 'INVALID_CREDENTIALS');
+  }
+
+  const isPasswordValid = await verifyPasswordHash(password, user.passwordHash);
+  if (!isPasswordValid) {
     throw createAuthError('Email or password is incorrect.', 401, 'INVALID_CREDENTIALS');
   }
 
@@ -477,7 +484,7 @@ export async function loginWithGoogle({ db, credential, request }) {
 
   const payload = await response.json();
 
-  if (payload.email_verified !== 'true' || !payload.email || !isGoogleIssuer(payload)) {
+  if (String(payload.email_verified) !== 'true' || !payload.email || !isGoogleIssuer(payload)) {
     throw createAuthError('Google account email could not be verified.', 401, 'GOOGLE_EMAIL_NOT_VERIFIED');
   }
 
@@ -519,17 +526,13 @@ export async function sendEmailVerification({ db, email = null, user = null }) {
     ttlSeconds: EMAIL_VERIFICATION_TTL_SECONDS
   });
 
-  await sendEmailDispatch({
-    url: env.gasEmailVerifyUrl || env.gasEmailDispatchUrl || env.gasMagicLinkUrl,
-    payload: {
-      type: 'email_verification',
-      email: targetUser.email,
-      name: targetUser.name,
-      token: token.rawToken,
-      link: buildFrontendActionUrl('verify-email', token.rawToken),
-      expiresAt: token.expiresAt.toISOString(),
-      appName: 'Aptico'
-    }
+  await sendAuthEmail({
+    type: 'email_verification',
+    email: targetUser.email,
+    name: targetUser.name,
+    link: buildFrontendActionUrl('verify-email', token.rawToken),
+    expiresAt: token.expiresAt.toISOString(),
+    appName: 'Aptico'
   });
 
   return {
@@ -563,7 +566,7 @@ export async function requestPasswordReset({ db, email }) {
 
   const user = await findUserByEmail(db, email.trim().toLowerCase());
 
-  if (!user?.passwordHash) {
+  if (!user) {
     return {
       sent: true
     };
@@ -575,17 +578,13 @@ export async function requestPasswordReset({ db, email }) {
     ttlSeconds: PASSWORD_RESET_TTL_SECONDS
   });
 
-  await sendEmailDispatch({
-    url: env.gasPasswordResetUrl || env.gasEmailDispatchUrl,
-    payload: {
-      type: 'password_reset',
-      email: user.email,
-      name: user.name,
-      token: token.rawToken,
-      link: buildFrontendActionUrl('reset-password', token.rawToken),
-      expiresAt: token.expiresAt.toISOString(),
-      appName: 'Aptico'
-    }
+  await sendAuthEmail({
+    type: 'password_reset',
+    email: user.email,
+    name: user.name,
+    link: buildFrontendActionUrl('reset-password', token.rawToken),
+    expiresAt: token.expiresAt.toISOString(),
+    appName: 'Aptico'
   });
 
   return {
@@ -607,10 +606,12 @@ export async function resetPassword({ db, token, password }) {
     throw createAuthError('User for reset token was not found.', 404, 'USER_NOT_FOUND');
   }
 
+  const passwordHash = await createPasswordHash(password);
+
   await db
     .update(users)
     .set({
-      passwordHash: createPasswordHash(password),
+      passwordHash,
       authProvider: resolveAuthProvider(user, 'password')
     })
     .where(eq(users.id, user.id));

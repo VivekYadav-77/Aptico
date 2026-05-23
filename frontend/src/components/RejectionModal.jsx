@@ -136,10 +136,10 @@ export default function RejectionModal({ isOpen, onClose, onSuccess }) {
   }
 
   return (
-    <div className="fixed inset-0 z-[120] flex items-center justify-center px-4 py-6">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 sm:p-6">
       <div className="absolute inset-0 bg-black/55" onClick={onClose} aria-hidden="true" />
 
-      <div className="relative w-full max-w-xl overflow-hidden rounded-[2rem] border border-[var(--border)] bg-[var(--panel)] shadow-[0_24px_80px_rgba(0,0,0,0.3)]">
+      <div className="relative w-full max-w-xl max-h-full overflow-y-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] rounded-[2rem] border border-[var(--border)] bg-[var(--panel)] shadow-[0_24px_80px_rgba(0,0,0,0.3)]">
         <ConfettiBurst active={Boolean(successState)} />
         <div className="absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_top,rgba(78,222,163,0.28),transparent_70%)]" />
 

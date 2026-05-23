@@ -27,6 +27,25 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true
         }
       }
+    },
+
+    // ── Chunk splitting for better caching ──────────────────
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) {
+              return 'vendor';
+            }
+            if (id.includes('node_modules/@reduxjs') || id.includes('node_modules/react-redux') || id.includes('node_modules/@tanstack')) {
+              return 'state';
+            }
+            if (id.includes('node_modules/react-router')) {
+              return 'router';
+            }
+          }
+        }
+      }
     }
   };
 });

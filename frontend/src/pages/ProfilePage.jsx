@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import PostComposer from '../components/PostComposer.jsx';
 import AppShell from '../components/AppShell.jsx';
-import ResumeTemplate from '../components/ResumeTemplate.jsx';
+import ResumeBuilderModal from '../components/ResumeBuilderModal.jsx';
 import { getMyProfile, getPublicFeedPosts, getPublicProfile, getProfileFollowers, getProfileFollowing, getProfileConnections } from '../api/socialApi.js';
 import UserListModal from '../components/UserListModal.jsx';
 import { useProfileSettings } from '../hooks/useProfileSettings.js';
@@ -51,17 +51,20 @@ function SectionCard({ id, title, icon, accentColor = 'var(--accent)', children,
   return (
     <section
       id={id}
-      className={`relative overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel)]/70 p-6 shadow-sm backdrop-blur-xl transition-all duration-300 hover:border-[var(--muted-strong)] hover:shadow-md ${className}`}
+      className={`relative overflow-hidden rounded-[2rem] border border-[var(--border)] bg-[var(--panel)]/70 p-6 sm:p-7 shadow-sm backdrop-blur-xl transition-all duration-300 hover:border-[var(--accent)]/20 hover:shadow-lg ${className}`}
     >
-      <div className="relative z-10 mb-5 flex w-full items-center gap-3">
-        <div className="h-6 w-1.5 rounded-full" style={{ background: accentColor, boxShadow: `0 0 12px ${accentColor}80` }} />
-        <h2 className="text-lg font-bold tracking-tight text-[var(--text)] sm:text-xl">{title}</h2>
-        {icon ? <span className="ml-auto text-[var(--muted-strong)]">{icon}</span> : null}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(78,222,163,0.03),transparent_60%)] pointer-events-none" />
+      <div className="relative z-10 mb-6 flex w-full items-center gap-3">
+        <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-[var(--border)]" style={{ background: `${accentColor}15` }}>
+          {icon || <div className="h-3 w-3 rounded-full" style={{ background: accentColor, boxShadow: `0 0 10px ${accentColor}50` }} />}
+        </div>
+        <h2 className="text-lg font-black tracking-tight text-[var(--text)] sm:text-xl">{title}</h2>
       </div>
       <div className="relative z-10">
         {isEmpty ? (
-          <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--panel-soft)]/50 py-8 text-center">
-            <p className="text-sm font-medium text-[var(--muted-strong)]">{emptyMessage || 'Nothing to show yet.'}</p>
+          <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--panel-soft)]/50 py-10 text-center flex flex-col items-center gap-3">
+            <span className="material-symbols-outlined text-2xl text-[var(--muted)]">info</span>
+            <p className="text-sm font-bold text-[var(--muted-strong)]">{emptyMessage || 'Nothing to show yet.'}</p>
           </div>
         ) : children}
       </div>
@@ -74,21 +77,21 @@ function MiniPost({ post }) {
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
 
   return (
-    <article className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/60 p-4 transition-all hover:border-[var(--muted-strong)] hover:shadow-sm">
+    <article className="rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)]/60 p-5 transition-all hover:border-[var(--accent)]/20 hover:shadow-md">
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--accent-strong)] text-[10px] font-black text-white shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-[var(--accent)] to-[var(--accent-strong)] text-[10px] font-black text-white shadow-sm">
             {String(post.author_name || 'U').charAt(0).toUpperCase()}
           </div>
-          <p className="text-xs font-black uppercase tracking-wider text-[var(--accent-strong)]">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--panel)] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--accent-strong)]">
             {String(post.post_type || 'post').replace('_', ' ')}
-          </p>
+          </span>
         </div>
-        <p className="text-xs font-medium text-[var(--muted)]">{new Date(post.created_at).toLocaleDateString()}</p>
+        <p className="text-xs font-bold text-[var(--muted)]">{new Date(post.created_at).toLocaleDateString()}</p>
       </div>
       <p className="mt-3 text-sm leading-relaxed text-[var(--text)]">{post.content}</p>
 
-      <div className="mt-4 flex items-center gap-4 border-t border-[var(--border)]/60 pt-3">
+      <div className="mt-4 flex items-center gap-5 border-t border-[var(--border)]/60 pt-3">
         <button
           onClick={() => {
             setLiked((current) => !current);
@@ -96,15 +99,11 @@ function MiniPost({ post }) {
           }}
           className={`flex items-center gap-1.5 text-xs font-bold transition-all ${liked ? 'scale-105 text-pink-500' : 'text-[var(--muted-strong)] hover:text-[var(--text)]'}`}
         >
-          <svg className={`h-4 w-4 transition-all ${liked ? 'fill-current text-pink-500' : 'fill-none'}`} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={liked ? 1.5 : 2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-          </svg>
+          <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: liked ? "'FILL' 1" : "'FILL' 0" }}>favorite</span>
           {likesCount} {likesCount === 1 ? 'Like' : 'Likes'}
         </button>
         <button className="flex items-center gap-1.5 text-xs font-bold text-[var(--muted-strong)] transition-colors hover:text-[var(--text)]">
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-          </svg>
+          <span className="material-symbols-outlined text-[16px]">chat_bubble</span>
           Comment
         </button>
       </div>
@@ -189,10 +188,10 @@ function Pill({ children, tone = 'default' }) {
     default: 'border-[var(--border)] bg-[var(--panel-soft)] text-[var(--text)]',
     accent: 'border-[var(--accent)]/20 bg-[var(--accent-soft)] text-[var(--accent-strong)]',
     success: 'border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
-    warning: 'border-[var(--warning-border)] bg-[var(--warning-soft)] text-[var(--warning-text)]'
+    warning: 'border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-400'
   };
 
-  return <span className={`rounded-xl border px-3 py-1.5 text-xs font-semibold ${tones[tone]}`}>{children}</span>;
+  return <span className={`rounded-full border px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] ${tones[tone]}`}>{children}</span>;
 }
 
 export default function ProfilePage() {
@@ -210,6 +209,7 @@ export default function ProfilePage() {
   const [bannerSettingsOpen, setBannerSettingsOpen] = useState(false);
   const [bannerPrefTemp, setBannerPrefTemp] = useState('badge');
   const [listModalState, setListModalState] = useState({ isOpen: false, type: null, title: '', fetchFn: null });
+  const [resumeModalOpen, setResumeModalOpen] = useState(false);
 
   const fullName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'Aptico User';
   const userInitials = `${profile.firstName?.[0] || 'A'}${profile.lastName?.[0] || 'U'}`.toUpperCase();
@@ -318,62 +318,18 @@ export default function ProfilePage() {
     reader.readAsDataURL(file);
   }
 
-  const printStyles = `
-    @media print {
-      html, body {
-        background: white !important;
-        color: black !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        width: 100% !important;
-        height: auto !important;
-        overflow: visible !important;
-      }
-
-      header, nav, aside, footer, .no-print, .app-shell-header, .app-shell-sidebar, [role="navigation"], [role="banner"], button {
-        display: none !important;
-        visibility: hidden !important;
-        opacity: 0 !important;
-        height: 0 !important;
-        margin: 0 !important;
-        padding: 0 !important;
-      }
-
-      main, .app-page {
-        display: block !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        width: 100% !important;
-      }
-
-      .resume-print-view {
-        display: block !important;
-        visibility: visible !important;
-        position: relative !important;
-        width: 100% !important;
-        height: auto !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        z-index: 9999 !important;
-      }
-    }
-  `;
-
   return (
     <AppShell
       title="Profile Portfolio"
       description="Your complete professional story in the same premium layout as your public profile, with personal-only access to every section."
       actions={
-        <div className="flex gap-3">
-          <style>{printStyles}</style>
+        <div className="flex flex-wrap gap-3">
           <button
-            onClick={() => window.print()}
-            className="app-button-secondary flex items-center gap-2 transition-colors hover:bg-[var(--panel-soft)]"
-            title="Export as PDF"
+            onClick={() => setResumeModalOpen(true)}
+            className="app-button-secondary flex items-center gap-2 transition-all hover:bg-[var(--panel-soft)]"
+            title="Build & Download Resume"
           >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
+            <span className="material-symbols-outlined text-[18px]">description</span>
             <span className="hidden sm:inline">Export Resume</span>
           </button>
           {username ? (
@@ -381,25 +337,22 @@ export default function ProfilePage() {
               to={`/u/${username}`}
               target="_blank"
               rel="noreferrer"
-              className="app-button-secondary flex items-center gap-2 transition-colors hover:bg-[var(--panel-soft)]"
+              className="app-button-secondary flex items-center gap-2 transition-all hover:bg-[var(--panel-soft)]"
             >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
+              <span className="material-symbols-outlined text-[18px]">visibility</span>
               <span className="hidden sm:inline">Preview Public</span>
             </Link>
           ) : null}
-          <Link to="/rewards" className="app-button-secondary flex items-center gap-2 transition-colors hover:bg-[var(--panel-soft)]">
-            <svg className="h-4 w-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-            </svg>
+          <Link to="/rewards" className="app-button-secondary flex items-center gap-2 transition-all hover:bg-[var(--panel-soft)]">
+            <span className="material-symbols-outlined text-[18px] text-amber-500">star</span>
             <span className="hidden sm:inline">Rewards</span>
           </Link>
-          <Link to="/settings" className="app-button-secondary transition-colors hover:bg-[var(--panel-soft)]">
-            Edit Information
+          <Link to="/settings" className="app-button-secondary flex items-center gap-2 transition-all hover:bg-[var(--panel-soft)]">
+            <span className="material-symbols-outlined text-[18px]">edit</span>
+            <span className="hidden sm:inline">Edit Info</span>
           </Link>
-          <Link to="/jobs" className="app-button shadow-lg shadow-[var(--accent)]/20 transition-shadow hover:shadow-[var(--accent)]/40">
+          <Link to="/jobs" className="app-button shadow-lg shadow-[var(--accent)]/20 transition-shadow hover:shadow-[var(--accent)]/40 flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px]">work</span>
             View Job Matches
           </Link>
         </div>
@@ -431,8 +384,8 @@ export default function ProfilePage() {
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           <div className="space-y-6 lg:col-span-8">
             <AnimatedSection>
-              <section className="overflow-hidden rounded-3xl border border-[var(--border)] bg-[var(--panel)]/80 shadow-sm backdrop-blur-xl">
-                <div className="relative h-56 overflow-hidden ">
+              <section className="overflow-hidden rounded-[2rem] border border-[var(--border)] bg-[var(--panel)]/80 shadow-lg backdrop-blur-xl">
+                <div className="relative h-56 overflow-hidden">
                   <div className="absolute left-4 top-4 z-20">
                     <button
                       onClick={() => {
@@ -441,10 +394,7 @@ export default function ProfilePage() {
                       }}
                       className="flex items-center gap-2 rounded-xl bg-black/50 px-3.5 py-2 text-xs font-bold text-white shadow-lg outline outline-1 outline-white/20 transition-all hover:scale-105 hover:bg-black/70"
                     >
-                      <svg className="h-4 w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
+                      <span className="material-symbols-outlined text-[16px]">settings</span>
                       Banner Settings
                     </button>
                   </div>
@@ -481,11 +431,8 @@ export default function ProfilePage() {
 
                   {bannerUrl ? (
                     <div className="pointer-events-none absolute right-4 top-4 z-10">
-                      <div className="flex items-center gap-1.5 rounded-md bg-black/40 px-2 py-1 text-[10px] font-bold text-white opacity-70 backdrop-blur">
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 15a3 3 0 100-6 3 3 0 000 6z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14v4m0 0l-2-2m2 2l2-2" />
-                        </svg>
+                      <div className="flex items-center gap-1.5 rounded-lg bg-black/40 px-2.5 py-1.5 text-[10px] font-bold text-white opacity-70 backdrop-blur">
+                        <span className="material-symbols-outlined text-[14px]">flip</span>
                         Click to Flip
                       </div>
                     </div>
@@ -496,13 +443,11 @@ export default function ProfilePage() {
                   <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
                     <div className="relative z-10 flex w-full flex-col gap-4 sm:flex-row sm:items-start">
                       <div className="relative w-max shrink-0">
-                        <div className="flex h-28 w-28 items-center justify-center rounded-3xl border-4 border-[var(--panel)] bg-gradient-to-br from-[var(--accent)] to-[var(--accent-strong)] text-5xl font-black text-white shadow-xl sm:h-36 sm:w-36">
+                        <div className="flex h-28 w-28 items-center justify-center rounded-[1.5rem] border-4 border-[var(--panel)] bg-gradient-to-br from-[var(--accent)] to-[var(--accent-strong)] text-5xl font-black text-white shadow-xl sm:h-36 sm:w-36">
                           {userInitials}
                         </div>
-                        <div className="absolute -bottom-2 -right-2 rounded-full border-4 border-[var(--panel)] bg-emerald-500 p-2 text-white shadow-lg">
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
+                        <div className="absolute -bottom-2 -right-2 flex h-8 w-8 items-center justify-center rounded-full border-4 border-[var(--panel)] bg-emerald-500 text-white shadow-lg">
+                          <span className="material-symbols-outlined text-[16px]">verified</span>
                         </div>
                       </div>
 
@@ -514,34 +459,28 @@ export default function ProfilePage() {
                           </p>
                         </div>
 
-                        <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm font-bold text-[var(--muted-strong)]">
+                        <div className="mt-4 flex flex-wrap gap-x-6 gap-y-3 text-sm font-bold text-[var(--muted-strong)]">
                           {profile.location ? (
                             <div className="flex items-center gap-2">
-                              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--panel-soft)] text-[var(--accent)] shadow-sm">
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.243-4.243a8 8 0 1111.314 0z" />
-                                </svg>
-                              </div>
+                              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--panel-soft)] shadow-sm">
+                                <span className="material-symbols-outlined text-[16px] text-[var(--accent)]">location_on</span>
+                              </span>
                               <span>{profile.location}</span>
                             </div>
                           ) : null}
                           {profile.showEmail && profile.email ? (
                             <div className="flex items-center gap-2">
-                              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--panel-soft)] text-[var(--accent)] shadow-sm">
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                </svg>
-                              </div>
+                              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--panel-soft)] shadow-sm">
+                                <span className="material-symbols-outlined text-[16px] text-[var(--accent)]">mail</span>
+                              </span>
                               <span>{profile.email}</span>
                             </div>
                           ) : null}
                           {profile.showPhone && profile.phone ? (
                             <div className="flex items-center gap-2">
-                              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--panel-soft)] text-[var(--accent)] shadow-sm">
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                                </svg>
-                              </div>
+                              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--panel-soft)] shadow-sm">
+                                <span className="material-symbols-outlined text-[16px] text-[var(--accent)]">call</span>
+                              </span>
                               <span>{profile.phone}</span>
                             </div>
                           ) : null}
@@ -584,19 +523,23 @@ export default function ProfilePage() {
                       </div>
                     </div>
 
-                    <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)]/80 p-4 shadow-sm backdrop-blur sm:min-w-[220px]">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Readiness</p>
-                      <div className="mt-3 flex items-end justify-between gap-3">
-                        <p className="text-4xl font-black tracking-tight text-[var(--text)]">{readinessScore}%</p>
-                        <span className="rounded-full border border-[var(--border)] bg-[var(--panel-soft)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted-strong)]">
-                          Latest sync
-                        </span>
-                      </div>
-                      <div className="mt-4 h-2 overflow-hidden rounded-full bg-[var(--border)] shadow-inner">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent-strong)] transition-all duration-1000"
-                          style={{ width: `${Math.max(0, Math.min(readinessScore, 100))}%` }}
-                        />
+                    <div className="rounded-2xl border border-[var(--accent)]/20 bg-gradient-to-br from-[var(--accent-soft)] to-[var(--panel)] p-5 shadow-sm relative overflow-hidden">
+                      <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,rgba(78,222,163,0.08),transparent_60%)] pointer-events-none" />
+                      <div className="relative z-10">
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Readiness</p>
+                        <div className="mt-3 flex items-end justify-between gap-3">
+                          <p className="text-4xl font-black tracking-tight text-[var(--text)]">{readinessScore}%</p>
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted-strong)]">
+                            <span className="h-1.5 w-1.5 rounded-full bg-[var(--accent)]" />
+                            Latest sync
+                          </span>
+                        </div>
+                        <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-[var(--panel-strong)] shadow-inner">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-[var(--accent-strong)] transition-all duration-1000"
+                            style={{ width: `${Math.max(0, Math.min(readinessScore, 100))}%` }}
+                          />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -618,34 +561,40 @@ export default function ProfilePage() {
                   </p>
 
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Current Role</p>
+                    <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4 relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-1 h-full bg-sky-500/50 rounded-r" />
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)] flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px]">badge</span>Current Role</p>
                       <p className="mt-2 text-sm font-bold text-[var(--text)]">
                         {[profile.currentTitle, profile.currentCompany].filter(Boolean).join(' at ') || 'Not specified'}
                       </p>
                     </div>
-                    <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Experience</p>
+                    <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4 relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500/50 rounded-r" />
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)] flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px]">timeline</span>Experience</p>
                       <p className="mt-2 text-sm font-bold text-[var(--text)]">
                         {profile.yearsExperience ? `${profile.yearsExperience} years` : 'Not specified'}
                       </p>
                     </div>
-                    <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Industry</p>
+                    <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4 relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-1 h-full bg-violet-500/50 rounded-r" />
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)] flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px]">factory</span>Industry</p>
                       <p className="mt-2 text-sm font-bold text-[var(--text)]">{profile.industry || 'Not specified'}</p>
                     </div>
-                    <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Employment Type</p>
+                    <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4 relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500/50 rounded-r" />
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)] flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px]">work</span>Employment</p>
                       <p className="mt-2 text-sm font-bold text-[var(--text)]">
                         {profile.employmentType ? formatLabel(profile.employmentType) : 'Not specified'}
                       </p>
                     </div>
-                    <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Availability</p>
+                    <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4 relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500/50 rounded-r" />
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)] flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px]">schedule</span>Availability</p>
                       <p className="mt-2 text-sm font-bold text-[var(--text)]">{profile.availability || 'Not specified'}</p>
                     </div>
-                    <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">Achievement Themes</p>
+                    <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4 relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-1 h-full bg-amber-500/50 rounded-r" />
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)] flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px]">emoji_events</span>Achievements</p>
                       <p className="mt-2 text-sm font-bold text-[var(--text)]">
                         {profile.achievements?.length ? `${profile.achievements.length} highlights added` : 'No highlights yet'}
                       </p>
@@ -681,12 +630,12 @@ export default function ProfilePage() {
                         const level = Math.max(55, 100 - (index * 12));
                         return (
                           <div key={skill}>
-                            <div className="mb-1 flex items-baseline justify-between">
+                            <div className="mb-1.5 flex items-baseline justify-between">
                               <span className="text-sm font-bold text-[var(--text)]">{skill}</span>
-                              <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">Core</span>
+                              <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--muted)]">{level}%</span>
                             </div>
-                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--border)]">
-                              <div className="h-full rounded-full bg-gradient-to-r from-[#fbcfe8] to-[#ec4899]" style={{ width: `${level}%` }} />
+                            <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--panel-strong)]">
+                              <div className="h-full rounded-full bg-gradient-to-r from-pink-400 to-pink-600 transition-all duration-700" style={{ width: `${level}%` }} />
                             </div>
                           </div>
                         );
@@ -834,11 +783,9 @@ export default function ProfilePage() {
               >
                 <div className="space-y-4">
                   {(profile.honorsAwards || []).map((award, index) => (
-                    <div key={`${award.title || 'award'}-${index}`} className="flex items-start gap-4 rounded-xl border border-transparent bg-[var(--panel-soft)]/40 p-4 transition-colors hover:border-[var(--border)] hover:bg-[var(--panel-soft)]">
-                      <div className="mt-0.5 shrink-0 rounded-xl bg-amber-500/10 p-2 text-amber-600">
-                        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                        </svg>
+                    <div key={`${award.title || 'award'}-${index}`} className="flex items-start gap-4 rounded-xl border border-transparent bg-[var(--panel-soft)]/40 p-4 transition-all hover:border-[var(--border)] hover:bg-[var(--panel-soft)]">
+                      <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20">
+                        <span className="material-symbols-outlined text-[18px] text-amber-500">star</span>
                       </div>
                       <div className="flex-1">
                         <h3 className="text-sm font-black text-[var(--text)]">{award.title || 'Award'}</h3>
@@ -893,8 +840,9 @@ export default function ProfilePage() {
               >
                 <div className="space-y-3">
                   {posts.map((post) => <MiniPost key={post.id} post={post} />)}
-                  <button className="app-button mt-2 w-full" onClick={() => setComposerOpen(true)}>
-                    + New Post
+                  <button className="app-button mt-3 w-full flex items-center justify-center gap-2" onClick={() => setComposerOpen(true)}>
+                    <span className="material-symbols-outlined text-[18px]">add</span>
+                    New Post
                   </button>
                 </div>
               </SectionCard>
@@ -949,8 +897,13 @@ export default function ProfilePage() {
             </AnimatedSection>
 
             <AnimatedSection delay={240}>
-              <article className="rounded-2xl border border-[var(--border)] bg-[var(--panel)]/70 p-6 shadow-sm backdrop-blur-xl">
-                <h3 className="mb-5 text-xs font-black uppercase tracking-widest text-[var(--muted-strong)]">Digital Footprint</h3>
+              <article className="rounded-[2rem] border border-[var(--border)] bg-[var(--panel)]/70 p-6 sm:p-7 shadow-sm backdrop-blur-xl">
+                <div className="mb-5 flex items-center gap-3">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/20">
+                    <span className="material-symbols-outlined text-[16px] text-[var(--accent-strong)]">link</span>
+                  </span>
+                  <h3 className="text-sm font-black uppercase tracking-widest text-[var(--muted-strong)]">Digital Footprint</h3>
+                </div>
                 <div className="space-y-3">
                   {publicLinks.length ? (
                     publicLinks.map((link) => (
@@ -959,20 +912,21 @@ export default function ProfilePage() {
                         href={normalizeUrl(link.url)}
                         target="_blank"
                         rel="noreferrer"
-                        className="group flex flex-col gap-1 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4 shadow-sm transition-all hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:shadow-md"
+                        className="group flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4 shadow-sm transition-all hover:border-[var(--accent)]/30 hover:shadow-md"
                       >
-                        <div className="flex items-center gap-2 text-[var(--text)] group-hover:text-[var(--accent-strong)]">
-                          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                          </svg>
-                          <span className="text-sm font-bold">{link.name}</span>
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--panel-soft)] group-hover:bg-[var(--accent-soft)] transition-colors">
+                          <span className="material-symbols-outlined text-[16px] text-[var(--muted-strong)] group-hover:text-[var(--accent-strong)] transition-colors">open_in_new</span>
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-bold text-[var(--text)] group-hover:text-[var(--accent-strong)] transition-colors">{link.name}</p>
+                          <p className="truncate text-xs font-medium text-[var(--muted-strong)] opacity-80 group-hover:opacity-100">{link.url}</p>
                         </div>
-                        <span className="ml-6 truncate text-xs font-medium text-[var(--muted-strong)] opacity-80 group-hover:opacity-100">{link.url}</span>
                       </a>
                     ))
                   ) : (
-                    <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--panel-soft)] p-5 text-center text-sm text-[var(--muted-strong)]">
-                      Connect your portfolio, GitHub, or LinkedIn to increase visibility.
+                    <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--panel-soft)] p-5 text-center flex flex-col items-center gap-2">
+                      <span className="material-symbols-outlined text-2xl text-[var(--muted)]">add_link</span>
+                      <p className="text-sm font-bold text-[var(--muted-strong)]">Connect your portfolio, GitHub, or LinkedIn to increase visibility.</p>
                     </div>
                   )}
                 </div>
@@ -1080,13 +1034,20 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        <ResumeTemplate profile={profile} />
+
       </div>
 
       <PostComposer
         open={composerOpen}
         onClose={() => setComposerOpen(false)}
         onCreated={(post) => setPosts((current) => [post, ...current].slice(0, 5))}
+      />
+
+      <ResumeBuilderModal
+        open={resumeModalOpen}
+        onClose={() => setResumeModalOpen(false)}
+        profile={profile}
+        educationEntries={educationEntries}
       />
 
       {bannerSettingsOpen ? (
@@ -1134,12 +1095,10 @@ export default function ProfilePage() {
 
       {badgePopupOpen ? (
         <div className="fixed inset-0 z-[200] flex cursor-pointer items-center justify-center bg-black/60 p-4 backdrop-blur-md animate-fade-in" onClick={() => setBadgePopupOpen(false)}>
-          <div className="relative w-full max-w-sm cursor-default rounded-3xl border border-[var(--border)] bg-[var(--panel)] p-8 shadow-2xl" onClick={(event) => event.stopPropagation()}>
-            <div className="absolute right-0 top-0 p-4">
-              <button onClick={() => setBadgePopupOpen(false)} className="rounded-full bg-[var(--panel-soft)] p-1 text-[var(--muted-strong)] transition-colors hover:text-[var(--text)]">
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+          <div className="relative w-full max-w-sm cursor-default rounded-[2rem] border border-[var(--border)] bg-[var(--panel)] p-8 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+            <div className="absolute right-4 top-4">
+              <button onClick={() => setBadgePopupOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--panel-soft)] text-[var(--muted-strong)] transition-colors hover:text-[var(--text)] hover:bg-[var(--panel-strong)]">
+                <span className="material-symbols-outlined text-[18px]">close</span>
               </button>
             </div>
             <h2 className="mb-1 text-center text-2xl font-black tracking-tight text-[var(--text)]">Developer Badge</h2>

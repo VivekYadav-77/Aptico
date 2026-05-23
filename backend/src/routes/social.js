@@ -319,7 +319,16 @@ export default async function socialRoutes(app) {
     try {
       const body = winBodySchema.parse(request.body || {});
       const win = await postWin(request.server.db, request.auth.userId, body);
-      await request.server.services?.redis?.del('platform:stats');
+      
+      const redis = request.server.services?.redis;
+      if (redis) {
+        await redis.del('platform:stats');
+        const keys = await redis.keys('wins:feed:*');
+        if (keys && keys.length > 0) {
+          await redis.del(...keys);
+        }
+      }
+      
       return reply.code(201).send(win);
     } catch (error) {
       return sendError(reply, error, 'Could not post win.');
