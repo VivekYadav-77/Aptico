@@ -262,7 +262,7 @@ export default function AppShell({ title, description, actions, children, banner
   return (
     <div className="app-page">
       {/* ── NAVBAR ──────────────────────────────────────────── */}
-      <header className="glass fixed left-0 right-0 top-0 z-50 border-b border-[var(--border)]">
+      <header className="fixed left-0 right-0 top-0 z-50 bg-[var(--shell)]/70 backdrop-blur-3xl border-b border-white/[0.06] shadow-[0_4px_24px_-8px_rgba(0,0,0,0.5)]">
         {banner}
         <div className="flex items-center justify-between gap-4 px-4 sm:px-6" style={{ height: `${NAVBAR_HEIGHT}px` }}>
           {/* Left: Mobile hamburger + App Logo */}
@@ -273,14 +273,14 @@ export default function AppShell({ title, description, actions, children, banner
               onClick={() => setMobileMenuOpen((current) => !current)}
               aria-label="Toggle navigation"
             >
-              <span className="material-symbols-outlined text-[20px]">{mobileMenuOpen ? 'close' : 'menu'}</span>
+              <span className="material-symbols-outlined text-[20px] transition-transform duration-300 hover:rotate-90">{mobileMenuOpen ? 'close' : 'menu'}</span>
             </button>
             <AppLogo />
           </div>
 
           {/* Center: Desktop horizontal centered tabs (only when logged in) */}
           {auth.isAuthenticated && (
-            <div className="hidden lg:flex items-center gap-1 bg-[var(--panel-soft)] border border-[var(--border)] rounded-full px-1.5 py-1">
+            <div className="hidden lg:flex items-center gap-2">
               {[
                 { to: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
                 { to: '/analysis', label: 'Analysis', icon: 'analytics' },
@@ -291,14 +291,14 @@ export default function AppShell({ title, description, actions, children, banner
                   <Link
                     key={tab.to}
                     to={tab.to}
-                    className={`flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-widest transition-all duration-200 ${
+                    className={`group relative flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-widest rounded-xl transition-all duration-300 ${
                       isActive
-                        ? 'bg-[var(--panel)] text-[var(--accent-strong)] border border-[var(--border)] shadow-[0_0_12px_rgba(78,222,163,0.15)]'
-                        : 'text-[var(--muted-strong)] hover:text-[var(--text)]'
+                        ? 'bg-[var(--accent)]/10 text-[var(--accent-strong)] border border-[var(--accent)]/20 shadow-[0_0_15px_rgba(78,222,163,0.1)]'
+                        : 'text-[var(--muted-strong)] hover:text-[var(--text)] hover:bg-[var(--panel-soft)] border border-transparent'
                     }`}
                   >
-                    <span className="material-symbols-outlined text-[14px]">{tab.icon}</span>
-                    {tab.label}
+                    <span className={`material-symbols-outlined text-[16px] transition-all duration-300 ${isActive ? 'drop-shadow-[0_0_8px_rgba(78,222,163,0.6)]' : 'group-hover:-translate-y-0.5'}`}>{tab.icon}</span>
+                    <span className="relative z-10">{tab.label}</span>
                   </Link>
                 );
               })}
@@ -311,19 +311,19 @@ export default function AppShell({ title, description, actions, children, banner
               >
                 <button
                   type="button"
-                  className={`flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-bold uppercase tracking-widest transition-all duration-200 cursor-pointer ${
+                  className={`group relative flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-widest rounded-xl transition-all duration-300 cursor-pointer ${
                     ['/squads', '/people', '/wins', '/portfolio-generator'].some(path => location.pathname === path)
-                      ? 'bg-[var(--panel)] text-[var(--accent-strong)] border border-[var(--border)] shadow-[0_0_12px_rgba(78,222,163,0.15)]'
-                      : 'text-[var(--muted-strong)] hover:text-[var(--text)]'
+                      ? 'bg-[var(--accent)]/10 text-[var(--accent-strong)] border border-[var(--accent)]/20 shadow-[0_0_15px_rgba(78,222,163,0.1)]'
+                      : 'text-[var(--muted-strong)] hover:text-[var(--text)] hover:bg-[var(--panel-soft)] border border-transparent'
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[14px]">hub</span>
-                  Hub
-                  <span className="material-symbols-outlined text-[12px] -ml-1">keyboard_arrow_down</span>
+                  <span className={`material-symbols-outlined text-[16px] transition-all duration-300 ${['/squads', '/people', '/wins', '/portfolio-generator'].some(path => location.pathname === path) ? 'drop-shadow-[0_0_8px_rgba(78,222,163,0.6)]' : 'group-hover:-translate-y-0.5'}`}>hub</span>
+                  <span className="relative z-10">Hub</span>
+                  <span className="material-symbols-outlined text-[14px] -ml-1 transition-transform duration-300 group-hover:translate-y-0.5">keyboard_arrow_down</span>
                 </button>
 
                 {hubDropdownOpen && (
-                  <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 w-48 rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-2 shadow-[0_16px_36px_rgba(0,0,0,0.25)] animate-fade-in-up">
+                  <div className="absolute left-1/2 -translate-x-1/2 top-full mt-3 w-52 rounded-2xl border border-[var(--border)] bg-[var(--panel)]/95 backdrop-blur-3xl p-2 shadow-[0_24px_48px_rgba(0,0,0,0.4)] animate-fade-in-up origin-top z-[200]">
                     {[
                       { to: '/squads', label: 'Squads', icon: 'groups' },
                       { to: '/people', label: 'People', icon: 'diversity_3' },
@@ -336,14 +336,14 @@ export default function AppShell({ title, description, actions, children, banner
                           key={subTab.to}
                           to={subTab.to}
                           onClick={() => setHubDropdownOpen(false)}
-                          className={`flex items-center gap-2 rounded-xl px-3 py-2 text-left text-xs font-bold uppercase tracking-wider transition ${
+                          className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
                             isSubActive
-                              ? 'bg-[var(--panel-soft)] text-[var(--accent-strong)]'
-                              : 'text-[var(--muted-strong)] hover:bg-[var(--panel-soft)] hover:text-[var(--text)]'
+                              ? 'bg-[var(--accent)]/15 text-[var(--accent-strong)]'
+                              : 'text-[var(--muted-strong)] hover:bg-white/[0.06] hover:text-[var(--text)]'
                           }`}
                         >
-                          <span className="material-symbols-outlined text-[14px]">{subTab.icon}</span>
-                          {subTab.label}
+                          <span className={`material-symbols-outlined text-[16px] transition-all duration-200 ${isSubActive ? 'drop-shadow-[0_0_6px_rgba(78,222,163,0.5)]' : 'group-hover:scale-110 group-hover:text-[var(--text)]'}`}>{subTab.icon}</span>
+                          <span className="transition-transform duration-200 group-hover:translate-x-1">{subTab.label}</span>
                         </Link>
                       );
                     })}
@@ -358,15 +358,18 @@ export default function AppShell({ title, description, actions, children, banner
             {/* Desktop Search (Only when logged in) */}
             {auth.isAuthenticated && (
               <div className="relative hidden md:block" ref={searchRef}>
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-[var(--muted)]">search</span>
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-[var(--muted-strong)] z-10 pointer-events-none transition-colors duration-300 peer-focus:text-[var(--accent)]">search</span>
                 <input
                   ref={searchInputRef}
-                  className="w-48 rounded-full border border-[var(--border)] bg-[var(--panel-soft)] py-2 pl-9 pr-4 text-xs text-[var(--text)] outline-none transition-all duration-200 focus:w-60 focus:border-[var(--accent)] focus:ring-2 focus:ring-[var(--accent-soft)] lg:w-52 lg:focus:w-64"
+                  className="peer w-48 rounded-full border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] py-2 pl-9 pr-12 text-xs text-[var(--text)] outline-none transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] focus:w-64 focus:border-[var(--accent)]/50 focus:bg-[var(--panel)] focus:ring-4 focus:ring-[var(--accent)]/10 shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)] lg:w-56 lg:focus:w-72"
                   placeholder="Search insights…"
                   value={searchQuery}
                   onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
                   onFocus={() => setSearchOpen(true)}
                 />
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center pointer-events-none opacity-80">
+                  <kbd className="font-mono text-[9px] font-bold tracking-widest text-[var(--muted-strong)] border border-white/[0.1] rounded px-1.5 py-0.5 bg-black/40 shadow-sm">⌘K</kbd>
+                </div>
                 {searchOpen && (
                   <SearchDropdown
                     query={searchQuery}
@@ -386,22 +389,22 @@ export default function AppShell({ title, description, actions, children, banner
                 <button
                   type="button"
                   onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                  className="flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--panel-soft)] hover:bg-[var(--panel)] hover:border-[var(--accent)]/40 px-3 py-1.5 text-xs text-[var(--text)] font-semibold transition cursor-pointer select-none"
+                  className="group flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/[0.15] hover:shadow-[0_4px_12px_rgba(0,0,0,0.2)] px-3 py-1.5 text-xs text-[var(--text)] font-semibold transition-all duration-300 cursor-pointer select-none"
                 >
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)] text-[9px] font-black text-[#003824]">
+                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)] text-[9px] font-black text-[#003824] shadow-[0_0_8px_rgba(78,222,163,0.4)]">
                     {userLabel.charAt(0).toUpperCase()}
                   </div>
                   <span className="hidden sm:inline max-w-[80px] truncate">{userLabel.split(' ')[0]}</span>
-                  <span className="material-symbols-outlined text-[16px] text-[var(--muted)]">keyboard_arrow_down</span>
+                  <span className="material-symbols-outlined text-[16px] text-[var(--muted-strong)] transition-all duration-300 group-hover:text-[var(--text)]">keyboard_arrow_down</span>
                 </button>
 
                 {profileDropdownOpen && (
-                  <div className="absolute right-0 top-[calc(100%+8px)] z-[250] w-72 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-5 shadow-[0_24px_60px_rgba(0,0,0,0.35)] animate-fade-in-up">
+                  <div className="absolute right-0 top-[calc(100%+12px)] z-[250] w-72 overflow-hidden rounded-[1.5rem] border border-white/[0.08] bg-[var(--panel)]/90 backdrop-blur-2xl p-5 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] animate-fade-in-up origin-top-right">
                     <div className="absolute inset-x-0 top-0 h-24 bg-[radial-gradient(circle_at_top,rgba(78,222,163,0.15),transparent_70%)]" />
                     
                     {/* User Profile Info */}
-                    <div className="relative z-10 flex items-center gap-3 pb-4 border-b border-[var(--border)]">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-sm font-black text-[#003824]">
+                    <div className="relative z-10 flex items-center gap-3 pb-4 border-b border-white/[0.08]">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-sm font-black text-[#003824] shadow-[0_0_12px_rgba(78,222,163,0.4)]">
                         {userLabel.charAt(0).toUpperCase()}
                       </div>
                       <div className="min-w-0">
@@ -412,25 +415,25 @@ export default function AppShell({ title, description, actions, children, banner
 
                     {/* Resilience Level HUD */}
                     {auth.user?.resilienceXp !== undefined && (
-                      <div className="relative z-10 py-4 border-b border-[var(--border)]">
+                      <div className="relative z-10 py-4 border-b border-white/[0.08]">
                         {(() => {
                           const xp = auth.user.resilienceXp || 0;
                           const lvl = Math.floor(xp / 1000) + 1;
                           const lvlXp = xp % 1000;
                           const percent = (lvlXp / 1000) * 100;
                           return (
-                            <div className="space-y-2">
-                              <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-[var(--muted-strong)]">
-                                <span>Lvl {lvl} Explorer</span>
-                                <span className="text-[var(--accent-strong)]">{lvlXp}/1000 XP</span>
-                              </div>
-                              <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--panel-strong)]">
-                                <div
-                                  className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-[#71a1ff] shadow-[0_0_8px_rgba(78,222,163,0.4)]"
-                                  style={{ width: `${Math.max(5, percent)}%` }}
-                                />
-                              </div>
-                            </div>
+                             <div className="space-y-2">
+                               <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-widest text-[var(--muted-strong)]">
+                                 <span>Lvl {lvl} Explorer</span>
+                                 <span className="text-[var(--accent-strong)] drop-shadow-[0_0_4px_rgba(78,222,163,0.4)]">{lvlXp}/1000 XP</span>
+                               </div>
+                               <div className="h-2 w-full overflow-hidden rounded-full bg-black/40 shadow-[inset_0_1px_3px_rgba(0,0,0,0.5)]">
+                                 <div
+                                   className="h-full rounded-full bg-gradient-to-r from-[var(--accent)] to-[#71a1ff] shadow-[0_0_12px_rgba(78,222,163,0.6)]"
+                                   style={{ width: `${Math.max(5, percent)}%` }}
+                                 />
+                               </div>
+                             </div>
                           );
                         })()}
                       </div>
@@ -441,30 +444,30 @@ export default function AppShell({ title, description, actions, children, banner
                       <Link
                         to={profileHref}
                         onClick={() => setProfileDropdownOpen(false)}
-                        className="flex items-center gap-3 rounded-xl px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[var(--muted-strong)] hover:bg-[var(--panel-soft)] hover:text-[var(--text)] transition"
+                        className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-[var(--muted-strong)] hover:bg-white/[0.06] hover:text-[var(--text)] transition-all duration-200"
                       >
-                        <span className="material-symbols-outlined text-[16px] text-[var(--accent-strong)]">person</span>
-                        View Profile
+                        <span className="material-symbols-outlined text-[16px] text-[var(--accent-strong)] transition-transform duration-200 group-hover:scale-110 drop-shadow-[0_0_4px_rgba(78,222,163,0.3)]">person</span>
+                        <span className="transition-transform duration-200 group-hover:translate-x-1">View Profile</span>
                       </Link>
                       <Link
                         to="/settings"
                         onClick={() => setProfileDropdownOpen(false)}
-                        className="flex items-center gap-3 rounded-xl px-3 py-2 text-left text-xs font-bold uppercase tracking-wider text-[var(--muted-strong)] hover:bg-[var(--panel-soft)] hover:text-[var(--text)] transition"
+                        className="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-[var(--muted-strong)] hover:bg-white/[0.06] hover:text-[var(--text)] transition-all duration-200"
                       >
-                        <span className="material-symbols-outlined text-[16px]">settings</span>
-                        Account Settings
+                        <span className="material-symbols-outlined text-[16px] transition-transform duration-200 group-hover:scale-110">settings</span>
+                        <span className="transition-transform duration-200 group-hover:translate-x-1">Account Settings</span>
                       </Link>
                     </div>
 
                     {/* Sign Out */}
-                    <div className="relative z-10 pt-3 border-t border-[var(--border)]">
+                    <div className="relative z-10 pt-3 border-t border-white/[0.08]">
                       <button
                         type="button"
                         onClick={() => { setProfileDropdownOpen(false); void handleSignOut(); }}
-                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/5 py-2 text-xs font-black uppercase tracking-widest text-rose-400 transition hover:bg-rose-500/10 hover:text-rose-300"
+                        className="group flex w-full items-center justify-center gap-2 rounded-xl border border-rose-500/20 bg-rose-500/5 py-2.5 text-xs font-black uppercase tracking-widest text-rose-400 transition-all duration-200 hover:bg-rose-500/15 hover:text-rose-300 hover:shadow-[0_0_12px_rgba(244,63,94,0.15)]"
                       >
-                        <span className="material-symbols-outlined text-[16px]">logout</span>
-                        Sign Out
+                        <span className="material-symbols-outlined text-[16px] transition-transform duration-200 group-hover:-translate-x-1">logout</span>
+                        <span className="transition-transform duration-200 group-hover:translate-x-1">Sign Out</span>
                       </button>
                     </div>
                   </div>

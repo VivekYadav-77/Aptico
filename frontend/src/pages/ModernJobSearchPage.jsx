@@ -161,7 +161,7 @@ export default function ModernJobSearchPage() {
     location: persistedJobSearchState?.formState?.location || 'India',
     useAnalysis: persistedJobSearchState?.formState?.useAnalysis || false
   });
-  const [submittedSearch, setSubmittedSearch] = useState(null);
+  const [submittedSearch, setSubmittedSearch] = useState(persistedJobSearchState?.submittedSearch || null);
   const [activeFocus, setActiveFocus] = useState(persistedJobSearchState?.activeFocus || 'best-match');
   const [localSearch, setLocalSearch] = useState(persistedJobSearchState?.localSearch || '');
   const [selectedJobId, setSelectedJobId] = useState(persistedJobSearchState?.selectedJobId || null);
