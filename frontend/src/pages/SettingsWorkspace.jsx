@@ -759,6 +759,21 @@ export default function SettingsWorkspace() {
                         </button>
                       </div>
 
+                      <div className="mt-8 pt-6 border-t border-[var(--border)]">
+                        <SelectField
+                          label="Default Resume Template"
+                          value={draft.resumeTemplate || 'executive'}
+                          onChange={(e) => updateField('resumeTemplate', e.target.value)}
+                          options={[
+                            { value: 'executive', label: 'Executive (ATS Classic)' },
+                            { value: 'modern', label: 'Modern (Professional Two-Column)' },
+                            { value: 'minimal', label: 'Minimal (Swiss Clean)' },
+                            { value: 'creative', label: 'Creative (Bold Gradient)' },
+                            { value: 'technical', label: 'Technical (Developer-Focused)' }
+                          ]}
+                        />
+                      </div>
+
                       <div className="flex items-center gap-4 mt-8 pt-6 border-t border-[var(--border)]">
                         <p className="text-sm font-bold text-[var(--text)]">Quick Toggle</p>
                         <ThemeToggle />

@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 
 /* ───── helpers ───── */
 function normalizeUrl(u) { return u && !u.startsWith('http') ? `https://${u}` : u || ''; }
@@ -692,13 +692,19 @@ const TEMPLATES = [
 /* ─────────────────────────────────────────────
    MAIN MODAL
    ───────────────────────────────────────────── */
-export default function ResumeBuilderModal({ open, onClose, profile, educationEntries }) {
-  const [selectedId, setSelectedId] = useState('executive');
+export default function ResumeBuilderModal({ open, onClose, profile, educationEntries, readonly = false }) {
+  const [selectedId, setSelectedId] = useState(profile?.resumeTemplate || 'executive');
   const [downloading, setDownloading] = useState(false);
   const previewRef = useRef(null);
 
+  useEffect(() => {
+    if (open && profile?.resumeTemplate) {
+      setSelectedId(profile.resumeTemplate);
+    }
+  }, [open, profile?.resumeTemplate]);
+
   const data = useResumeData(profile, educationEntries);
-  const selected = TEMPLATES.find(t => t.id === selectedId);
+  const selected = TEMPLATES.find(t => t.id === selectedId) || TEMPLATES[0];
 
   const handleDownload = useCallback(async () => {
     if (!previewRef.current || downloading) return;
@@ -755,39 +761,41 @@ export default function ResumeBuilderModal({ open, onClose, profile, educationEn
       {/* ── Body ── */}
       <div className="flex flex-1 overflow-hidden">
         {/* Sidebar — template selector */}
-        <aside className="w-[280px] shrink-0 border-r border-[var(--border)] bg-[var(--panel)]/80 backdrop-blur-xl overflow-y-auto p-5 space-y-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--muted)] mb-3">Choose Template</p>
-          {TEMPLATES.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setSelectedId(t.id)}
-              className={`w-full rounded-2xl border p-4 text-left transition-all ${
-                selectedId === t.id
-                  ? 'border-[var(--accent)]/50 bg-[var(--accent-soft)] shadow-[0_4px_20px_rgba(78,222,163,0.1)] ring-1 ring-[var(--accent)]'
-                  : 'border-[var(--border)] bg-[var(--panel)] hover:border-[var(--accent)]/30 hover:bg-[var(--panel-soft)]'
-              }`}
-            >
-              <div className="flex items-center gap-3 mb-2">
-                <span
-                  className="flex h-8 w-8 items-center justify-center rounded-lg"
-                  style={{ background: selectedId === t.id ? `${t.color}20` : 'var(--panel-soft)' }}
-                >
+        {!readonly && (
+          <aside className="w-[280px] shrink-0 border-r border-[var(--border)] bg-[var(--panel)]/80 backdrop-blur-xl overflow-y-auto p-5 space-y-2.5">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--muted)] mb-3">Choose Template</p>
+            {TEMPLATES.map(t => (
+              <button
+                key={t.id}
+                onClick={() => setSelectedId(t.id)}
+                className={`w-full rounded-2xl border p-4 text-left transition-all ${
+                  selectedId === t.id
+                    ? 'border-[var(--accent)]/50 bg-[var(--accent-soft)] shadow-[0_4px_20px_rgba(78,222,163,0.1)] ring-1 ring-[var(--accent)]'
+                    : 'border-[var(--border)] bg-[var(--panel)] hover:border-[var(--accent)]/30 hover:bg-[var(--panel-soft)]'
+                }`}
+              >
+                <div className="flex items-center gap-3 mb-2">
                   <span
-                    className="material-symbols-outlined text-[16px]"
-                    style={{ color: selectedId === t.id ? t.color : 'var(--muted)' }}
-                  >{t.icon}</span>
-                </span>
-                <span className="text-sm font-black text-[var(--text)]">{t.label}</span>
-                {selectedId === t.id && (
-                  <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)] text-white">
-                    <span className="material-symbols-outlined text-[12px]">check</span>
+                    className="flex h-8 w-8 items-center justify-center rounded-lg"
+                    style={{ background: selectedId === t.id ? `${t.color}20` : 'var(--panel-soft)' }}
+                  >
+                    <span
+                      className="material-symbols-outlined text-[16px]"
+                      style={{ color: selectedId === t.id ? t.color : 'var(--muted)' }}
+                    >{t.icon}</span>
                   </span>
-                )}
-              </div>
-              <p className="text-[11px] font-medium text-[var(--muted-strong)] leading-relaxed">{t.desc}</p>
-            </button>
-          ))}
-        </aside>
+                  <span className="text-sm font-black text-[var(--text)]">{t.label}</span>
+                  {selectedId === t.id && (
+                    <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)] text-white">
+                      <span className="material-symbols-outlined text-[12px]">check</span>
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] font-medium text-[var(--muted-strong)] leading-relaxed">{t.desc}</p>
+              </button>
+            ))}
+          </aside>
+        )}
 
         {/* Preview area */}
         <div className="flex-1 overflow-auto bg-[var(--panel-strong)]/50 p-8 flex justify-center">
