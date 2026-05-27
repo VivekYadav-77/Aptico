@@ -24,6 +24,8 @@ const envSchema = z.object({
   ADZUNA_API_BASE_URL: z.string().trim().url().default('https://api.adzuna.com/v1/api/jobs/in/search/1'),
   DUCKDUCKGO_HTML_URL: z.string().trim().url().default('https://html.duckduckgo.com/html/'),
   FRONTEND_URL: z.string().trim().url().default('http://localhost:3000'),
+  ALLOWED_ORIGINS: z.string().trim().optional(),
+  COOKIE_DOMAIN: z.string().trim().min(1).optional(),
   GAS_EMAIL_DISPATCH_URL: z.string().trim().url().optional(),
   GAS_EMAIL_DISPATCH_TOKEN: z.string().trim().min(1).optional(),
   GAS_EMAIL_VERIFY_URL: z.string().trim().url().optional(),
@@ -55,6 +57,10 @@ const envSchema = z.object({
   REMOTIVE_API_BASE_URL: z.string().trim().url().default('https://remotive.com/api/remote-jobs'),
   SERPER_API_URL: z.string().trim().url().default('https://google.serper.dev/search'),
   JWT_SECRET: z.string().trim().min(32).default('development-only-jwt-secret-change-me-123'),
+  JWT_ISSUER: z.string().trim().min(1).default('aptico-api'),
+  JWT_AUDIENCE: z.string().trim().min(1).default('aptico-web'),
+  SECURITY_MODE: z.enum(['development', 'production']).optional(),
+  REQUIRE_AUTH_FOR_AI: z.coerce.boolean().default(true),
   SERPER_API_KEY: z.string().trim().min(1).optional(),
   UPSTASH_REDIS_REST_URL: z.string().trim().url().optional(),
   UPSTASH_REDIS_REST_TOKEN: z.string().trim().min(1).optional()
@@ -65,6 +71,35 @@ const parsedEnv = envSchema.safeParse(process.env);
 if (!parsedEnv.success) {
   throw new Error(`Invalid environment configuration: ${parsedEnv.error.message}`);
 }
+
+export const defaultJwtSecret = 'development-only-jwt-secret-change-me-123';
+
+export function validateProductionEnv(data, effectiveSecurityMode) {
+  if (data.NODE_ENV !== 'production') {
+    return;
+  }
+
+  const frontendUrl = new URL(data.FRONTEND_URL);
+
+  if (data.JWT_SECRET === defaultJwtSecret) {
+    throw new Error('Invalid production configuration: JWT_SECRET must be changed from the development default.');
+  }
+
+  if (!data.DATABASE_URL) {
+    throw new Error('Invalid production configuration: DATABASE_URL is required.');
+  }
+
+  if (frontendUrl.protocol !== 'https:') {
+    throw new Error('Invalid production configuration: FRONTEND_URL must use https.');
+  }
+
+  if (effectiveSecurityMode !== 'production') {
+    throw new Error('Invalid production configuration: SECURITY_MODE must be production.');
+  }
+}
+
+const effectiveSecurityMode = parsedEnv.data.SECURITY_MODE || (parsedEnv.data.NODE_ENV === 'production' ? 'production' : 'development');
+validateProductionEnv(parsedEnv.data, effectiveSecurityMode);
 
 function uniqueNonEmpty(values) {
   return [...new Set(values.map((value) => String(value || '').trim()).filter(Boolean))];
@@ -150,6 +185,7 @@ for (const keyName of KEY_NAMES) {
 
 export const env = {
   nodeEnv: parsedEnv.data.NODE_ENV,
+  securityMode: effectiveSecurityMode,
   host: parsedEnv.data.HOST,
   port: parsedEnv.data.PORT,
   adzunaAppId: adzunaCredentials[0]?.appId || parsedEnv.data.ADZUNA_APP_ID || null,
@@ -159,6 +195,8 @@ export const env = {
   databaseUrl: parsedEnv.data.DATABASE_URL || null,
   duckDuckGoHtmlUrl: parsedEnv.data.DUCKDUCKGO_HTML_URL,
   frontendUrl: parsedEnv.data.FRONTEND_URL,
+  allowedOrigins: uniqueNonEmpty([parsedEnv.data.FRONTEND_URL, ...(parsedEnv.data.ALLOWED_ORIGINS || '').split(',')]),
+  cookieDomain: parsedEnv.data.COOKIE_DOMAIN || null,
   gasEmailDispatchUrl: parsedEnv.data.GAS_EMAIL_DISPATCH_URL || null,
   gasEmailDispatchToken: parsedEnv.data.GAS_EMAIL_DISPATCH_TOKEN || null,
   gasEmailVerifyUrl: parsedEnv.data.GAS_EMAIL_VERIFY_URL || null,
@@ -195,6 +233,9 @@ export const env = {
   reedApiKey: parsedEnv.data.REED_API_KEY || null,
   remotiveApiBaseUrl: parsedEnv.data.REMOTIVE_API_BASE_URL,
   jwtSecret: parsedEnv.data.JWT_SECRET,
+  jwtIssuer: parsedEnv.data.JWT_ISSUER,
+  jwtAudience: parsedEnv.data.JWT_AUDIENCE,
+  requireAuthForAi: parsedEnv.data.REQUIRE_AUTH_FOR_AI,
   serperApiUrl: parsedEnv.data.SERPER_API_URL,
   serperApiKey: serperApiKeys[0] || parsedEnv.data.SERPER_API_KEY || null,
   serperApiKeys,

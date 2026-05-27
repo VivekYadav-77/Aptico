@@ -6,6 +6,7 @@ import analyzeRoutes from '../modules/analysis/analysis.routes.js';
 import authRoutes from '../modules/auth/auth.routes.js';
 import badgeRoutes from '../modules/badge/badge.routes.js';
 import generateRoutes from '../modules/content/content.routes.js';
+import healthRoutes from '../modules/health/health.routes.js';
 import jobRoutes from '../modules/jobs/jobs.routes.js';
 import profileRoutes from '../modules/profile/profile.routes.js';
 import rejectionRoutes from '../modules/rejections/rejections.routes.js';
@@ -20,6 +21,7 @@ const mercurius = require('mercurius');
 // Route registration lives here so URL prefixes remain auditable during refactors.
 export function registerRoutes(app) {
   app.register(authRoutes, { prefix: '/api/auth' });
+  app.register(healthRoutes, { prefix: '/api/health' });
   app.register(analyzeRoutes, { prefix: '/api/analyze' });
   app.register(generateRoutes, { prefix: '/api/generate' });
   app.register(jobRoutes, { prefix: '/api/jobs' });

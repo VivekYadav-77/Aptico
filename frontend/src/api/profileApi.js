@@ -1,9 +1,7 @@
 import api from './axios.js';
 
 export function invalidateReadmeCache() {
-  try {
-    localStorage.removeItem('aptico-portfolio-readme');
-  } catch (e) {}
+  // Portfolio README content can include personal profile details, so it is not persisted in browser storage.
 }
 
 export async function fetchProfileSettings() {
@@ -35,18 +33,7 @@ export async function fetchDashboardSummary() {
 }
 
 export async function generatePortfolioReadme(forceRefresh = false) {
-  if (!forceRefresh) {
-    try {
-      const cached = localStorage.getItem('aptico-portfolio-readme');
-      if (cached) {
-        return Promise.resolve(JSON.parse(cached));
-      }
-    } catch (e) {}
-  }
   const response = await api.post('/api/portfolio/readme');
-  try {
-    localStorage.setItem('aptico-portfolio-readme', JSON.stringify(response.data.data));
-  } catch (e) {}
   return response.data.data;
 }
 

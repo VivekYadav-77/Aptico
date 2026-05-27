@@ -1,5 +1,5 @@
-import api from './axios.js';
-import { clearAuthSession, setAuthSession, store } from '../store/authSlice.js';
+import { clearAuthSession, store } from '../store/authSlice.js';
+import { refreshSessionRequest } from './authApi.js';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
@@ -14,17 +14,7 @@ function getAuthHeaders() {
 
 async function refreshAnalysisSession() {
   try {
-    const response = await api.post('/api/auth/refresh');
-    const session = response.data?.data;
-
-    if (session?.accessToken && session?.user) {
-      store.dispatch(
-        setAuthSession({
-          user: session.user,
-          accessToken: session.accessToken
-        })
-      );
-    }
+    const session = await refreshSessionRequest(store);
 
     return session;
   } catch (error) {

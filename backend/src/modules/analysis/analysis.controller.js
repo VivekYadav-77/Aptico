@@ -39,9 +39,9 @@ export async function analyzeController(request, reply) {
     return reply.code(400).send({ success: false, error: 'File must be under 5 MB.' });
   }
 
-  const allowedTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+  const allowedTypes = ['application/pdf'];
   if (incomingFile?.type && !allowedTypes.includes(incomingFile.type)) {
-    return reply.code(400).send({ success: false, error: 'Only PDF and DOCX formats are accepted.' });
+    return reply.code(400).send({ success: false, error: 'Only PDF files are accepted.' });
   }
 
   let body;
@@ -66,6 +66,10 @@ export async function analyzeController(request, reply) {
 
   if (pdfBuffer.length > MAX_FILE_BYTES) {
     return reply.code(400).send({ success: false, error: 'File must be under 5 MB.' });
+  }
+
+  if (pdfBuffer.subarray(0, 5).toString('utf8') !== '%PDF-') {
+    return reply.code(400).send({ success: false, error: 'Uploaded file is not a valid PDF.' });
   }
 
   let parsedPdf;

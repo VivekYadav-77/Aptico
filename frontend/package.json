@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "check": "next build",
+    "test": "node --test"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.0.0",

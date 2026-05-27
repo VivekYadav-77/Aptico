@@ -12,7 +12,7 @@ export class RedisService {
     return Boolean(this.url && this.token);
   }
 
-  async request(commandSegments, { query } = {}) {
+  async request(commandSegments, { query, failOpen = true } = {}) {
     const commandName = commandSegments[0];
 
     if (!this.isConfigured()) {
@@ -53,7 +53,10 @@ export class RedisService {
 
       return payload.result ?? null;
     } catch (error) {
-      this.logger.error(`[RedisService] ${commandName} failed open.`, error);
+      this.logger.error(`[RedisService] ${commandName} failed${failOpen ? ' open' : ' closed'}.`, error);
+      if (!failOpen) {
+        throw error;
+      }
       return null;
     } finally {
       clearTimeout(timeoutHandle);
@@ -64,15 +67,15 @@ export class RedisService {
     return this.request(['PING']);
   }
 
-  async get(key) {
-    return this.request(['GET', key]);
+  async get(key, options) {
+    return this.request(['GET', key], options);
   }
 
-  async set(key, value, ttlSeconds) {
+  async set(key, value, ttlSeconds, options) {
     const serializedValue = typeof value === 'string' ? value : JSON.stringify(value);
     const query = ttlSeconds ? { EX: ttlSeconds } : undefined;
 
-    return this.request(['SET', key, serializedValue], { query });
+    return this.request(['SET', key, serializedValue], { query, ...(options || {}) });
   }
 
   async incr(key) {

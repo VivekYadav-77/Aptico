@@ -35,7 +35,11 @@ async function resolveAuth(request, reply, { optional, adminOnly = false }) {
   let payload;
 
   try {
-    payload = jwt.verify(bearerToken, env.jwtSecret);
+    payload = jwt.verify(bearerToken, env.jwtSecret, {
+      algorithms: ['HS256'],
+      issuer: env.jwtIssuer,
+      audience: env.jwtAudience
+    });
   } catch (error) {
     if (allowGuestFallback) {
       request.auth = null;
@@ -58,14 +62,18 @@ async function resolveAuth(request, reply, { optional, adminOnly = false }) {
 
   if (redis) {
     const revocationResult = await Promise.race([
-      redis.get(`revoked_jwt:${payload.jti}`),
+      redis.get(`revoked_jwt:${payload.jti}`, { failOpen: !adminOnly }),
       new Promise((resolve) => {
         setTimeout(() => resolve(REDIS_TIMEOUT_SYMBOL), 300);
       })
     ]);
 
     if (revocationResult === REDIS_TIMEOUT_SYMBOL) {
-      request.log.warn(`Redis revocation check timed out for JWT ${payload.jti}. Allowing request.`);
+      request.log.warn(`Redis revocation check timed out for JWT ${payload.jti}.`);
+
+      if (adminOnly) {
+        return sendAuthError(reply, 'Token revocation status could not be verified.', 503);
+      }
     } else if (revocationResult) {
       if (allowGuestFallback) {
         request.auth = null;

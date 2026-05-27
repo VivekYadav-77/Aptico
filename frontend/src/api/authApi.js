@@ -1,18 +1,49 @@
 import api from './axios.js';
-import { clearAuthSession, setAuthReady, setAuthSession, updateAccessToken } from '../store/authSlice.js';
+import { clearAuthSession, setAuthReady, setAuthSession } from '../store/authSlice.js';
 import { invalidateReadmeCache } from './profileApi.js';
 
 let interceptorsReady = false;
 let activeStore = null;
 let refreshPromise = null;
+let csrfToken = null;
+
+function readCookie(name) {
+  if (typeof document === 'undefined') {
+    return null;
+  }
+
+  const prefix = `${name}=`;
+  const cookie = document.cookie
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(prefix));
+
+  return cookie ? decodeURIComponent(cookie.slice(prefix.length)) : null;
+}
+
+function getCsrfToken() {
+  csrfToken = csrfToken || readCookie('aptico_csrf_token');
+  return csrfToken;
+}
+
+function rememberCsrfToken(session) {
+  if (session?.csrfToken) {
+    csrfToken = session.csrfToken;
+  }
+}
 
 function getRequestUrl(config) {
   return `${config.baseURL || ''}${config.url || ''}`;
 }
 
 async function runRefreshFlow() {
-  const response = await api.post('/api/auth/refresh');
-  return response.data.data;
+  const token = getCsrfToken();
+  const response = await api.post('/api/auth/refresh', null, {
+    headers: token ? { 'X-CSRF-Token': token } : undefined
+  });
+  const session = response.data.data;
+  rememberCsrfToken(session);
+  return session;
 }
 
 function isAuthenticationEndpoint(requestUrl) {
@@ -67,6 +98,7 @@ export function setupAuthInterceptors(store) {
       try {
         refreshPromise = refreshPromise || runRefreshFlow();
         const refreshedSession = await refreshPromise;
+        rememberCsrfToken(refreshedSession);
 
         activeStore.dispatch(
           setAuthSession({
@@ -97,6 +129,7 @@ export async function sendMagicLinkRequest(email) {
 }
 
 function applySessionToStore(store, session) {
+  rememberCsrfToken(session);
   store.dispatch(
     setAuthSession({
       user: session.user,
@@ -151,7 +184,6 @@ export async function requestEmailVerification(email) {
 export async function refreshSessionRequest(store) {
   const session = await runRefreshFlow();
 
-  store.dispatch(updateAccessToken(session.accessToken));
   applySessionToStore(store, session);
 
   return session;
@@ -169,8 +201,12 @@ export async function bootstrapAuthSession(store) {
 
 export async function logoutRequest(store) {
   try {
-    await api.post('/api/auth/logout');
+    const token = getCsrfToken();
+    await api.post('/api/auth/logout', null, {
+      headers: token ? { 'X-CSRF-Token': token } : undefined
+    });
   } finally {
+    csrfToken = null;
     invalidateReadmeCache();
     store.dispatch(clearAuthSession());
   }

@@ -3,6 +3,7 @@ import { userProfiles, users } from '../../db/schema.js';
 
 const SVG_WIDTH = 460;
 const SVG_HEIGHT = 180;
+const USERNAME_PATTERN = /^[a-z0-9_-]{3,30}$/;
 
 function escapeXml(value) {
   return String(value || '')
@@ -208,7 +209,11 @@ function sendResponse(request, reply, svgCode) {
 
   if (isDirectBrowserVisit) {
       // User typed URL directly into address bar - return a gorgeous HTML preview
-      return reply.type('text/html').send(`
+      return reply
+        .header('X-Content-Type-Options', 'nosniff')
+        .header('Cache-Control', 'no-store')
+        .type('text/html')
+        .send(`
           <!DOCTYPE html>
           <html lang="en">
           <head>
@@ -271,17 +276,21 @@ function sendResponse(request, reply, svgCode) {
   }
 
   // They used an <img> tag (e.g. GitHub Readme). Return raw transparent SVG!
-  return reply.header('Cache-Control', 'public, max-age=120').type('image/svg+xml').send(svgCode);
+  return reply
+    .header('X-Content-Type-Options', 'nosniff')
+    .header('Cache-Control', 'public, max-age=120')
+    .type('image/svg+xml')
+    .send(svgCode);
 }
 
 export async function getBadgeSvgController(request, reply) {
   try {
     const username = String(request.params?.username || '').trim().toLowerCase();
 
-    if (!username) {
+    if (!username || !USERNAME_PATTERN.test(username)) {
       return sendResponse(request, reply, buildBadgeSvg({
         level: 0,
-        statusText: 'Setup Required',
+        statusText: username ? 'Invalid Profile' : 'Setup Required',
         xp: 0,
         isPublic: false
       }));

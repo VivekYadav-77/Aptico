@@ -15,6 +15,12 @@ import {
   verifyEmailToken
 } from './auth.service.js';
 import { applyXpDecayIfNeeded } from '../../shared/services/xp-engine.service.js';
+import {
+  buildClearedCsrfCookie,
+  buildCsrfCookie,
+  createCsrfToken,
+  verifyCsrfRequest
+} from '../../shared/security/csrf.js';
 
 const googleSchema = z.object({
   credential: z.string().trim().min(1)
@@ -79,13 +85,18 @@ async function sendSessionReply(request, reply, session) {
     db: request.server.db,
     userId: session.user.id
   });
+  const csrfToken = createCsrfToken();
 
-  reply.header('Set-Cookie', buildRefreshCookie(session.refreshToken, session.refreshTokenExpiresIn)).send({
+  reply.header('Set-Cookie', [
+    buildRefreshCookie(session.refreshToken, session.refreshTokenExpiresIn),
+    buildCsrfCookie(csrfToken, request.server.env, session.refreshTokenExpiresIn)
+  ]).send({
     success: true,
     data: {
       user,
       accessToken: session.accessToken,
-      expiresIn: session.accessTokenExpiresIn
+      expiresIn: session.accessTokenExpiresIn,
+      csrfToken
     }
   });
 }
@@ -209,19 +220,25 @@ export async function resetPasswordController(request, reply) {
 
 export async function refreshController(request, reply) {
   try {
+    verifyCsrfRequest(request);
     const refreshToken = readRefreshTokenFromCookie(request.headers.cookie || '');
     const session = await refreshSession({
       db: request.server.db,
       refreshToken,
       request
     });
+    const csrfToken = createCsrfToken();
 
-    reply.header('Set-Cookie', buildRefreshCookie(session.refreshToken, session.refreshTokenExpiresIn)).send({
+    reply.header('Set-Cookie', [
+      buildRefreshCookie(session.refreshToken, session.refreshTokenExpiresIn),
+      buildCsrfCookie(csrfToken, request.server.env, session.refreshTokenExpiresIn)
+    ]).send({
       success: true,
       data: {
         user: session.user,
         accessToken: session.accessToken,
-        expiresIn: session.accessTokenExpiresIn
+        expiresIn: session.accessTokenExpiresIn,
+        csrfToken
       }
     });
   } catch (error) {
@@ -231,13 +248,25 @@ export async function refreshController(request, reply) {
 
 export async function logoutController(request, reply) {
   try {
+    verifyCsrfRequest(request);
     const refreshToken = readRefreshTokenFromCookie(request.headers.cookie || '');
-    await logoutSession({
+    const result = await logoutSession({
       db: request.server.db,
       refreshToken
     });
 
-    reply.header('Set-Cookie', buildClearedRefreshCookie()).send({
+    if (result.revoked?.accessTokenJti) {
+      await request.server.services?.redis?.set(
+        `revoked_jwt:${result.revoked.accessTokenJti}`,
+        result.revoked.userId,
+        15 * 60
+      );
+    }
+
+    reply.header('Set-Cookie', [
+      buildClearedRefreshCookie(),
+      buildClearedCsrfCookie(request.server.env)
+    ]).send({
       success: true,
       data: {
         success: true

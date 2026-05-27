@@ -106,6 +106,9 @@ function signAccessToken(user) {
     },
     env.jwtSecret,
     {
+      algorithm: 'HS256',
+      issuer: env.jwtIssuer,
+      audience: env.jwtAudience,
       expiresIn: ACCESS_TOKEN_TTL_SECONDS
     }
   );
@@ -127,6 +130,9 @@ function signRefreshToken(user) {
     },
     env.jwtSecret,
     {
+      algorithm: 'HS256',
+      issuer: env.jwtIssuer,
+      audience: env.jwtAudience,
       expiresIn: REFRESH_TOKEN_TTL_SECONDS
     }
   );
@@ -264,12 +270,18 @@ async function storeRefreshToken(db, { userId, accessTokenJti, refreshTokenJti, 
 }
 
 async function revokeRefreshTokenRecord(db, token) {
-  await db
+  const rows = await db
     .update(refreshTokens)
     .set({
       revokedAt: new Date()
     })
-    .where(eq(refreshTokens.tokenHash, hashToken(token)));
+    .where(eq(refreshTokens.tokenHash, hashToken(token)))
+    .returning({
+      userId: refreshTokens.userId,
+      accessTokenJti: refreshTokens.accessTokenJti
+    });
+
+  return rows[0] || null;
 }
 
 async function revokeAllRefreshTokensForUser(db, userId) {
@@ -633,7 +645,11 @@ export async function refreshSession({ db, refreshToken, request }) {
   let payload;
 
   try {
-    payload = jwt.verify(refreshToken, env.jwtSecret);
+    payload = jwt.verify(refreshToken, env.jwtSecret, {
+      algorithms: ['HS256'],
+      issuer: env.jwtIssuer,
+      audience: env.jwtAudience
+    });
   } catch (error) {
     throw createAuthError('Refresh token is invalid or expired.', 401, 'REFRESH_TOKEN_INVALID');
   }
@@ -658,6 +674,20 @@ export async function refreshSession({ db, refreshToken, request }) {
   const storedRefreshToken = activeRefreshTokens[0];
 
   if (!storedRefreshToken) {
+    const reusedTokens = await db
+      .select({
+        userId: refreshTokens.userId,
+        revokedAt: refreshTokens.revokedAt
+      })
+      .from(refreshTokens)
+      .where(eq(refreshTokens.refreshTokenJti, payload.jti))
+      .limit(1);
+
+    if (reusedTokens[0]?.revokedAt) {
+      await revokeAllRefreshTokensForUser(db, reusedTokens[0].userId);
+      throw createAuthError('Refresh token reuse was detected. All sessions were revoked.', 401, 'REFRESH_TOKEN_REUSE_DETECTED');
+    }
+
     throw createAuthError('Refresh token is no longer active.', 401, 'REFRESH_TOKEN_REVOKED');
   }
 
@@ -680,10 +710,11 @@ export async function logoutSession({ db, refreshToken }) {
     };
   }
 
-  await revokeRefreshTokenRecord(db, refreshToken);
+  const revoked = await revokeRefreshTokenRecord(db, refreshToken);
 
   return {
-    success: true
+    success: true,
+    revoked
   };
 }
 
@@ -706,6 +737,10 @@ export function buildRefreshCookie(token, maxAgeSeconds) {
     `Max-Age=${maxAgeSeconds}`,
     env.nodeEnv === 'production' ? 'SameSite=None' : 'SameSite=Lax'
   ];
+
+  if (env.cookieDomain) {
+    cookieParts.push(`Domain=${env.cookieDomain}`);
+  }
 
   if (env.nodeEnv === 'production') {
     cookieParts.push('Secure');

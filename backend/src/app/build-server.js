@@ -13,8 +13,12 @@ const require = createRequire(import.meta.url);
 const helmet = require('@fastify/helmet');
 const rateLimit = require('@fastify/rate-limit');
 
-const CORS_HEADERS = 'authorization, content-type';
+const CORS_HEADERS = 'authorization, content-type, x-csrf-token, x-request-id';
 const CORS_METHODS = 'GET, POST, PUT, PATCH, DELETE, OPTIONS';
+
+function isAllowedOrigin(origin) {
+  return env.allowedOrigins.includes(origin);
+}
 
 export function buildServer() {
   const app = Fastify({
@@ -67,15 +71,22 @@ export function buildServer() {
   app.addHook('onRequest', async (request, reply) => {
     const requestOrigin = request.headers.origin;
 
+    reply.header('X-Request-Id', request.id);
+    reply.header('X-Content-Type-Options', 'nosniff');
+    reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
+    reply.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+
     if (requestOrigin) {
-      if (requestOrigin !== env.frontendUrl) {
+      if (!isAllowedOrigin(requestOrigin)) {
         return reply.code(403).send({
           success: false,
-          error: 'CORS origin is not allowed.'
+          code: 'CORS_ORIGIN_DENIED',
+          message: 'CORS origin is not allowed.',
+          requestId: request.id
         });
       }
 
-      reply.header('Access-Control-Allow-Origin', env.frontendUrl);
+      reply.header('Access-Control-Allow-Origin', requestOrigin);
       reply.header('Access-Control-Allow-Credentials', 'true');
       reply.header('Access-Control-Allow-Headers', CORS_HEADERS);
       reply.header('Access-Control-Allow-Methods', CORS_METHODS);
