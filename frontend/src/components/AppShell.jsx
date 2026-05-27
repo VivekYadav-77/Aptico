@@ -196,7 +196,7 @@ export default function AppShell({ title, description, actions, children, banner
     return 'Visitor';
   }, [auth.guestMode, auth.user]);
 
-  const profileHref = socialProfile?.username ? `/u/${socialProfile.username}` : '/settings';
+  const profileHref = socialProfile?.username ? '/profile' : '/settings';
   const profileLabel = socialProfile?.username ? userLabel : 'Set up profile';
 
   useEffect(() => {
@@ -279,11 +279,7 @@ export default function AppShell({ title, description, actions, children, banner
           {/* Center: Desktop horizontal centered tabs (only when logged in) */}
           {auth.isAuthenticated && (
             <div className="hidden lg:flex items-center gap-1.5 p-1 rounded-xl bg-white/[0.02] border border-white/[0.04] shadow-sm">
-              {[
-                { to: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
-                { to: '/analysis', label: 'Analysis', icon: 'analytics' },
-                { to: '/jobs', label: 'Jobs', icon: 'work' },
-              ].map((tab) => {
+              {NAV_ITEMS.filter(item => ['/dashboard', '/analysis', '/jobs'].includes(item.to)).map((tab) => {
                 const isActive = location.pathname === tab.to;
                 return (
                   <Link
@@ -326,16 +322,9 @@ export default function AppShell({ title, description, actions, children, banner
                       <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--muted)]">Tools & Resources</p>
                     </div>
                     <div className="grid grid-cols-2 gap-1">
-                      {[
-                        { to: '/squads', label: 'Squads', icon: 'groups' },
-                        { to: '/people', label: 'People', icon: 'diversity_3' },
-                        { to: '/wins', label: 'Wins', icon: 'military_tech' },
-                        { to: '/portfolio-generator', label: 'Portfolio', icon: 'code_blocks' },
-                        { to: '/interview-prep', label: 'Interviews', icon: 'psychology' },
-                        { to: '/rewards', label: 'Rewards', icon: 'token' },
-                        { to: '/saved-jobs', label: 'Saved Jobs', icon: 'bookmark' },
-                        { to: '/analysis-history', label: 'History', icon: 'history' }
-                      ].map((subTab) => {
+                      {NAV_ITEMS.filter(item => 
+                        ['/squads', '/people', '/wins', '/portfolio-generator', '/interview-prep', '/rewards', '/saved-jobs', '/analysis-history'].includes(item.to)
+                      ).map((subTab) => {
                         const isSubActive = location.pathname === subTab.to;
                         return (
                           <Link

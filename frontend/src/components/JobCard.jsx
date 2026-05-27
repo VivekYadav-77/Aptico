@@ -1,6 +1,5 @@
 export default function JobCard({
   job,
-  onOpenApplyKit,
   onSave,
   isSaving = false,
   saveDisabled = false,
@@ -50,14 +49,6 @@ export default function JobCard({
           >
             Open role
           </a>
-          <button
-            type="button"
-            disabled={applyDisabled}
-            onClick={() => onOpenApplyKit(job)}
-            className="rounded-full border border-cyan-500/40 px-4 py-2 text-xs font-medium uppercase tracking-[0.2em] text-cyan-200 transition hover:border-cyan-300 hover:bg-cyan-400/10 disabled:cursor-not-allowed disabled:border-slate-800 disabled:text-slate-500"
-          >
-            Apply kit
-          </button>
           <button
             type="button"
             disabled={saveDisabled || isSaving}

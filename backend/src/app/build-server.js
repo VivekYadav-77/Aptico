@@ -64,8 +64,15 @@ export function buildServer() {
 
   app.register(rateLimit, {
     global: true,
-    max: 20,
-    timeWindow: '1 minute'
+    max: env.globalRateLimitMax,
+    timeWindow: env.globalRateLimitWindow,
+    skipOnError: true,
+    errorResponseBuilder: (request) => ({
+      success: false,
+      code: 'RATE_LIMITED',
+      message: 'Too many requests. Please wait a moment.',
+      requestId: request.id
+    })
   });
 
   app.addHook('onRequest', async (request, reply) => {

@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { Link } from '@/lib/router-compat.jsx';
 import { useSelector } from 'react-redux';
 import api from '../api/axios.js';
-import ApplyKitModal from '../components/ApplyKitModal.jsx';
 import JobCard from '../components/JobCard.jsx';
 import { selectAuth } from '../store/authSlice.js';
 import { selectCurrentAnalysis } from '../store/historySlice.js';
@@ -22,7 +21,6 @@ export default function JobSearch() {
   const [status, setStatus] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [savingUrl, setSavingUrl] = useState('');
-  const [activeJob, setActiveJob] = useState(null);
 
   const filteredJobs = useMemo(() => {
     if (selectedFilter === 'All') {
@@ -219,7 +217,6 @@ export default function JobSearch() {
               <JobCard
                 key={`${job.sourceKey}-${job.id}`}
                 job={job}
-                onOpenApplyKit={setActiveJob}
                 onSave={handleSave}
                 isSaving={savingUrl === job.url}
                 saveDisabled={!auth.isAuthenticated}
@@ -232,13 +229,6 @@ export default function JobSearch() {
             </div>
           )}
         </section>
-
-        <ApplyKitModal
-          isOpen={Boolean(activeJob)}
-          onClose={() => setActiveJob(null)}
-          job={activeJob}
-          analysisId={currentAnalysis?.id || null}
-        />
       </div>
     </main>
   );

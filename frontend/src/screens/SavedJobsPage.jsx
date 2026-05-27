@@ -138,24 +138,6 @@ export default function SavedJobsPage() {
     }
   }
 
-  function handleGenerateApplyKit(job) {
-    const fullJobDescription = [
-      `Job Title: ${job.title || 'Not specified'}`,
-      `Company: ${job.company || 'Not specified'}`,
-      `Location: ${job.location || 'Not specified'}`,
-      `Compensation: ${job.stipend || 'Not specified'}`,
-      '',
-      'Job Description:',
-      job.description || 'Not provided.'
-    ].join('\n');
-
-    navigate('/analysis', {
-      state: {
-        jobDescription: fullJobDescription
-      }
-    });
-  }
-
   return (
     <AppShell
       title="Saved jobs"
@@ -316,18 +298,10 @@ export default function SavedJobsPage() {
               </div>
 
               <div className="flex flex-wrap items-center gap-3 pt-2">
-                <a href={getJobUrl(selectedJob)} target="_blank" rel="noreferrer" className="app-button">
+                <a href={getJobUrl(selectedJob)} target="_blank" rel="noreferrer" className="app-button flex-1 justify-center py-2.5 shadow-sm">
                   <span className="material-symbols-outlined mr-2">open_in_new</span>
-                  Open job link
+                  Apply
                 </a>
-                <button
-                  type="button"
-                  onClick={() => handleGenerateApplyKit(selectedJob)}
-                  className="app-button-secondary bg-[var(--accent)]/10 text-[var(--accent)] border-[var(--accent)]/20 hover:bg-[var(--accent)]/20"
-                >
-                  <span className="material-symbols-outlined mr-2">work</span>
-                  Generate Apply Kit
-                </button>
               </div>
             </div>
           </div>

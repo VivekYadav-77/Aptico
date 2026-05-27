@@ -440,24 +440,6 @@ export default function ModernJobSearchPage() {
     }
   }
 
-  function handleGenerateApplyKit(job) {
-    const fullJobDescription = [
-      `Job Title: ${job.title || 'Not specified'}`,
-      `Company: ${job.company || 'Not specified'}`,
-      `Location: ${job.location || 'Not specified'}`,
-      `Compensation: ${job.compensation || 'Not specified'}`,
-      '',
-      'Job Description:',
-      job.description || 'Not provided.'
-    ].join('\n');
-
-    navigate('/analysis', {
-      state: {
-        jobDescription: fullJobDescription
-      }
-    });
-  }
-
   function handleSkillClick(skill) {
     navigate('/analysis', {
       state: {
@@ -968,10 +950,6 @@ export default function ModernJobSearchPage() {
                           >
                             <span className="material-symbols-outlined text-[18px]">{(savingJobId === selectedJob.id || savedJobIds.has(selectedJob.id)) ? 'bookmark_added' : 'bookmark'}</span>
                             {savingJobId === selectedJob.id ? 'Saving...' : savedJobIds.has(selectedJob.id) ? 'Saved' : 'Save'}
-                          </button>
-                          <button type="button" onClick={() => handleGenerateApplyKit(selectedJob)} className="app-button-secondary flex-1 justify-center py-2.5 shadow-sm">
-                            <span className="material-symbols-outlined text-[18px]">assignment</span>
-                            Apply Kit
                           </button>
                         </div>
                       </div>
