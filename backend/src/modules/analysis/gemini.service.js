@@ -4,7 +4,6 @@ import { env } from '../../config/env.js';
 import { createGeminiClient, isRateLimitError, sleep, normalizeGeminiError } from '../../shared/utils/gemini-client.js';
 
 const CACHE_TTL_SECONDS = 2 * 60 * 60;
-const STAGE_TIMEOUT_MS = 20_000;
 
 const portfolioReadmeSchema = z.object({
   readmeMarkdown: z.string().trim().min(1),
@@ -481,11 +480,16 @@ async function callGeminiStage({ apiKey, fallbackKey, model, prompt, config, log
     const client = createGeminiClient(key);
 
     try {
+      const abortController = new AbortController();
       const timeoutPromise = new Promise((_, reject) => {
-        setTimeout(() => reject(new Error('Gemini call timed out after 20 seconds.')), STAGE_TIMEOUT_MS);
+        setTimeout(() => {
+          abortController.abort();
+          reject(new Error(`Gemini call timed out after ${env.geminiTimeoutMs / 1000} seconds.`));
+        }, env.geminiTimeoutMs);
       });
 
-      const callPromise = client.models.generateContent({ model, contents: prompt, config });
+      // Pass the signal to the Gemini SDK config if supported, otherwise Promise.race still enforces the timeout
+      const callPromise = client.models.generateContent({ model, contents: prompt, config: { ...config, signal: abortController.signal } });
       const response = await Promise.race([callPromise, timeoutPromise]);
       return typeof response.text === 'function' ? response.text() : response.text;
     } catch (error) {
