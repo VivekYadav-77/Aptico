@@ -100,24 +100,21 @@ function SearchDropdown({ query, onClose, navigate }) {
       style={{ backdropFilter: 'blur(20px)' }}
     >
       {!trimmed ? (
-        <div className="px-5 py-4">
-          <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Quick navigation</p>
-          <div className="space-y-0.5">
-            {NAV_ITEMS.map((item) => (
-              <button
-                key={item.to}
-                type="button"
-                onClick={() => handleSelect(item.to)}
-                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition hover:bg-[var(--panel-soft)]"
-              >
-                <span className="material-symbols-outlined text-[18px] text-[var(--accent-strong)]">{item.icon}</span>
-                <div>
-                  <p className="font-semibold text-[var(--text)]">{item.label}</p>
-                  <p className="text-xs text-[var(--muted-strong)]">{item.description}</p>
-                </div>
-              </button>
-            ))}
-          </div>
+        <div className="px-5 py-8 text-center">
+           <span className="material-symbols-outlined text-[32px] text-[var(--muted)] mb-3">manage_search</span>
+           <p className="text-sm font-medium text-[var(--text)]">Type to search insights</p>
+           <p className="mt-1 text-xs text-[var(--muted-strong)]">Find pages, squad info, and settings quickly.</p>
+           <div className="mt-5 flex flex-wrap justify-center gap-2">
+             {['/dashboard', '/analysis', '/jobs'].map(path => {
+               const item = NAV_ITEMS.find(n => n.to === path);
+               return item ? (
+                 <button key={path} onClick={() => handleSelect(path)} className="flex items-center gap-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] px-3 py-1.5 text-xs font-semibold text-[var(--text)] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all duration-200">
+                   <span className="material-symbols-outlined text-[14px] text-[var(--accent)] drop-shadow-[0_0_4px_rgba(78,222,163,0.4)]">{item.icon}</span>
+                   {item.label}
+                 </button>
+               ) : null;
+             })}
+           </div>
         </div>
       ) : hasResults ? (
         <div className="py-3">
@@ -281,7 +278,7 @@ export default function AppShell({ title, description, actions, children, banner
 
           {/* Center: Desktop horizontal centered tabs (only when logged in) */}
           {auth.isAuthenticated && (
-            <div className="hidden lg:flex items-center gap-2">
+            <div className="hidden lg:flex items-center gap-1.5 p-1 rounded-xl bg-white/[0.02] border border-white/[0.04] shadow-sm">
               {[
                 { to: '/dashboard', label: 'Dashboard', icon: 'dashboard' },
                 { to: '/analysis', label: 'Analysis', icon: 'analytics' },
@@ -292,19 +289,19 @@ export default function AppShell({ title, description, actions, children, banner
                   <Link
                     key={tab.to}
                     to={tab.to}
-                    className={`group relative flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-widest rounded-xl transition-all duration-300 ${
+                    className={`group relative flex items-center gap-2 px-3.5 py-1.5 text-[13px] font-medium rounded-lg transition-all duration-200 ${
                       isActive
-                        ? 'bg-[var(--accent)]/10 text-[var(--accent-strong)] border border-[var(--accent)]/20 shadow-[0_0_15px_rgba(78,222,163,0.1)]'
-                        : 'text-[var(--muted-strong)] hover:text-[var(--text)] hover:bg-[var(--panel-soft)] border border-transparent'
+                        ? 'bg-white/[0.08] text-[var(--text)] shadow-sm'
+                        : 'text-[var(--muted-strong)] hover:text-[var(--text)] hover:bg-white/[0.04]'
                     }`}
                   >
-                    <span className={`material-symbols-outlined text-[16px] transition-all duration-300 ${isActive ? 'drop-shadow-[0_0_8px_rgba(78,222,163,0.6)]' : 'group-hover:-translate-y-0.5'}`}>{tab.icon}</span>
-                    <span className="relative z-10">{tab.label}</span>
+                    <span className={`material-symbols-outlined text-[16px] transition-all duration-200 ${isActive ? 'text-[var(--text)]' : 'text-[var(--muted-strong)] group-hover:text-[var(--text)]'}`}>{tab.icon}</span>
+                    <span className="relative z-10 tracking-wide">{tab.label}</span>
                   </Link>
                 );
               })}
 
-              {/* Hub Dropdown containing the remaining page routes */}
+              {/* Apps Dropdown containing the remaining page routes */}
               <div 
                 className="relative"
                 onMouseEnter={() => setHubDropdownOpen(true)}
@@ -312,46 +309,53 @@ export default function AppShell({ title, description, actions, children, banner
               >
                 <button
                   type="button"
-                  className={`group relative flex items-center gap-2 px-4 py-2 text-xs font-bold uppercase tracking-widest rounded-xl transition-all duration-300 cursor-pointer ${
+                  className={`group relative flex items-center gap-1.5 px-3.5 py-1.5 text-[13px] font-medium rounded-lg transition-all duration-200 cursor-pointer ${
                     ['/squads', '/people', '/wins', '/portfolio-generator', '/interview-prep', '/rewards', '/saved-jobs', '/analysis-history'].some(path => location.pathname === path)
-                      ? 'bg-[var(--accent)]/10 text-[var(--accent-strong)] border border-[var(--accent)]/20 shadow-[0_0_15px_rgba(78,222,163,0.1)]'
-                      : 'text-[var(--muted-strong)] hover:text-[var(--text)] hover:bg-[var(--panel-soft)] border border-transparent'
+                      ? 'bg-white/[0.08] text-[var(--text)] shadow-sm'
+                      : 'text-[var(--muted-strong)] hover:text-[var(--text)] hover:bg-white/[0.04]'
                   }`}
                 >
-                  <span className={`material-symbols-outlined text-[16px] transition-all duration-300 ${['/squads', '/people', '/wins', '/portfolio-generator', '/interview-prep', '/rewards', '/saved-jobs', '/analysis-history'].some(path => location.pathname === path) ? 'drop-shadow-[0_0_8px_rgba(78,222,163,0.6)]' : 'group-hover:-translate-y-0.5'}`}>hub</span>
-                  <span className="relative z-10">Hub</span>
-                  <span className="material-symbols-outlined text-[14px] -ml-1 transition-transform duration-300 group-hover:translate-y-0.5">keyboard_arrow_down</span>
+                  <span className={`material-symbols-outlined text-[16px] transition-all duration-200 ${['/squads', '/people', '/wins', '/portfolio-generator', '/interview-prep', '/rewards', '/saved-jobs', '/analysis-history'].some(path => location.pathname === path) ? 'text-[var(--text)]' : 'text-[var(--muted-strong)] group-hover:text-[var(--text)]'}`}>apps</span>
+                  <span className="relative z-10 tracking-wide">Apps</span>
+                  <span className="material-symbols-outlined text-[16px] transition-transform duration-200 group-hover:translate-y-0.5">expand_more</span>
                 </button>
 
                 {hubDropdownOpen && (
-                  <div className="absolute left-1/2 -translate-x-1/2 top-full mt-3 w-52 rounded-2xl border border-[var(--border)] bg-[var(--panel)]/95 backdrop-blur-3xl p-2 shadow-[0_24px_48px_rgba(0,0,0,0.4)] animate-fade-in-up origin-top z-[200]">
-                    {[
-                      { to: '/squads', label: 'Squads', icon: 'groups' },
-                      { to: '/people', label: 'People', icon: 'diversity_3' },
-                      { to: '/wins', label: 'Wins', icon: 'military_tech' },
-                      { to: '/portfolio-generator', label: 'Portfolio', icon: 'code_blocks' },
-                      { to: '/interview-prep', label: 'Interviews', icon: 'psychology' },
-                      { to: '/rewards', label: 'Rewards', icon: 'token' },
-                      { to: '/saved-jobs', label: 'Saved Jobs', icon: 'bookmark' },
-                      { to: '/analysis-history', label: 'History', icon: 'history' }
-                    ].map((subTab) => {
-                      const isSubActive = location.pathname === subTab.to;
-                      return (
-                        <Link
-                          key={subTab.to}
-                          to={subTab.to}
-                          onClick={() => setHubDropdownOpen(false)}
-                          className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
-                            isSubActive
-                              ? 'bg-[var(--accent)]/15 text-[var(--accent-strong)]'
-                              : 'text-[var(--muted-strong)] hover:bg-white/[0.06] hover:text-[var(--text)]'
-                          }`}
-                        >
-                          <span className={`material-symbols-outlined text-[16px] transition-all duration-200 ${isSubActive ? 'drop-shadow-[0_0_6px_rgba(78,222,163,0.5)]' : 'group-hover:scale-110 group-hover:text-[var(--text)]'}`}>{subTab.icon}</span>
-                          <span className="transition-transform duration-200 group-hover:translate-x-1">{subTab.label}</span>
-                        </Link>
-                      );
-                    })}
+                  <div className="absolute left-1/2 -translate-x-1/2 top-full mt-3 w-[360px] rounded-3xl border border-white/[0.08] bg-[var(--panel)]/95 backdrop-blur-3xl p-3 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] animate-fade-in-up origin-top z-[200]">
+                    <div className="mb-2 px-3 pt-2">
+                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--muted)]">Tools & Resources</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1">
+                      {[
+                        { to: '/squads', label: 'Squads', icon: 'groups' },
+                        { to: '/people', label: 'People', icon: 'diversity_3' },
+                        { to: '/wins', label: 'Wins', icon: 'military_tech' },
+                        { to: '/portfolio-generator', label: 'Portfolio', icon: 'code_blocks' },
+                        { to: '/interview-prep', label: 'Interviews', icon: 'psychology' },
+                        { to: '/rewards', label: 'Rewards', icon: 'token' },
+                        { to: '/saved-jobs', label: 'Saved Jobs', icon: 'bookmark' },
+                        { to: '/analysis-history', label: 'History', icon: 'history' }
+                      ].map((subTab) => {
+                        const isSubActive = location.pathname === subTab.to;
+                        return (
+                          <Link
+                            key={subTab.to}
+                            to={subTab.to}
+                            onClick={() => setHubDropdownOpen(false)}
+                            className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all duration-200 ${
+                              isSubActive
+                                ? 'bg-[var(--accent)]/15 text-[var(--text)]'
+                                : 'text-[var(--muted-strong)] hover:bg-white/[0.04] hover:text-[var(--text)]'
+                            }`}
+                          >
+                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors duration-200 ${isSubActive ? 'bg-[var(--accent)]/20 text-[var(--accent-strong)]' : 'bg-white/[0.03] text-[var(--muted)] group-hover:bg-white/[0.08] group-hover:text-[var(--text)]'}`}>
+                              <span className="material-symbols-outlined text-[18px]">{subTab.icon}</span>
+                            </div>
+                            <span className="text-xs font-semibold tracking-wide">{subTab.label}</span>
+                          </Link>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               </div>
@@ -363,17 +367,17 @@ export default function AppShell({ title, description, actions, children, banner
             {/* Desktop Search (Only when logged in) */}
             {auth.isAuthenticated && (
               <div className="relative hidden md:block" ref={searchRef}>
-                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[18px] text-[var(--muted-strong)] z-10 pointer-events-none transition-colors duration-300 peer-focus:text-[var(--accent)]">search</span>
+                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[16px] text-[var(--muted-strong)] z-10 pointer-events-none transition-colors duration-300 peer-focus:text-[var(--text)]">search</span>
                 <input
                   ref={searchInputRef}
-                  className="peer w-48 rounded-full border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] py-2 pl-9 pr-12 text-xs text-[var(--text)] outline-none transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)] focus:w-64 focus:border-[var(--accent)]/50 focus:bg-[var(--panel)] focus:ring-4 focus:ring-[var(--accent)]/10 shadow-[inset_0_2px_4px_rgba(0,0,0,0.2)] lg:w-56 lg:focus:w-72"
-                  placeholder="Search insights…"
+                  className="peer w-48 rounded-xl border border-white/[0.1] bg-black/20 hover:bg-black/40 py-1.5 pl-9 pr-12 text-[13px] text-[var(--text)] outline-none transition-all duration-300 focus:w-64 focus:border-white/[0.2] focus:bg-black/60 focus:ring-2 focus:ring-white/[0.05] lg:w-56 lg:focus:w-72"
+                  placeholder="Search..."
                   value={searchQuery}
                   onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
                   onFocus={() => setSearchOpen(true)}
                 />
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center pointer-events-none opacity-80">
-                  <kbd className="font-mono text-[9px] font-bold tracking-widest text-[var(--muted-strong)] border border-white/[0.1] rounded px-1.5 py-0.5 bg-black/40 shadow-sm">⌘K</kbd>
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center pointer-events-none opacity-80">
+                  <kbd className="font-sans text-[10px] font-medium text-[var(--muted-strong)] border border-white/[0.1] rounded-[4px] px-1.5 py-0.5 bg-black/40 shadow-sm">⌘K</kbd>
                 </div>
                 {searchOpen && (
                   <SearchDropdown
@@ -394,13 +398,13 @@ export default function AppShell({ title, description, actions, children, banner
                 <button
                   type="button"
                   onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                  className="group flex items-center gap-2 rounded-full border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.08] hover:border-white/[0.15] hover:shadow-[0_4px_12px_rgba(0,0,0,0.2)] px-3 py-1.5 text-xs text-[var(--text)] font-semibold transition-all duration-300 cursor-pointer select-none"
+                  className="group flex items-center gap-2 rounded-full border border-white/[0.1] bg-black/20 hover:bg-black/40 hover:border-white/[0.15] px-2.5 py-1 text-[13px] text-[var(--text)] font-medium transition-all duration-200 cursor-pointer select-none"
                 >
-                  <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)] text-[9px] font-black text-[#003824] shadow-[0_0_8px_rgba(78,222,163,0.4)]">
+                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br from-[var(--accent)] to-[var(--accent-strong)] text-[11px] font-bold text-[#003824] shadow-sm">
                     {userLabel.charAt(0).toUpperCase()}
                   </div>
-                  <span className="hidden sm:inline max-w-[80px] truncate">{userLabel.split(' ')[0]}</span>
-                  <span className="material-symbols-outlined text-[16px] text-[var(--muted-strong)] transition-all duration-300 group-hover:text-[var(--text)]">keyboard_arrow_down</span>
+                  <span className="hidden sm:inline max-w-[80px] truncate ml-0.5">{userLabel.split(' ')[0]}</span>
+                  <span className="material-symbols-outlined text-[16px] text-[var(--muted-strong)] transition-transform duration-200 group-hover:text-[var(--text)] group-hover:translate-y-[1px]">expand_more</span>
                 </button>
 
                 {profileDropdownOpen && (

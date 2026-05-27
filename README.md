@@ -62,7 +62,7 @@ graph TD
 
 | Layer | Technology | Rationale |
 | :--- | :--- | :--- |
-| **Frontend** | **React 19 + Vite 8** | Leveraging Concurrent Mode and sub-millisecond build times. |
+| **Frontend** | **Next.js + React 19** | App Router pages with server/client boundaries and production builds via `next build`. |
 | **Styling** | **Tailwind CSS 4** | Next-generation utility-first CSS with optimized engine. |
 | **State** | **TanStack Query v5** | Advanced server-state synchronization with optimistic updates. |
 | **Backend** | **Fastify** | 2x performance compared to Express with native schema validation. |
@@ -75,16 +75,22 @@ graph TD
 ## 📂 Repository Standards
 
 ```bash
-├── backend/
-│   ├── scripts/        # Production-grade migration & verification tools
-│   ├── src/config/     # Engine-specific configurations (Drizzle, Gemini)
-│   └── src/services/   # Decoupled business logic (XP, AI, Social, Comms)
-├── frontend/
-│   ├── src/api/        # Centralized TanStack Query hooks & interceptors
-│   ├── src/components/ # Atomic design system with premium glassmorphic tokens
-│   ├── src/store/      # Redux Toolkit for complex local UI state
-│   └── src/utils/      # Deterministic sticker & rarity registries
+backend/
+  scripts/        # Migration, verification, and integration utilities
+  src/app/        # Fastify server construction and route registration
+  src/config/     # Runtime environment and Drizzle configuration
+  src/modules/    # Feature modules with routes, controllers, and services
+  src/shared/     # Shared middleware, services, and utilities
+frontend/
+  src/app/        # Next.js routes, layout, providers, and route adapters
+  src/api/        # API clients and server-state request helpers
+  src/components/ # Reusable UI components shared across screens
+  src/screens/    # Route-level product screens
+  src/store/      # Redux Toolkit local application state
+  src/utils/      # Browser-safe utilities and registries
 ```
+
+Cleanup standard: generated folders and logs such as `.next/`, `dist/`, and `*.log` stay out of source control. Keep one-off database repair scripts out of tracked source unless they are parameterized through environment variables, documented, and wired into `package.json`.
 
 ---
 
