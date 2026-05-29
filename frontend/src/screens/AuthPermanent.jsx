@@ -46,6 +46,13 @@ function Reveal({ children, className = '', type = 'fade' }) {
 
 function GoogleButton({ onError, onSuccess }) {
   const buttonRef = useRef(null);
+  const onErrorRef = useRef(onError);
+  const onSuccessRef = useRef(onSuccess);
+
+  useEffect(() => {
+    onErrorRef.current = onError;
+    onSuccessRef.current = onSuccess;
+  }, [onError, onSuccess]);
 
   useEffect(() => {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
@@ -57,6 +64,7 @@ function GoogleButton({ onError, onSuccess }) {
     }
 
     let isCancelled = false;
+    let existingScript = null;
 
     function initialize() {
       if (isCancelled || !window.google || !buttonRef.current) {
@@ -67,11 +75,11 @@ function GoogleButton({ onError, onSuccess }) {
         client_id: clientId,
         callback: ({ credential }) => {
           if (!credential) {
-            onError('Google did not return a credential.');
+            onErrorRef.current('Google did not return a credential.');
             return;
           }
 
-          onSuccess(credential);
+          onSuccessRef.current(credential);
         }
       });
 
@@ -85,11 +93,23 @@ function GoogleButton({ onError, onSuccess }) {
       });
     }
 
-    const existingScript = document.querySelector('script[data-google-identity-script="true"]');
+    function handleScriptError() {
+      onErrorRef.current('Google Identity script could not be loaded.');
+    }
+
+    existingScript = document.querySelector('script[data-google-identity-script="true"]');
     if (existingScript) {
-      initialize();
+      if (window.google) {
+        initialize();
+      } else {
+        existingScript.addEventListener('load', initialize);
+        existingScript.addEventListener('error', handleScriptError);
+      }
+
       return () => {
         isCancelled = true;
+        existingScript?.removeEventListener('load', initialize);
+        existingScript?.removeEventListener('error', handleScriptError);
       };
     }
 
@@ -99,13 +119,13 @@ function GoogleButton({ onError, onSuccess }) {
     script.defer = true;
     script.dataset.googleIdentityScript = 'true';
     script.onload = initialize;
-    script.onerror = () => onError('Google Identity script could not be loaded.');
+    script.onerror = handleScriptError;
     document.body.appendChild(script);
 
     return () => {
       isCancelled = true;
     };
-  }, [onError, onSuccess]);
+  }, []);
 
   if (!process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID) {
     return <div className="app-panel-soft text-sm text-[var(--muted-strong)] w-full text-center">Add `NEXT_PUBLIC_GOOGLE_CLIENT_ID` to enable Google sign-in.</div>;
