@@ -108,7 +108,7 @@ function PrecheckFailedCard({ score, reason }) {
       </div>
       <h2 className="text-2xl font-semibold text-white mb-3">Low Compatibility Detected</h2>
       <p className="mx-auto max-w-lg text-sm leading-7 text-slate-300">{reason}</p>
-      <p className="mt-4 text-xs text-slate-500 uppercase tracking-[0.2em]">Analysis halted — background and job description are not aligned</p>
+      <p className="mt-4 text-xs text-slate-500 uppercase tracking-[0.2em]">Analysis halted - background and job description are not aligned</p>
     </section>
   );
 }
@@ -280,17 +280,17 @@ function SalaryCoachView({ content }) {
     <div className="grid gap-5">
       <div className="rounded-3xl border border-emerald-500/30 bg-emerald-500/10 p-6 text-center">
         <p className="mb-1 text-xs uppercase tracking-[0.25em] text-emerald-400">Estimated Range</p>
-        <p className="text-2xl font-bold text-emerald-200">{sections.range || '—'}</p>
+        <p className="text-2xl font-bold text-emerald-200">{sections.range || '-'}</p>
       </div>
 
       <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
         <h3 className="mb-3 text-xs font-bold uppercase tracking-[0.25em] text-slate-300">Why This Range</h3>
-        <p className="text-sm leading-7 text-slate-200">{sections.why || '—'}</p>
+        <p className="text-sm leading-7 text-slate-200">{sections.why || '-'}</p>
       </div>
 
       <div className={`rounded-3xl border ${positionColors.border} ${positionColors.bg} p-5`}>
         <h3 className={`mb-3 text-xs font-bold uppercase tracking-[0.25em] ${positionColors.text}`}>Your Negotiation Position</h3>
-        <p className={`text-sm leading-7 font-medium ${positionColors.text}`}>{sections.position || '—'}</p>
+        <p className={`text-sm leading-7 font-medium ${positionColors.text}`}>{sections.position || '-'}</p>
       </div>
 
       <div className="rounded-3xl border border-white/10 bg-white/5 p-5">
@@ -850,14 +850,14 @@ export default function Dashboard() {
                     <span className="text-lg font-bold text-emerald-400">✓</span>
                   </div>
                   <div>
-                    <p className="text-sm font-medium text-emerald-300">Compatibility check passed — score: {precheck.score}/100</p>
+                    <p className="text-sm font-medium text-emerald-300">Compatibility check passed - score: {precheck.score}/100</p>
                     <p className="text-xs text-slate-400">{precheck.reason}</p>
                   </div>
                 </div>
               </FadeIn>
             )}
 
-            {/* ── Stage 1 — Features 1, 2, 3 ─────────────────────────────── */}
+            {/* ── Stage 1 - Features 1, 2, 3 ─────────────────────────────── */}
             {(stage1 || loadingStages.stage1) && (
               <FadeIn visible={true}>
                 <div className="space-y-6">
@@ -924,7 +924,7 @@ export default function Dashboard() {
 
             {stageErrors.stage1 && <StageErrorCard message={stageErrors.stage1} />}
 
-            {/* ── Stage 2 — Features 4, 5, 6 ─────────────────────────────── */}
+            {/* ── Stage 2 - Features 4, 5, 6 ─────────────────────────────── */}
             {(stage2 || loadingStages.stage2) && (
               <FadeIn visible={true}>
                 <div className="space-y-6">
@@ -948,7 +948,7 @@ export default function Dashboard() {
 
             {stageErrors.stage2 && <StageErrorCard message={stageErrors.stage2} />}
 
-            {/* ── Stage 3 — Features 7, 8 ─────────────────────────────────── */}
+            {/* ── Stage 3 - Features 7, 8 ─────────────────────────────────── */}
             {(stage3 || loadingStages.stage3) && (
               <FadeIn visible={true}>
                 <div className="space-y-6">

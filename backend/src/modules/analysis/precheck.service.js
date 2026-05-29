@@ -48,7 +48,7 @@ export async function runPrecheck({ resumeText, jobDescription, logger = console
 
   if (!apiKey) {
     logger?.warn?.('GEMINI_PRECHECK_API_KEY is not configured. Defaulting canProceed to true.');
-    return { score: 100, reason: 'Precheck key not configured — proceeding by default.', canProceed: true };
+    return { score: 100, reason: 'Precheck key not configured - proceeding by default.', canProceed: true };
   }
 
   try {
@@ -82,6 +82,6 @@ export async function runPrecheck({ resumeText, jobDescription, logger = console
     };
   } catch (error) {
     logger?.error?.('Precheck failed, defaulting canProceed to true.', error?.message || error);
-    return { score: 100, reason: 'Precheck could not be completed — proceeding by default.', canProceed: true };
+    return { score: 100, reason: 'Precheck could not be completed - proceeding by default.', canProceed: true };
   }
 }

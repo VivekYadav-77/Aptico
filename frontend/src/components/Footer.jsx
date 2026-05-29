@@ -96,17 +96,18 @@ export default function Footer() {
                 Have questions or feedback? Drop your email and we'll get back to you shortly.
               </p>
             </div>
-            <div 
-              className="relative cursor-pointer group" 
+            <button
+              type="button"
+              className="group flex min-h-14 w-full items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-3 text-left text-xs font-semibold text-[var(--muted)] transition-colors hover:border-[var(--accent)]"
               onClick={() => setIsContactOpen(true)}
             >
-              <div className="app-input pr-12 text-xs flex items-center text-[var(--muted)] group-hover:border-[var(--accent)] transition-colors">
+              <span className="min-w-0 truncate">
                 support@aptico.ai
-              </div>
-              <div className="absolute right-1 top-1 flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--accent)] text-[#003824]">
+              </span>
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)] text-[#003824] transition-transform group-hover:scale-105">
                 <span className="material-symbols-outlined text-[16px]">send</span>
-              </div>
-            </div>
+              </span>
+            </button>
             <div className="flex flex-col gap-3 pt-2">
                {FOOTER_LINKS.legal.map(link => (
                  <Link key={link.label} to={link.to} className="text-[10px] font-bold text-[var(--muted)] transition hover:text-[var(--text)]">

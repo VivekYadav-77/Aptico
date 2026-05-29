@@ -276,13 +276,13 @@ export default function GuestDashboard() {
         </section>
 
         {/* ── LOGO STRIP ───────────────────────────────────── */}
-        <div className="border-y border-[var(--border)] bg-[var(--panel-soft)] py-8 overflow-hidden">
+        {/* <div className="border-y border-[var(--border)] bg-[var(--panel-soft)] py-8 overflow-hidden">
            <div className="flex items-center justify-center gap-12 grayscale opacity-40">
               {['Google', 'Stripe', 'Vercel', 'Linear', 'Cursor'].map(brand => (
                 <span key={brand} className="text-sm font-black tracking-widest uppercase">{brand}</span>
               ))}
            </div>
-        </div>
+        </div> */}
 
         {/* ── ARCHITECTURE DIAGRAM ─────────────────────────── */}
         <section className="bg-[var(--bg)] pt-20 md:pt-32">
@@ -447,7 +447,7 @@ export default function GuestDashboard() {
               Join thousands of job seekers who use Aptico to analyze, match, and master their career trajectory.
             </p>
             <Link to="/signup" className="app-button mt-10 px-10 py-4 text-lg shadow-xl shadow-[var(--accent-soft)]">
-              Start Free — No Card Required
+              Start Free - No Card Required
             </Link>
           </Reveal>
         </section>

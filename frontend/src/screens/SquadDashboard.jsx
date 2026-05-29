@@ -633,7 +633,8 @@ export default function SquadDashboard() {
                             value={applicationForm.companyName}
                             onChange={(event) => setApplicationForm((current) => ({ ...current, companyName: event.target.value }))}
                             placeholder="Acme Labs"
-                            className="app-input w-full pl-11 text-base py-3 transition-all focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/50"
+                            className="app-input w-full text-base py-3 transition-all focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/50"
+                            style={{ paddingLeft: '3rem' }}
                           />
                         </div>
                       </label>
@@ -646,7 +647,8 @@ export default function SquadDashboard() {
                             value={applicationForm.roleTitle}
                             onChange={(event) => setApplicationForm((current) => ({ ...current, roleTitle: event.target.value }))}
                             placeholder="Frontend Engineer"
-                            className="app-input w-full pl-11 text-base py-3 transition-all focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/50"
+                            className="app-input w-full text-base py-3 transition-all focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/50"
+                            style={{ paddingLeft: '3rem' }}
                           />
                         </div>
                       </label>
@@ -659,7 +661,8 @@ export default function SquadDashboard() {
                             value={applicationForm.jobUrl}
                             onChange={(event) => setApplicationForm((current) => ({ ...current, jobUrl: event.target.value }))}
                             placeholder="https://company.com/careers/job-id"
-                            className="app-input w-full pl-11 text-base py-3 transition-all focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/50"
+                            className="app-input w-full text-base py-3 transition-all focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]/50"
+                            style={{ paddingLeft: '3rem' }}
                           />
                         </div>
                       </label>

@@ -26,7 +26,7 @@ function writeSSE(raw, event, data) {
   try {
     raw.write(payload);
   } catch (error) {
-    // Client disconnected — swallow
+    // Client disconnected - swallow
   }
 }
 
@@ -111,7 +111,7 @@ export async function analyzeController(request, reply) {
     writeSSE(raw, 'precheck', { score: 100, reason: 'Precheck skipped.', canProceed: true });
   }
 
-  // ── Stage 1: KEY_1 — sharedContext + Features 1, 2, 3 ────────────────────
+  // ── Stage 1: KEY_1 - sharedContext + Features 1, 2, 3 ────────────────────
   let sharedContext = null;
   try {
     const stage1 = await runStage1({ resumeText, jobDescription, logger: request.log });

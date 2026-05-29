@@ -146,7 +146,7 @@ function doPost(e) {
   var expectedSecret = getSecretFromProperties();
 
   if (!expectedSecret) {
-    // Script property not configured — refuse all requests until it is set up.
+    // Script property not configured - refuse all requests until it is set up.
     return errorResponse(
       'Email gateway is not configured. Set APTICO_EMAIL_SECRET in Script Properties.',
       'GATEWAY_NOT_CONFIGURED'

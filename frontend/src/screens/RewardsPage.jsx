@@ -224,7 +224,7 @@ export default function RewardsPage() {
                       {isSecret ? '???' : sticker.name}
                     </h3>
                     <p className="mt-1 text-xs text-[var(--muted-strong)] leading-relaxed line-clamp-2">
-                      {isSecret ? 'Hidden achievement — keep exploring!' : sticker.description}
+                      {isSecret ? 'Hidden achievement - keep exploring!' : sticker.description}
                     </p>
                   </div>
                 </div>

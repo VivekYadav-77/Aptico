@@ -7,7 +7,7 @@ function StickerIcon({ sticker, size = 32 }) {
 }
 
 /**
- * StickerShowcase — displays equipped stickers on a profile with custom hover tooltips.
+ * StickerShowcase - displays equipped stickers on a profile with custom hover tooltips.
  * The "See All" button fires onSeeAll so the parent can render the modal at the root level
  * (avoiding overflow-hidden traps in nested containers).
  * @param {{ equippedStickers: string[], unlockedStickers: string[], userName: string, onSeeAll: () => void }} props
@@ -83,7 +83,7 @@ export default function StickerShowcase({ equippedStickers = [], unlockedSticker
           );
         })}
 
-        {/* See All Button — calls parent handler instead of rendering modal here */}
+        {/* See All Button - calls parent handler instead of rendering modal here */}
         {hasUnlocked && (
           <button 
             onClick={onSeeAll}

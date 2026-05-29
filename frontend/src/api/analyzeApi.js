@@ -28,7 +28,7 @@ async function refreshAnalysisSession() {
  *
  * @param {{ file: File, jobDescription: string }} payload
  * @param {{ onPrecheck, onStage1, onStage2, onStage3, onAnalysisId, onError, onDone }} callbacks
- * @returns {AbortController} — call .abort() to cancel the stream
+ * @returns {AbortController} - call .abort() to cancel the stream
  */
 export function streamAnalysis(payload, callbacks) {
   const controller = new AbortController();

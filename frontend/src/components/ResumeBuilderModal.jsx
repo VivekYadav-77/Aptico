@@ -45,7 +45,7 @@ function bulletLines(desc) {
 }
 
 /* ─────────────────────────────────────────────
-   TEMPLATE 1 — EXECUTIVE (ATS Classic)
+   TEMPLATE 1 - EXECUTIVE (ATS Classic)
    ───────────────────────────────────────────── */
 function ExecutiveTemplate({ data }) {
   const s = {
@@ -139,7 +139,7 @@ function ExecutiveTemplate({ data }) {
 }
 
 /* ─────────────────────────────────────────────
-   TEMPLATE 2 — MODERN (Professional Two-Column)
+   TEMPLATE 2 - MODERN (Professional Two-Column)
    Polished, recruiter-ready layout with refined
    typography, warm neutrals, and elegant spacing.
    Uses table for reliable PDF rendering.
@@ -298,7 +298,7 @@ function ModernTemplate({ data }) {
 }
 
 /* ─────────────────────────────────────────────
-   TEMPLATE 3 — MINIMAL (Swiss Clean)
+   TEMPLATE 3 - MINIMAL (Swiss Clean)
    ───────────────────────────────────────────── */
 function MinimalTemplate({ data }) {
   const s = {
@@ -386,7 +386,7 @@ function MinimalTemplate({ data }) {
 }
 
 /* ─────────────────────────────────────────────
-   TEMPLATE 4 — CREATIVE (Bold Gradient Accent)
+   TEMPLATE 4 - CREATIVE (Bold Gradient Accent)
    ───────────────────────────────────────────── */
 function CreativeTemplate({ data }) {
   const primary = '#6d28d9';
@@ -506,7 +506,7 @@ function CreativeTemplate({ data }) {
 }
 
 /* ─────────────────────────────────────────────
-   TEMPLATE 5 — TECHNICAL (Developer-Focused)
+   TEMPLATE 5 - TECHNICAL (Developer-Focused)
    ───────────────────────────────────────────── */
 function TechnicalTemplate({ data }) {
   const green = '#10b981';
@@ -760,7 +760,7 @@ export default function ResumeBuilderModal({ open, onClose, profile, educationEn
 
       {/* ── Body ── */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Sidebar — template selector */}
+        {/* Sidebar - template selector */}
         {!readonly && (
           <aside className="w-[280px] shrink-0 border-r border-[var(--border)] bg-[var(--panel)]/80 backdrop-blur-xl overflow-y-auto p-5 space-y-2.5">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--muted)] mb-3">Choose Template</p>

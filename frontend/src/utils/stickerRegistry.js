@@ -1,19 +1,19 @@
 /**
  * ═══════════════════════════════════════════════════════
- *  APTICO STICKER REGISTRY — Single Source of Truth
+ *  APTICO STICKER REGISTRY - Single Source of Truth
  * ═══════════════════════════════════════════════════════
  *
  *  Each sticker has:
- *    id          — Unique key stored in DB
- *    name        — Display name
- *    description — Short meaning / how it was earned
- *    category    — 'milestone' | 'resilience' | 'social' | 'mastery' | 'engagement' | 'secret' | 'event'
- *    rarity      — 'common' | 'rare' | 'epic' | 'legendary'
- *    visualId    — Mapping to SVG template in StickerVisual.jsx
- *    color       — Primary accent colour for the sticker
- *    requirement — { type, value } describing unlock condition
- *    evolvesFrom — id of the sticker this one replaces (or null)
- *    tier        — Evolution tier (1, 2, 3...)
+ *    id          - Unique key stored in DB
+ *    name        - Display name
+ *    description - Short meaning / how it was earned
+ *    category    - 'milestone' | 'resilience' | 'social' | 'mastery' | 'engagement' | 'secret' | 'event'
+ *    rarity      - 'common' | 'rare' | 'epic' | 'legendary'
+ *    visualId    - Mapping to SVG template in StickerVisual.jsx
+ *    color       - Primary accent colour for the sticker
+ *    requirement - { type, value } describing unlock condition
+ *    evolvesFrom - id of the sticker this one replaces (or null)
+ *    tier        - Evolution tier (1, 2, 3...)
  */
 
 export const RARITY_CONFIG = {

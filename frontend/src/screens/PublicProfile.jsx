@@ -721,7 +721,7 @@ export default function PublicProfile() {
                                 <p className="text-sm sm:text-base font-bold text-[#0ea5e9] mt-1">{exp.company || 'Company'}</p>
                               </div>
                               <div className="text-xs text-[var(--muted-strong)] font-bold shrink-0 sm:text-right bg-[var(--panel-soft)]/50 px-3 py-2 rounded-xl mb-2 sm:mb-0 w-max border border-[var(--border)]/50 shadow-sm backdrop-blur-sm">
-                                <p className="text-[var(--text)]">{[exp.startDate, exp.isCurrent ? 'Present' : exp.endDate].filter(Boolean).join(' — ') || 'Date not specified'}</p>
+                                <p className="text-[var(--text)]">{[exp.startDate, exp.isCurrent ? 'Present' : exp.endDate].filter(Boolean).join(' - ') || 'Date not specified'}</p>
                                 {exp.location && <p className="mt-1 opacity-80">{exp.location}</p>}
                               </div>
                             </div>
@@ -749,7 +749,7 @@ export default function PublicProfile() {
                                 <p className="text-sm sm:text-base font-bold text-[#10b981] mt-1">{edu.school || 'School'}</p>
                               </div>
                               <div className="text-xs text-[var(--muted-strong)] font-bold shrink-0 sm:text-right bg-[var(--panel-soft)]/50 px-3 py-2 rounded-xl mb-2 sm:mb-0 w-max border border-[var(--border)]/50 shadow-sm backdrop-blur-sm">
-                                <p className="text-[var(--text)]">{[edu.startDate, edu.isCurrent ? 'Present' : edu.endDate].filter(Boolean).join(' — ') || 'Date not specified'}</p>
+                                <p className="text-[var(--text)]">{[edu.startDate, edu.isCurrent ? 'Present' : edu.endDate].filter(Boolean).join(' - ') || 'Date not specified'}</p>
                               </div>
                             </div>
                             {edu.description && <p className="mt-4 text-sm text-[var(--text)] opacity-90 leading-relaxed whitespace-pre-wrap bg-[var(--panel-soft)]/30 p-4 rounded-2xl border border-[var(--border)]/50">{edu.description}</p>}
@@ -1073,7 +1073,7 @@ export default function PublicProfile() {
                             <Link to={resilienceLink} state={{ activeTab: 'applications' }} className="group block rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4 transition-all hover:border-[var(--accent)]/40 hover:bg-[var(--panel-soft)]">
                               <div className="flex items-center justify-between">
                                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">
-                                  Daily Streak — {now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                                  Daily Streak - {now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                                 </p>
                                 <div className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--accent-strong)] transition-colors group-hover:text-[var(--text)]">
                                   See Full Year

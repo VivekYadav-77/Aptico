@@ -651,7 +651,7 @@ export async function getPublicProfile(db, username, viewerId = null) {
     return false;
   }
 
-  // Build enriched settings — only include sections the viewer can see
+  // Build enriched settings - only include sections the viewer can see
   const enrichedSettings = {
     sectionVisibility: sectionVis,
     viewerRelationship: isSelf ? 'self' : isConnected ? 'connected' : 'public',

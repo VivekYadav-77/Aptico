@@ -3,7 +3,7 @@ import { STICKER_REGISTRY, STICKER_CATEGORIES, RARITY_CONFIG } from '../utils/st
 import StickerVisual from './StickerVisual.jsx';
 
 /**
- * StickerInventoryModal — Displays all unlocked stickers for a user in a premium gallery view.
+ * StickerInventoryModal - Displays all unlocked stickers for a user in a premium gallery view.
  */
 export default function StickerInventoryModal({ isOpen, onClose, unlockedStickers = [], userName = 'User' }) {
   const [activeCategory, setActiveCategory] = useState('all');

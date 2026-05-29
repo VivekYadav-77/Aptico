@@ -1,11 +1,11 @@
 // ─────────────────────────────────────────────────────────────
-// SkeletonLoader — Pulse-animated loading placeholders
+// SkeletonLoader - Pulse-animated loading placeholders
 // Matches the shape of the actual content for zero-layout-shift
 // ─────────────────────────────────────────────────────────────
 
 /**
  * @param {'card' | 'list' | 'profile' | 'text' | 'stat'} variant
- * @param {number} count  — how many skeletons to render
+ * @param {number} count  - how many skeletons to render
  */
 export default function SkeletonLoader({ variant = 'card', count = 1 }) {
   const items = Array.from({ length: count }, (_, i) => i);

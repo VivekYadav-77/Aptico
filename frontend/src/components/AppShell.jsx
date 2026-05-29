@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// AppShell — Main authenticated layout shell
+// AppShell - Main authenticated layout shell
 // Frosted-glass navbar (64px), slide-in mobile drawer,
 // desktop sidebar, and page content container.
 // ─────────────────────────────────────────────────────────────
@@ -568,7 +568,7 @@ export default function AppShell({ title, description, actions, children, banner
                         <span className="material-symbols-outlined text-[16px] text-[var(--muted)]">{item.icon}</span>
                         <div>
                           <span className="text-[var(--text)]">{item.label}</span>
-                          <span className="ml-2 text-xs text-[var(--muted-strong)]">— {item.category}</span>
+                          <span className="ml-2 text-xs text-[var(--muted-strong)]">- {item.category}</span>
                         </div>
                       </button>
                     ))}

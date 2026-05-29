@@ -1,7 +1,7 @@
 import { createSlice } from '@reduxjs/toolkit';
 
 /**
- * Transient analysis state — tracks the live progress of an in-flight
+ * Transient analysis state - tracks the live progress of an in-flight
  * analysis stream. Unlike historySlice (persisted to localStorage),
  * this slice resets on page reload, which is the desired behavior
  * since the SSE stream itself cannot survive a reload.

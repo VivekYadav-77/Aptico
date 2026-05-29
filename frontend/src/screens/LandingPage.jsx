@@ -93,7 +93,7 @@ export default function LandingPage() {
             <ThemeToggle compact />
             <Link to="/auth" className="hidden text-sm font-semibold text-[var(--muted)] transition hover:text-[var(--text)] sm:inline-flex">Log in</Link>
             <Link to="/auth" className="app-button hidden px-4 py-2 md:inline-flex">Start free</Link>
-            {/* Hamburger — mobile only */}
+            {/* Hamburger - mobile only */}
             <button
               type="button"
               onClick={() => setMobileMenuOpen((prev) => !prev)}

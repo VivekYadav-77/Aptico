@@ -958,7 +958,7 @@ export default function ProfilePage() {
                       <Link to={resilienceLink} state={{ activeTab: 'applications' }} className="group block rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4 transition-all hover:border-[var(--accent)]/40 hover:bg-[var(--panel-soft)]">
                         <div className="flex items-center justify-between">
                           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)]">
-                            Daily Streak — {now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                            Daily Streak - {now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
                           </p>
                           <div className="inline-flex items-center gap-1 text-[11px] font-bold text-[var(--accent-strong)] transition-colors group-hover:text-[var(--text)]">
                             See Full Year

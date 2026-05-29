@@ -7,7 +7,7 @@
  *
  * Architecture notes:
  * ─────────────────────────────────────────────────────────
- * • authService.js calls sendAuthEmail() — it knows NOTHING about HTTP or GAS.
+ * • authService.js calls sendAuthEmail() - it knows NOTHING about HTTP or GAS.
  * • This file contains all transport logic.
  * • To swap providers (Resend, SendGrid, AWS SES), only this file changes.
  * • A shared secret (GAS_EMAIL_DISPATCH_TOKEN) is sent in both a header and
@@ -83,7 +83,7 @@ function buildEmailShell({ appName, previewText, innerHtml }) {
             <td align="center" style="padding-top:32px;">
               <p style="color:#4b5563;font-size:11px;line-height:1.6;margin:0;">
                 This email was sent to you by ${appName}.<br/>
-                If you did not request this, please ignore it — no action is required.
+                If you did not request this, please ignore it - no action is required.
               </p>
             </td>
           </tr>
@@ -105,7 +105,7 @@ function buildVerificationEmailHtml({ name, appName, verificationLink, expiryHou
   const greeting = safeName ? `Hi ${safeName},` : 'Hi there,';
   return buildEmailShell({
     appName,
-    previewText: `Verify your ${appName} account — link expires in ${expiryHours} hours`,
+    previewText: `Verify your ${appName} account - link expires in ${expiryHours} hours`,
     innerHtml: `
       <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#f9fafb;letter-spacing:-0.03em;">
         Verify your email address
@@ -147,7 +147,7 @@ function buildPasswordResetEmailHtml({ name, appName, resetLink, expiryMinutes =
   const greeting = safeName ? `Hi ${safeName},` : 'Hi there,';
   return buildEmailShell({
     appName,
-    previewText: `Reset your ${appName} password — link expires in ${expiryMinutes} minutes`,
+    previewText: `Reset your ${appName} password - link expires in ${expiryMinutes} minutes`,
     innerHtml: `
       <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#f9fafb;letter-spacing:-0.03em;">
         Reset your password
@@ -175,11 +175,11 @@ function buildPasswordResetEmailHtml({ name, appName, resetLink, expiryMinutes =
         ${resetLink}
       </p>
       <p style="margin:0 0 8px;font-size:12px;color:#6b7280;border-top:1px solid #1f2937;padding-top:20px;">
-        ⏳ This link expires in <strong style="color:#9ca3af;">${expiryMinutes} minutes</strong>.
+         This link expires in <strong style="color:#9ca3af;">${expiryMinutes} minutes</strong>.
         After that, request a new reset from the login page.
       </p>
       <p style="margin:8px 0 0;font-size:12px;color:#6b7280;">
-        🔒 If you did not request a password reset, you can safely ignore this email.
+         If you did not request a password reset, you can safely ignore this email.
         Your password will not change.
       </p>`
   });
@@ -293,11 +293,11 @@ async function dispatchViaGas({ to, subject, htmlBody, emailType }) {
  * sendAuthEmail
  *
  * The single entry-point for all transactional auth emails.
- * Called by authService.js — completely decoupled from transport details.
+ * Called by authService.js - completely decoupled from transport details.
  *
  * Supported types:
- *   • 'email_verification'  — sent after registration
- *   • 'password_reset'      — sent when a user requests a password reset
+ *   • 'email_verification'  - sent after registration
+ *   • 'password_reset'      - sent when a user requests a password reset
  *
  * @param {{
  *   type: 'email_verification' | 'password_reset',

@@ -431,7 +431,7 @@ export default function ResilienceDetailsPage() {
           <section>
             <div className="mb-4 flex items-center gap-3">
               <div className="h-6 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_12px_rgba(16,185,129,0.5)]" />
-              <h2 className="text-xl font-black tracking-tight text-[var(--text)]">Daily Activity — Last 365 Days</h2>
+              <h2 className="text-xl font-black tracking-tight text-[var(--text)]">Daily Activity - Last 365 Days</h2>
             </div>
             <GitHubHeatmap 
               heatmap={heatmap} 

@@ -307,7 +307,7 @@ export default function SettingsWorkspace() {
                 <div>
                   <h2 className="text-2xl font-black text-[var(--text)] tracking-tight">{activeSection} Configuration</h2>
                   <p className="mt-1 text-sm font-medium text-[var(--muted-strong)]">
-                    {activeSectData?.description} — changes made here will reflect instantly on your linked profile.
+                    {activeSectData?.description} - changes made here will reflect instantly on your linked profile.
                   </p>
                 </div>
               </div>

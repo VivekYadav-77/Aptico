@@ -1,16 +1,16 @@
 // ─────────────────────────────────────────────────────────────
-// EmptyState — Standardized "nothing here yet" component
+// EmptyState - Standardized "nothing here yet" component
 // Every list/table uses this for a consistent empty experience.
 // ─────────────────────────────────────────────────────────────
 import { Link } from '@/lib/router-compat.jsx';
 
 /**
- * @param {string}  icon    — Material Symbols icon name
- * @param {string}  title   — Primary message
- * @param {string}  message — Secondary description
- * @param {string}  ctaLabel — Button text (optional)
- * @param {string}  ctaTo    — React Router path (optional)
- * @param {Function} onCtaClick — Callback for non-link CTA (optional)
+ * @param {string}  icon    - Material Symbols icon name
+ * @param {string}  title   - Primary message
+ * @param {string}  message - Secondary description
+ * @param {string}  ctaLabel - Button text (optional)
+ * @param {string}  ctaTo    - React Router path (optional)
+ * @param {Function} onCtaClick - Callback for non-link CTA (optional)
  */
 export default function EmptyState({
   icon = 'inbox',

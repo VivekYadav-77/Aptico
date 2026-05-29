@@ -158,7 +158,7 @@ async function createSquadActivityForRejection(db, { squadId, userId, companyNam
       }
     });
   } catch {
-    // Non-critical — don't break the rejection flow if squad activity insert fails
+    // Non-critical - don't break the rejection flow if squad activity insert fails
   }
 }
 
@@ -209,7 +209,7 @@ export async function createRejectionController(request, reply) {
             stageRejected: body.stageRejected
           });
         } catch {
-          // Non-critical — don't break the rejection flow
+          // Non-critical - don't break the rejection flow
         }
       }
 

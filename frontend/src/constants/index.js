@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────
-// Aptico — Centralized Constants
+// Aptico - Centralized Constants
 // Single source of truth for all app-wide labels, config, and
 // navigation. No hardcoded strings should exist outside this file.
 // ─────────────────────────────────────────────────────────────
@@ -79,7 +79,7 @@ export const LANDING_FEATURES = [
   },
   {
     title: 'The Shadow Resume',
-    copy: 'A public profile that tracks your career resilience, wins, and grit—not just your job titles.',
+    copy: 'A public profile that tracks your career resilience, wins, and grit-not just your job titles.',
     icon: 'shield_with_heart',
   },
   {
@@ -227,7 +227,7 @@ export const CACHE_TIMES = {
 };
 
 // ── Misc ─────────────────────────────────────────────────────
-export const MIN_TOUCH_TARGET = 44; // px — accessibility minimum
-export const SIDEBAR_WIDTH = 240;   // px — expanded sidebar
-export const SIDEBAR_COLLAPSED = 64; // px — icon-only sidebar
+export const MIN_TOUCH_TARGET = 44; // px - accessibility minimum
+export const SIDEBAR_WIDTH = 240;   // px - expanded sidebar
+export const SIDEBAR_COLLAPSED = 64; // px - icon-only sidebar
 export const NAVBAR_HEIGHT = 64;    // px
