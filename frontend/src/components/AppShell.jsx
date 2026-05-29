@@ -317,33 +317,35 @@ export default function AppShell({ title, description, actions, children, banner
                 </button>
 
                 {hubDropdownOpen && (
-                  <div className="absolute left-1/2 -translate-x-1/2 top-full mt-3 w-[360px] rounded-3xl border border-white/[0.08] bg-[var(--panel)]/95 backdrop-blur-3xl p-3 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] animate-fade-in-up origin-top z-[200]">
-                    <div className="mb-2 px-3 pt-2">
-                      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--muted)]">Tools & Resources</p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-1">
-                      {NAV_ITEMS.filter(item => 
-                        ['/squads', '/people', '/wins', '/portfolio-generator', '/interview-prep', '/rewards', '/saved-jobs', '/analysis-history'].includes(item.to)
-                      ).map((subTab) => {
-                        const isSubActive = location.pathname === subTab.to;
-                        return (
-                          <Link
-                            key={subTab.to}
-                            to={subTab.to}
-                            onClick={() => setHubDropdownOpen(false)}
-                            className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all duration-200 ${
-                              isSubActive
-                                ? 'bg-[var(--accent)]/15 text-[var(--text)]'
-                                : 'text-[var(--muted-strong)] hover:bg-white/[0.04] hover:text-[var(--text)]'
-                            }`}
-                          >
-                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors duration-200 ${isSubActive ? 'bg-[var(--accent)]/20 text-[var(--accent-strong)]' : 'bg-white/[0.03] text-[var(--muted)] group-hover:bg-white/[0.08] group-hover:text-[var(--text)]'}`}>
-                              <span className="material-symbols-outlined text-[18px]">{subTab.icon}</span>
-                            </div>
-                            <span className="text-xs font-semibold tracking-wide">{subTab.label}</span>
-                          </Link>
-                        );
-                      })}
+                  <div className="absolute left-1/2 top-full z-[200] w-[360px] -translate-x-1/2 pt-3">
+                    <div className="rounded-3xl border border-white/[0.08] bg-[var(--panel)]/95 p-3 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] backdrop-blur-3xl animate-fade-in-up origin-top">
+                      <div className="mb-2 px-3 pt-2">
+                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--muted)]">Tools & Resources</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1">
+                        {NAV_ITEMS.filter(item =>
+                          ['/squads', '/people', '/wins', '/portfolio-generator', '/interview-prep', '/rewards', '/saved-jobs', '/analysis-history'].includes(item.to)
+                        ).map((subTab) => {
+                          const isSubActive = location.pathname === subTab.to;
+                          return (
+                            <Link
+                              key={subTab.to}
+                              to={subTab.to}
+                              onClick={() => setHubDropdownOpen(false)}
+                              className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all duration-200 ${
+                                isSubActive
+                                  ? 'bg-[var(--accent)]/15 text-[var(--text)]'
+                                  : 'text-[var(--muted-strong)] hover:bg-white/[0.04] hover:text-[var(--text)]'
+                              }`}
+                            >
+                              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors duration-200 ${isSubActive ? 'bg-[var(--accent)]/20 text-[var(--accent-strong)]' : 'bg-white/[0.03] text-[var(--muted)] group-hover:bg-white/[0.08] group-hover:text-[var(--text)]'}`}>
+                                <span className="material-symbols-outlined text-[18px]">{subTab.icon}</span>
+                              </div>
+                              <span className="text-xs font-semibold tracking-wide">{subTab.label}</span>
+                            </Link>
+                          );
+                        })}
+                      </div>
                     </div>
                   </div>
                 )}
