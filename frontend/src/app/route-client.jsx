@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Navigate } from '@/lib/router-compat.jsx';
 import { AdminRoute, ProtectedRoute } from '../components/ProtectedRoute.jsx';
@@ -56,11 +57,20 @@ const routes = {
   legal: LegalPage
 };
 
+function LoadingShell() {
+  return <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] text-[var(--muted-strong)]">Loading Aptico...</div>;
+}
+
 function RootRoute() {
   const auth = useSelector(selectAuth);
+  const [isMounted, setIsMounted] = useState(false);
 
-  if (!auth.authReady) {
-    return <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] text-[var(--muted-strong)]">Loading Aptico...</div>;
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted || !auth.authReady) {
+    return <LoadingShell />;
   }
 
   return auth.isAuthenticated ? <Navigate replace to="/squads" /> : <GuestDashboard />;
