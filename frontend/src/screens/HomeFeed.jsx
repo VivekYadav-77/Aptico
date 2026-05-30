@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from '@/lib/router-compat.jsx';
 import { useSelector } from 'react-redux';
 import AppShell from '../components/AppShell.jsx';
+import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import PostComposer from '../components/PostComposer.jsx';
 import {
   addPostComment,
@@ -101,6 +102,8 @@ function PostCard({ post, currentUserId, onPostChanged, onDeleted, onEdit }) {
   const [submittingComment, setSubmittingComment] = useState(false);
   const [commentError, setCommentError] = useState('');
   const [actionError, setActionError] = useState('');
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const isOwn = Boolean(post.user_id && currentUserId && String(post.user_id) === String(currentUserId));
   const [label, className] = typeLabels[post.post_type] || ['Post', 'bg-[var(--panel-soft)] text-[var(--muted-strong)]'];
 
@@ -146,17 +149,21 @@ function PostCard({ post, currentUserId, onPostChanged, onDeleted, onEdit }) {
   }
 
   async function handleDelete() {
-    if (!window.confirm('Delete this post?')) return;
     setActionError('');
+    setDeleting(true);
     try {
       await deleteSocialPost(post.id);
+      setDeleteOpen(false);
       onDeleted(post.id);
     } catch (requestError) {
       setActionError(requestError.response?.data?.error || requestError.response?.data?.message || 'Could not delete this post.');
+    } finally {
+      setDeleting(false);
     }
   }
 
   return (
+    <>
     <article id={`post-${post.id}`} className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 gap-3">
@@ -197,7 +204,7 @@ function PostCard({ post, currentUserId, onPostChanged, onDeleted, onEdit }) {
           <span className="material-symbols-outlined text-[18px]">chat</span>{post.comments_count || 0}
         </button>
         {isOwn ? <button type="button" className="app-button-secondary px-3 py-2" onClick={() => onEdit?.(post)}><span className="material-symbols-outlined text-[18px]">edit</span>Edit</button> : null}
-        {isOwn ? <button type="button" className="app-button-secondary px-3 py-2 text-red-500" onClick={handleDelete}><span className="material-symbols-outlined text-[18px]">delete</span>Delete</button> : null}
+        {isOwn ? <button type="button" className="app-button-secondary px-3 py-2 text-red-500" onClick={() => setDeleteOpen(true)}><span className="material-symbols-outlined text-[18px]">delete</span>Delete</button> : null}
       </div>
       {actionError ? <p className="mt-3 rounded-lg border border-red-500/25 bg-red-500/10 p-3 text-sm font-semibold text-red-500">{actionError}</p> : null}
 
@@ -224,6 +231,16 @@ function PostCard({ post, currentUserId, onPostChanged, onDeleted, onEdit }) {
         </div>
       ) : null}
     </article>
+    <ConfirmDialog
+      open={deleteOpen}
+      title="Delete this post?"
+      description="This removes the post from your feed, profile activity, and any connected conversations."
+      confirmLabel="Delete Post"
+      loading={deleting}
+      onCancel={() => setDeleteOpen(false)}
+      onConfirm={handleDelete}
+    />
+    </>
   );
 }
 

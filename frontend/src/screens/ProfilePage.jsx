@@ -3,6 +3,7 @@ import { Link } from '@/lib/router-compat.jsx';
 import { useSelector } from 'react-redux';
 import PostComposer from '../components/PostComposer.jsx';
 import AppShell from '../components/AppShell.jsx';
+import ProfileActivityPost from '../components/ProfileActivityPost.jsx';
 import ResumeBuilderModal from '../components/ResumeBuilderModal.jsx';
 import { getMyProfile, getPublicFeedPosts, getPublicProfile, getProfileFollowers, getProfileFollowing, getProfileConnections } from '../api/socialApi.js';
 import UserListModal from '../components/UserListModal.jsx';
@@ -205,6 +206,7 @@ export default function ProfilePage() {
   const [socialProfile, setSocialProfile] = useState(null);
   const [posts, setPosts] = useState([]);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState(null);
   const [toast, setToast] = useState('');
   const [bannerSettingsOpen, setBannerSettingsOpen] = useState(false);
   const [bannerPrefTemp, setBannerPrefTemp] = useState('badge');
@@ -839,7 +841,16 @@ export default function ProfilePage() {
                 emptyMessage="No posts yet. Write your first career update!"
               >
                 <div className="space-y-3">
-                  {posts.map((post) => <MiniPost key={post.id} post={post} />)}
+                  {posts.map((post) => (
+                    <ProfileActivityPost
+                      key={post.id}
+                      post={post}
+                      currentUserId={auth.user?.id}
+                      onPostChanged={(next) => setPosts((current) => current.map((item) => item.id === next.id ? next : item))}
+                      onDeleted={(postId) => setPosts((current) => current.filter((item) => item.id !== postId))}
+                      onEdit={setEditingPost}
+                    />
+                  ))}
                   <button className="app-button mt-3 w-full flex items-center justify-center gap-2" onClick={() => setComposerOpen(true)}>
                     <span className="material-symbols-outlined text-[18px]">add</span>
                     New Post
@@ -1041,6 +1052,15 @@ export default function ProfilePage() {
         open={composerOpen}
         onClose={() => setComposerOpen(false)}
         onCreated={(post) => setPosts((current) => [post, ...current].slice(0, 5))}
+      />
+      <PostComposer
+        open={Boolean(editingPost)}
+        initialPost={editingPost}
+        onClose={() => setEditingPost(null)}
+        onUpdated={(post) => {
+          setPosts((current) => current.map((item) => item.id === post.id ? post : item));
+          setToast('Post updated.');
+        }}
       />
 
       <ResumeBuilderModal

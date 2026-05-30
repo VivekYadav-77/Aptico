@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from '@/lib/router-compat.jsx';
 import { useSelector } from 'react-redux';
+import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import { deleteWin, getMyWins, getWins, likeWin, postWin, updateWin } from '../api/socialApi.js';
 import { selectAuth } from '../store/authSlice.js';
 
@@ -74,6 +75,8 @@ export default function CommunityWins() {
   const [hideCompany, setHideCompany] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     const loader = viewMode === 'mine' ? getMyWins : getWins;
@@ -143,11 +146,20 @@ export default function CommunityWins() {
     setModalOpen(true);
   }
 
-  async function handleDelete(winId) {
-    if (!window.confirm('Delete this win?')) return;
-    await deleteWin(winId);
-    setWins((current) => current.filter((win) => win.id !== winId));
-    setToast('Win removed.');
+  async function handleDelete() {
+    if (!deleteTarget?.id) return;
+
+    setDeleting(true);
+    try {
+      await deleteWin(deleteTarget.id);
+      setWins((current) => current.filter((win) => win.id !== deleteTarget.id));
+      setDeleteTarget(null);
+      setToast('Win removed.');
+    } catch (requestError) {
+      setToast(requestError.response?.data?.error || 'Could not delete this win.');
+    } finally {
+      setDeleting(false);
+    }
   }
 
   async function handleSubmit(event) {
@@ -314,7 +326,7 @@ export default function CommunityWins() {
                     <span className="material-symbols-outlined text-[18px]">edit</span>
                     Edit
                   </button>
-                  <button type="button" className="app-button-secondary px-3 py-2 text-red-500" onClick={() => handleDelete(win.id)}>
+                  <button type="button" className="app-button-secondary px-3 py-2 text-red-500" onClick={() => setDeleteTarget(win)}>
                     <span className="material-symbols-outlined text-[18px]">delete</span>
                     Delete
                   </button>
@@ -496,6 +508,15 @@ export default function CommunityWins() {
           </form>
         </div>
       ) : null}
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete this win?"
+        description="This removes the win from your profile and the community wins board. This action cannot be undone."
+        confirmLabel="Delete Win"
+        loading={deleting}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+      />
     </main>
   );
 }

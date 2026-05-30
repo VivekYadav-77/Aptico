@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from '@/lib/router-compat.jsx';
 import { useSelector } from 'react-redux';
 import PostComposer from '../components/PostComposer.jsx';
+import ProfileActivityPost from '../components/ProfileActivityPost.jsx';
 import {
   followProfile,
   getConnectionStatus,
@@ -232,6 +233,7 @@ export default function PublicProfile() {
   const [connectOpen, setConnectOpen] = useState(false);
   const [connectNote, setConnectNote] = useState('');
   const [composerOpen, setComposerOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState(null);
   const [toast, setToast] = useState('');
   const [aboutExpanded, setAboutExpanded] = useState(false);
 
@@ -915,7 +917,16 @@ export default function PublicProfile() {
                   ) : isSectionVisible('activity') ? (
                     <SectionCard id="activity" title="Activity" accentColor="#8b5cf6" isEmpty={!posts.length} emptyMessage="No recent activity.">
                       <div className="space-y-3">
-                        {posts.map((post) => <MiniPost key={post.id} post={post} />)}
+                        {posts.map((post) => (
+                          <ProfileActivityPost
+                            key={post.id}
+                            post={post}
+                            currentUserId={auth.user?.id}
+                            onPostChanged={(next) => setPosts((current) => current.map((item) => item.id === next.id ? next : item))}
+                            onDeleted={(postId) => setPosts((current) => current.filter((item) => item.id !== postId))}
+                            onEdit={viewingOwnProfile ? setEditingPost : undefined}
+                          />
+                        ))}
                         {posts.length >= 5 && <Link to="/home" className="block text-center text-xs font-black uppercase tracking-widest text-[#8b5cf6] hover:text-[var(--text)] transition-colors mt-4 py-2 border border-[#8b5cf6]/20 bg-[#8b5cf6]/5 rounded-xl">View all activity</Link>}
                       </div>
                     </SectionCard>
@@ -1216,6 +1227,15 @@ export default function PublicProfile() {
       </div>
 
       <PostComposer open={composerOpen} onClose={() => setComposerOpen(false)} onCreated={(post) => setPosts((current) => [post, ...current].slice(0, 5))} />
+      <PostComposer
+        open={Boolean(editingPost)}
+        initialPost={editingPost}
+        onClose={() => setEditingPost(null)}
+        onUpdated={(post) => {
+          setPosts((current) => current.map((item) => item.id === post.id ? post : item));
+          setToast('Post updated.');
+        }}
+      />
       
       {connectOpen ? (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4 backdrop-blur-md animate-fade-in">
