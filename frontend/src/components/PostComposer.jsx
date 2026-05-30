@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { createSocialPost } from '../api/socialApi.js';
+import { useEffect, useMemo, useState } from 'react';
+import { createSocialPost, updateSocialPost } from '../api/socialApi.js';
 
 const postTypes = [
   ['career_update', 'emoji_events', 'Career Update', 'Share a milestone'],
@@ -17,18 +17,34 @@ const careerTypes = [
   ['new_project', 'New Project']
 ];
 
-export default function PostComposer({ open, onClose, onCreated, recentAnalyses = [], initialJob = null }) {
-  const [step, setStep] = useState(1);
-  const [postType, setPostType] = useState(initialJob ? 'job_share' : '');
-  const [content, setContent] = useState('');
-  const [careerUpdateType, setCareerUpdateType] = useState('');
-  const [analysisId, setAnalysisId] = useState('');
+function toDatetimeLocal(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function toScheduledIso(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+export default function PostComposer({ open, onClose, onCreated, onUpdated, recentAnalyses = [], initialJob = null, initialPost = null }) {
+  const isEditing = Boolean(initialPost?.id);
+  const [step, setStep] = useState(isEditing || initialJob ? 2 : 1);
+  const [postType, setPostType] = useState(initialPost?.post_type || (initialJob ? 'job_share' : ''));
+  const [content, setContent] = useState(initialPost?.content || '');
+  const [careerUpdateType, setCareerUpdateType] = useState(initialPost?.career_update_type || '');
+  const [analysisId, setAnalysisId] = useState(initialPost?.analysis_id || '');
   const [showScore, setShowScore] = useState(true);
   const [jobData, setJobData] = useState({
-    title: initialJob?.title || '',
-    company: initialJob?.company || '',
-    applyUrl: initialJob?.applyUrl || initialJob?.apply_url || ''
+    title: initialPost?.job_data?.title || initialJob?.title || '',
+    company: initialPost?.job_data?.company || initialJob?.company || '',
+    applyUrl: initialPost?.job_data?.applyUrl || initialJob?.applyUrl || initialJob?.apply_url || ''
   });
+  const [scheduledAt, setScheduledAt] = useState(toDatetimeLocal(initialPost?.scheduled_at));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -37,16 +53,33 @@ export default function PostComposer({ open, onClose, onCreated, recentAnalyses 
     [analysisId, recentAnalyses]
   );
 
+  useEffect(() => {
+    if (!open) return;
+    setStep(isEditing || initialJob ? 2 : 1);
+    setPostType(initialPost?.post_type || (initialJob ? 'job_share' : ''));
+    setContent(initialPost?.content || '');
+    setCareerUpdateType(initialPost?.career_update_type || '');
+    setAnalysisId(initialPost?.analysis_id || '');
+    setJobData({
+      title: initialPost?.job_data?.title || initialJob?.title || '',
+      company: initialPost?.job_data?.company || initialJob?.company || '',
+      applyUrl: initialPost?.job_data?.applyUrl || initialJob?.applyUrl || initialJob?.apply_url || ''
+    });
+    setScheduledAt(toDatetimeLocal(initialPost?.scheduled_at));
+    setError('');
+  }, [open, initialPost?.id, initialJob?.id]);
+
   if (!open) {
     return null;
   }
 
   function resetAndClose() {
-    setStep(1);
-    setPostType(initialJob ? 'job_share' : '');
-    setContent('');
-    setCareerUpdateType('');
-    setAnalysisId('');
+    setStep(isEditing || initialJob ? 2 : 1);
+    setPostType(initialPost?.post_type || (initialJob ? 'job_share' : ''));
+    setContent(initialPost?.content || '');
+    setCareerUpdateType(initialPost?.career_update_type || '');
+    setAnalysisId(initialPost?.analysis_id || '');
+    setScheduledAt(toDatetimeLocal(initialPost?.scheduled_at));
     setError('');
     onClose?.();
   }
@@ -72,18 +105,24 @@ export default function PostComposer({ open, onClose, onCreated, recentAnalyses 
 
     setSubmitting(true);
     try {
-      const created = await createSocialPost({
+      const payload = {
         post_type: postType,
         content,
         career_update_type: postType === 'career_update' ? careerUpdateType : undefined,
         analysis_id: postType === 'analysis_share' ? analysisId : undefined,
         job_data: postType === 'job_share' ? jobData : undefined,
-        show_score: showScore
-      });
-      onCreated?.(created);
+        show_score: showScore,
+        scheduled_at: toScheduledIso(scheduledAt)
+      };
+      const saved = isEditing ? await updateSocialPost(initialPost.id, payload) : await createSocialPost(payload);
+      if (isEditing) {
+        onUpdated?.(saved);
+      } else {
+        onCreated?.(saved);
+      }
       resetAndClose();
     } catch (requestError) {
-      setError(requestError.response?.data?.error || 'Could not publish this post.');
+      setError(requestError.response?.data?.error || 'Could not save this post.');
     } finally {
       setSubmitting(false);
     }
@@ -95,7 +134,7 @@ export default function PostComposer({ open, onClose, onCreated, recentAnalyses 
         <div className="flex items-start justify-between gap-4">
           <div>
             <p className="app-kicker">Create post</p>
-            <h2 className="mt-2 text-2xl font-black text-[var(--text)]">{step === 1 ? 'What do you want to share?' : 'Write your post'}</h2>
+            <h2 className="mt-2 text-2xl font-black text-[var(--text)]">{isEditing ? 'Edit post' : step === 1 ? 'What do you want to share?' : 'Write your post'}</h2>
           </div>
           <button type="button" className="app-icon-button" onClick={resetAndClose} aria-label="Close composer">
             <span className="material-symbols-outlined">close</span>
@@ -182,11 +221,25 @@ export default function PostComposer({ open, onClose, onCreated, recentAnalyses 
               </div>
             ) : null}
 
+            <label className="block rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] p-4">
+              <span className="app-field-label flex items-center gap-2">
+                <span className="material-symbols-outlined text-[16px]">event_upcoming</span>
+                Schedule
+              </span>
+              <input
+                type="datetime-local"
+                className="app-input mt-2"
+                value={scheduledAt}
+                onChange={(event) => setScheduledAt(event.target.value)}
+              />
+              <span className="mt-2 block text-xs text-[var(--muted-strong)]">Leave empty to post immediately.</span>
+            </label>
+
             {error ? <p className="rounded-lg border border-red-500/25 bg-red-500/10 p-3 text-sm font-semibold text-red-500">{error}</p> : null}
 
             <div className="flex justify-between gap-3">
-              <button type="button" className="app-button-secondary" onClick={() => setStep(1)}>Back</button>
-              <button type="submit" className="app-button" disabled={submitting}>{submitting ? 'Posting...' : 'Post'}</button>
+              {!isEditing ? <button type="button" className="app-button-secondary" onClick={() => setStep(1)}>Back</button> : <span />}
+              <button type="submit" className="app-button" disabled={submitting}>{submitting ? 'Saving...' : scheduledAt ? 'Schedule' : isEditing ? 'Save Changes' : 'Post'}</button>
             </div>
           </form>
         )}

@@ -9,7 +9,8 @@
     "test": "node test/security.test.js",
     "check": "node --check src/server.js",
     "db:push": "drizzle-kit push --config=src/config/drizzle.config.js",
-    "db:migrate:comms": "node scripts/migrations/apply-squad-comms-migration.js"
+    "db:migrate:comms": "node scripts/migrations/apply-squad-comms-migration.js",
+    "db:migrate:social-scheduling": "node scripts/migrations/apply-social-scheduling-migration.js"
   },
   "dependencies": {
     "@fastify/helmet": "^13.0.2",

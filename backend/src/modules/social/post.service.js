@@ -1,9 +1,10 @@
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm';
 import { analyses, follows, postComments, posts, userProfiles, users } from '../../db/schema.js';
 import { createNotification } from '../../shared/utils/notification-helper.js';
 
 const POST_TYPES = new Set(['career_update', 'job_tip', 'job_share', 'analysis_share', 'question']);
 const CAREER_UPDATE_TYPES = new Set(['got_hired', 'got_promoted', 'started_learning', 'completed_course', 'new_project']);
+const PUBLICATION_FILTER = or(sql`${posts.scheduledAt} is null`, sql`${posts.scheduledAt} <= now()`);
 
 function serviceError(message, statusCode) {
   const error = new Error(message);
@@ -40,6 +41,7 @@ function selectPostShape() {
     likes_count: posts.likesCount,
     comments_count: posts.commentsCount,
     is_visible: posts.isVisible,
+    scheduled_at: posts.scheduledAt,
     created_at: posts.createdAt,
     updated_at: posts.updatedAt,
     user: {
@@ -54,6 +56,19 @@ function selectPostShape() {
       gap_analysis_json: analyses.gapAnalysisJson
     }
   };
+}
+
+function parseScheduledAt(value) {
+  if (!value) {
+    return null;
+  }
+
+  const scheduledAt = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(scheduledAt.getTime())) {
+    throw serviceError('Scheduled time is invalid', 400);
+  }
+
+  return scheduledAt;
 }
 
 async function getActorName(db, userId) {
@@ -129,6 +144,8 @@ export async function createPost(db, userId, data) {
     }
   }
 
+  const scheduledAt = parseScheduledAt(data.scheduled_at || data.scheduledAt);
+
   const recentRows = await db
     .select({ total: sql`count(*)::int` })
     .from(posts)
@@ -146,7 +163,8 @@ export async function createPost(db, userId, data) {
       content,
       analysisId: postType === 'analysis_share' ? data.analysis_id : null,
       jobData: postType === 'job_share' ? data.job_data : null,
-      careerUpdateType: postType === 'career_update' ? data.career_update_type : null
+      careerUpdateType: postType === 'career_update' ? data.career_update_type : null,
+      scheduledAt
     })
     .returning({ id: posts.id });
 
@@ -171,7 +189,7 @@ export async function getFeedPosts(db, userId, { limit = 20, offset = 0, filterT
     .where(eq(follows.followerId, userId));
 
   const feedUserIds = [...new Set([userId, ...followingRows.map((row) => row.followingId)])];
-  const filters = [inArray(posts.userId, feedUserIds), eq(posts.isVisible, true)];
+  const filters = [inArray(posts.userId, feedUserIds), eq(posts.isVisible, true), PUBLICATION_FILTER];
 
   if (filterType) {
     filters.push(eq(posts.postType, filterType));
@@ -197,7 +215,7 @@ export async function getFeedPosts(db, userId, { limit = 20, offset = 0, filterT
 }
 
 export async function getPublicFeedPosts(db, { limit = 20, offset = 0, filterType = null, userId = null } = {}) {
-  const filters = [eq(posts.isVisible, true)];
+  const filters = [eq(posts.isVisible, true), PUBLICATION_FILTER];
 
   if (filterType) {
     filters.push(eq(posts.postType, filterType));
@@ -226,11 +244,119 @@ export async function getPublicFeedPosts(db, { limit = 20, offset = 0, filterTyp
   }));
 }
 
+export async function getMyPosts(db, userId, { limit = 20, offset = 0, filterType = null } = {}) {
+  const filters = [eq(posts.userId, userId), eq(posts.isVisible, true)];
+
+  if (filterType) {
+    filters.push(eq(posts.postType, filterType));
+  }
+
+  const rows = await db
+    .select(selectPostShape())
+    .from(posts)
+    .innerJoin(users, eq(posts.userId, users.id))
+    .leftJoin(userProfiles, eq(posts.userId, userProfiles.userId))
+    .leftJoin(analyses, eq(posts.analysisId, analyses.id))
+    .where(and(...filters))
+    .orderBy(desc(sql`coalesce(${posts.scheduledAt}, ${posts.createdAt})`))
+    .limit(normalizeLimit(limit))
+    .offset(normalizeOffset(offset));
+
+  return rows.map((row) => ({
+    ...row,
+    analysis: row.analysis?.company_name || row.analysis?.confidence_score != null
+      ? { ...row.analysis, top_skill_gaps: topSkillGaps({ gapAnalysisJson: row.analysis.gap_analysis_json }) }
+      : null
+  }));
+}
+
+export async function updatePost(db, userId, postId, data) {
+  const existingRows = await db
+    .select({ id: posts.id, postType: posts.postType })
+    .from(posts)
+    .where(and(eq(posts.id, postId), eq(posts.userId, userId), eq(posts.isVisible, true)))
+    .limit(1);
+
+  const existing = existingRows[0];
+  if (!existing) {
+    throw serviceError('You cannot edit this post', 403);
+  }
+
+  const postType = data.post_type || data.postType || existing.postType;
+  const content = String(data.content || '').trim();
+
+  if (!POST_TYPES.has(postType)) {
+    throw serviceError('Invalid post type', 400);
+  }
+
+  if (!content) {
+    throw serviceError('Post content is required', 400);
+  }
+
+  if (content.length > 500) {
+    throw serviceError('Post content cannot exceed 500 characters', 400);
+  }
+
+  if (postType === 'career_update' && !CAREER_UPDATE_TYPES.has(data.career_update_type)) {
+    throw serviceError('Career update type is required', 400);
+  }
+
+  if (postType === 'job_share') {
+    const jobData = data.job_data;
+    if (!jobData || typeof jobData !== 'object' || !jobData.title || !jobData.applyUrl) {
+      throw serviceError('Job title and apply URL are required', 400);
+    }
+  }
+
+  let analysisRow = null;
+  if (postType === 'analysis_share') {
+    if (!data.analysis_id) {
+      throw serviceError('Analysis is required for this post type', 400);
+    }
+
+    const analysisRows = await db
+      .select()
+      .from(analyses)
+      .where(and(eq(analyses.id, data.analysis_id), eq(analyses.userId, userId)))
+      .limit(1);
+
+    analysisRow = analysisRows[0];
+    if (!analysisRow) {
+      throw serviceError('Analysis not found or does not belong to you', 403);
+    }
+  }
+
+  await db
+    .update(posts)
+    .set({
+      postType,
+      content,
+      analysisId: postType === 'analysis_share' ? data.analysis_id : null,
+      jobData: postType === 'job_share' ? data.job_data : null,
+      careerUpdateType: postType === 'career_update' ? data.career_update_type : null,
+      scheduledAt: parseScheduledAt(data.scheduled_at || data.scheduledAt),
+      updatedAt: new Date()
+    })
+    .where(eq(posts.id, postId));
+
+  const post = await getEnrichedPost(db, postId);
+  if (post && analysisRow) {
+    post.analysis = {
+      company_name: analysisRow.companyName,
+      confidence_score: analysisRow.confidenceScore,
+      gap_analysis_json: analysisRow.gapAnalysisJson,
+      top_skill_gaps: topSkillGaps(analysisRow)
+    };
+  }
+
+  return post;
+}
+
 export async function likePost(db, userId, postId) {
   const updated = await db
     .update(posts)
     .set({ likesCount: sql`${posts.likesCount} + 1`, updatedAt: new Date() })
-    .where(and(eq(posts.id, postId), eq(posts.isVisible, true)))
+    .where(and(eq(posts.id, postId), eq(posts.isVisible, true), PUBLICATION_FILTER))
     .returning({ userId: posts.userId, likesCount: posts.likesCount });
 
   const post = updated[0];
@@ -267,7 +393,7 @@ export async function addComment(db, userId, postId, content) {
   const postRows = await db
     .select({ userId: posts.userId })
     .from(posts)
-    .where(and(eq(posts.id, postId), eq(posts.isVisible, true)))
+    .where(and(eq(posts.id, postId), eq(posts.isVisible, true), PUBLICATION_FILTER))
     .limit(1);
 
   const post = postRows[0];

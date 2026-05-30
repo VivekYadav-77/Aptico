@@ -272,10 +272,12 @@ export const communityWins = pgTable(
     message: text('message'),
     likesCount: integer('likes_count').default(0),
     isVisible: boolean('is_visible').default(true),
+    scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
   },
   (table) => ({
     visibleCreatedAtIdx: index('community_wins_is_visible_created_at_idx').on(table.isVisible, table.createdAt),
+    visibleScheduledAtIdx: index('community_wins_is_visible_scheduled_at_idx').on(table.isVisible, table.scheduledAt),
     userIdIdx: index('community_wins_user_id_idx').on(table.userId)
   })
 );
@@ -319,12 +321,14 @@ export const posts = pgTable(
     likesCount: integer('likes_count').default(0),
     commentsCount: integer('comments_count').default(0),
     isVisible: boolean('is_visible').default(true),
+    scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
   },
   (table) => ({
     userCreatedAtIdx: index('posts_user_id_created_at_idx').on(table.userId, table.createdAt),
     visibleCreatedAtIdx: index('posts_is_visible_created_at_idx').on(table.isVisible, table.createdAt),
+    visibleScheduledAtIdx: index('posts_is_visible_scheduled_at_idx').on(table.isVisible, table.scheduledAt),
     postTypeCheck: check(
       'posts_post_type_check',
       sql`${table.postType} in ('career_update', 'job_tip', 'job_share', 'analysis_share', 'question')`

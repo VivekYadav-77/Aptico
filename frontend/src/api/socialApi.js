@@ -20,6 +20,21 @@ export async function postWin(payload) {
   return response.data;
 }
 
+export async function getMyWins(params = {}) {
+  const response = await api.get('/api/social/wins/mine', { params });
+  return response.data;
+}
+
+export async function updateWin(winId, payload) {
+  const response = await api.put(`/api/social/wins/${winId}`, payload);
+  return response.data;
+}
+
+export async function deleteWin(winId) {
+  const response = await api.delete(`/api/social/wins/${winId}`);
+  return response.data;
+}
+
 export async function likeWin(winId) {
   const response = await api.post(`/api/social/wins/${winId}/like`);
   return response.data;
@@ -85,6 +100,11 @@ export async function getFeedPosts(params = {}) {
   return response.data;
 }
 
+export async function getMyPosts(params = {}) {
+  const response = await api.get('/api/social/posts/mine', { params });
+  return response.data;
+}
+
 export async function getPublicFeedPosts(params = {}) {
   const response = await api.get('/api/social/feed/public', { params });
   return response.data;
@@ -107,6 +127,11 @@ export async function getPostComments(postId, params = {}) {
 
 export async function deleteSocialPost(postId) {
   const response = await api.delete(`/api/social/posts/${postId}`);
+  return response.data;
+}
+
+export async function updateSocialPost(postId, payload) {
+  const response = await api.put(`/api/social/posts/${postId}`, payload);
   return response.data;
 }
 

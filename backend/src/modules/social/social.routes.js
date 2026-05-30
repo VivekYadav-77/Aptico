@@ -25,11 +25,13 @@ import {
   createPost,
   deletePost,
   getFeedPosts,
+  getMyPosts,
   getPostComments,
   getPublicFeedPosts,
-  likePost
+  likePost,
+  updatePost
 } from './post.service.js';
-import { getPublicJobsFeed, getWinsFeed, likeWin, postWin } from './social.service.js';
+import { deleteWin, getMyWins, getPublicJobsFeed, getWinsFeed, likeWin, postWin, updateWin } from './social.service.js';
 import { getUnreadCount } from '../../shared/utils/notification-helper.js';
 
 const USERNAME_PATTERN = /^[a-z0-9_-]{3,30}$/;
@@ -46,7 +48,8 @@ const winBodySchema = z.object({
   role_title: z.string().trim().min(1).max(100),
   company_name: z.string().trim().max(100).optional().nullable(),
   search_duration_weeks: z.number().int().min(1).max(200).optional().nullable(),
-  message: z.string().trim().max(280).optional().nullable()
+  message: z.string().trim().max(280).optional().nullable(),
+  scheduled_at: z.string().datetime().optional().nullable()
 });
 
 const paginationSchema = z.object({
@@ -61,7 +64,8 @@ const postBodySchema = z.object({
   content: z.string().trim().min(1).max(500),
   analysis_id: z.string().uuid().optional().nullable(),
   job_data: z.record(z.any()).optional().nullable(),
-  career_update_type: z.string().optional().nullable()
+  career_update_type: z.string().optional().nullable(),
+  scheduled_at: z.string().datetime().optional().nullable()
 });
 
 const feedQuerySchema = paginationSchema.extend({
@@ -349,6 +353,51 @@ export default async function socialRoutes(app) {
     }
   });
 
+  app.get('/wins/mine', { preHandler: authenticateRequest }, async (request, reply) => {
+    try {
+      const query = paginationSchema.parse(request.query || {});
+      const wins = await getMyWins(request.server.db, request.auth.userId, query);
+      return reply.send({ wins, hasMore: wins.length === query.limit });
+    } catch (error) {
+      return sendError(reply, error, 'Could not load your wins.');
+    }
+  });
+
+  app.put('/wins/:winId', { preHandler: authenticateRequest, config: socialWriteRateLimit }, async (request, reply) => {
+    try {
+      const body = winBodySchema.parse(request.body || {});
+      const win = await updateWin(request.server.db, request.auth.userId, request.params.winId, body);
+      const redis = request.server.services?.redis;
+      if (redis) {
+        await redis.del('platform:stats');
+        const keys = await redis.keys('wins:feed:*');
+        if (keys && keys.length > 0) {
+          await redis.del(...keys);
+        }
+      }
+      return reply.send(win);
+    } catch (error) {
+      return sendError(reply, error, 'Could not update win.');
+    }
+  });
+
+  app.delete('/wins/:winId', { preHandler: authenticateRequest, config: socialWriteRateLimit }, async (request, reply) => {
+    try {
+      const result = await deleteWin(request.server.db, request.auth.userId, request.params.winId);
+      const redis = request.server.services?.redis;
+      if (redis) {
+        await redis.del('platform:stats');
+        const keys = await redis.keys('wins:feed:*');
+        if (keys && keys.length > 0) {
+          await redis.del(...keys);
+        }
+      }
+      return reply.send(result);
+    } catch (error) {
+      return sendError(reply, error, 'Could not delete win.');
+    }
+  });
+
   app.get('/wins', async (request, reply) => {
     try {
       const query = paginationSchema.parse(request.query || {});
@@ -364,7 +413,7 @@ export default async function socialRoutes(app) {
       const totalRows = await request.server.db
         .select({ total: sql`count(*)::int` })
         .from(communityWins)
-        .where(eq(communityWins.isVisible, true));
+        .where(and(eq(communityWins.isVisible, true), or(sql`${communityWins.scheduledAt} is null`, sql`${communityWins.scheduledAt} <= now()`)));
       const payload = { wins, total: totalRows[0]?.total || 0 };
 
       await redis?.set(cacheKey, JSON.stringify(payload), 120);
@@ -440,6 +489,26 @@ export default async function socialRoutes(app) {
       return reply.code(201).send(post);
     } catch (error) {
       return sendError(reply, error, 'Could not create post.');
+    }
+  });
+
+  app.get('/posts/mine', { preHandler: authenticateRequest }, async (request, reply) => {
+    try {
+      const query = feedQuerySchema.omit({ userId: true }).parse(request.query || {});
+      const posts = await getMyPosts(request.server.db, request.auth.userId, query);
+      return reply.send({ posts, hasMore: posts.length === query.limit });
+    } catch (error) {
+      return sendError(reply, error, 'Could not load your posts.');
+    }
+  });
+
+  app.put('/posts/:postId', { preHandler: authenticateRequest, config: socialWriteRateLimit }, async (request, reply) => {
+    try {
+      const body = postBodySchema.parse(request.body || {});
+      const post = await updatePost(request.server.db, request.auth.userId, request.params.postId, body);
+      return reply.send(post);
+    } catch (error) {
+      return sendError(reply, error, 'Could not update post.');
     }
   });
 
