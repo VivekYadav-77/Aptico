@@ -46,7 +46,7 @@ function Reveal({ children, className = '', type = 'fade' }) {
 
 function GoogleButton({ onError, onSuccess }) {
   const buttonRef = useRef(null);
-  const onErrorRef = useRef(onError);
+   const onErrorRef = useRef(onError);
   const onSuccessRef = useRef(onSuccess);
 
   useEffect(() => {
