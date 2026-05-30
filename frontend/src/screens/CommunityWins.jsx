@@ -59,6 +59,8 @@ export default function CommunityWins() {
   const [toast, setToast] = useState('');
   const [form, setForm] = useState(emptyForm);
   const [hideCompany, setHideCompany] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const loader = viewMode === 'mine' ? getMyWins : getWins;
@@ -91,6 +93,7 @@ export default function CommunityWins() {
     setEditingWin(null);
     setForm(emptyForm);
     setHideCompany(false);
+    setError('');
     setModalOpen(true);
   }
 
@@ -104,6 +107,7 @@ export default function CommunityWins() {
       scheduled_at: toDatetimeLocal(win.scheduled_at)
     });
     setHideCompany(!win.company_name);
+    setError('');
     setModalOpen(true);
   }
 
@@ -116,22 +120,31 @@ export default function CommunityWins() {
 
   async function handleSubmit(event) {
     event.preventDefault();
+    setError('');
     const payload = {
       ...form,
       company_name: hideCompany ? null : form.company_name || null,
       scheduled_at: toScheduledIso(form.scheduled_at)
     };
-    const saved = editingWin ? await updateWin(editingWin.id, payload) : await postWin(payload);
-    setWins((current) => {
-      if (editingWin) {
-        return current.map((win) => win.id === saved.id ? saved : win);
-      }
-      return viewMode === 'mine' || !isScheduledFuture(saved.scheduled_at) ? [saved, ...current] : current;
-    });
-    setModalOpen(false);
-    setToast(isScheduledFuture(saved.scheduled_at) ? 'Your win has been scheduled.' : editingWin ? 'Win updated.' : 'Congratulations! Your win has been shared.');
-    setForm(emptyForm);
-    setEditingWin(null);
+    setSubmitting(true);
+
+    try {
+      const saved = editingWin ? await updateWin(editingWin.id, payload) : await postWin(payload);
+      setWins((current) => {
+        if (editingWin) {
+          return current.map((win) => win.id === saved.id ? saved : win);
+        }
+        return viewMode === 'mine' || !isScheduledFuture(saved.scheduled_at) ? [saved, ...current] : current;
+      });
+      setModalOpen(false);
+      setToast(isScheduledFuture(saved.scheduled_at) ? 'Your win has been scheduled.' : editingWin ? 'Win updated.' : 'Congratulations! Your win has been shared.');
+      setForm(emptyForm);
+      setEditingWin(null);
+    } catch (requestError) {
+      setError(requestError.response?.data?.error || 'Could not save this win.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -406,6 +419,12 @@ export default function CommunityWins() {
                 />
                 <span className="mt-2 block text-xs text-[var(--muted-strong)]">Leave empty to publish immediately.</span>
               </label>
+
+              {error ? (
+                <p className="rounded-xl border border-red-500/25 bg-red-500/10 p-3 text-sm font-semibold text-red-500">
+                  {error}
+                </p>
+              ) : null}
             </div>
 
             <div className="mt-8 flex gap-4">
@@ -418,9 +437,10 @@ export default function CommunityWins() {
               </button>
               <button 
                 type="submit" 
+                disabled={submitting}
                 className="group relative flex-[2] flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-3.5 text-sm font-black uppercase tracking-widest text-[#003824] shadow-[0_0_20px_rgba(78,222,163,0.3)] transition-transform hover:scale-[1.02] active:scale-[0.98]"
               >
-                {form.scheduled_at ? 'Schedule Win' : editingWin ? 'Save Win' : 'Broadcast Win'}
+                {submitting ? 'Saving...' : form.scheduled_at ? 'Schedule Win' : editingWin ? 'Save Win' : 'Broadcast Win'}
                 <span className="material-symbols-outlined text-[18px] transition-transform group-hover:translate-x-1">send</span>
               </button>
             </div>

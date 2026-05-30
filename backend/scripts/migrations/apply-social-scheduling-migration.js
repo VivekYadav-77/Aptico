@@ -1,4 +1,12 @@
 import { Client } from 'pg';
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
+
+for (const envFilePath of [resolve(process.cwd(), '.env.local'), resolve(process.cwd(), '.env')]) {
+  if (existsSync(envFilePath) && typeof process.loadEnvFile === 'function') {
+    process.loadEnvFile(envFilePath);
+  }
+}
 
 const migrationSql = `
 ALTER TABLE posts
