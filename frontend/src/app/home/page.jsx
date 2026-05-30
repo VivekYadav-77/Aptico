@@ -1,5 +1,7 @@
-import { redirect } from 'next/navigation';
+import RouteClient from '../route-client.jsx';
+
+export const metadata = { title: 'Feed' };
 
 export default function Page() {
-  redirect('/squads');
+  return <RouteClient name="home" guard="protected" />;
 }

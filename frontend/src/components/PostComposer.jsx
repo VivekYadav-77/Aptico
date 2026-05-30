@@ -31,6 +31,22 @@ function toScheduledIso(value) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+function getMinScheduleValue() {
+  const date = new Date(Date.now() + 60000);
+  date.setSeconds(0, 0);
+  return toDatetimeLocal(date);
+}
+
+function isScheduledFuture(value) {
+  return value && new Date(value).getTime() > Date.now();
+}
+
+function isPastScheduleValue(value) {
+  if (!value) return false;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) || date.getTime() <= Date.now();
+}
+
 export default function PostComposer({ open, onClose, onCreated, onUpdated, recentAnalyses = [], initialJob = null, initialPost = null }) {
   const isEditing = Boolean(initialPost?.id);
   const [step, setStep] = useState(isEditing || initialJob ? 2 : 1);
@@ -44,7 +60,7 @@ export default function PostComposer({ open, onClose, onCreated, onUpdated, rece
     company: initialPost?.job_data?.company || initialJob?.company || '',
     applyUrl: initialPost?.job_data?.applyUrl || initialJob?.applyUrl || initialJob?.apply_url || ''
   });
-  const [scheduledAt, setScheduledAt] = useState(toDatetimeLocal(initialPost?.scheduled_at));
+  const [scheduledAt, setScheduledAt] = useState(isScheduledFuture(initialPost?.scheduled_at) ? toDatetimeLocal(initialPost?.scheduled_at) : '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -65,7 +81,7 @@ export default function PostComposer({ open, onClose, onCreated, onUpdated, rece
       company: initialPost?.job_data?.company || initialJob?.company || '',
       applyUrl: initialPost?.job_data?.applyUrl || initialJob?.applyUrl || initialJob?.apply_url || ''
     });
-    setScheduledAt(toDatetimeLocal(initialPost?.scheduled_at));
+    setScheduledAt(isScheduledFuture(initialPost?.scheduled_at) ? toDatetimeLocal(initialPost?.scheduled_at) : '');
     setError('');
   }, [open, initialPost?.id, initialJob?.id]);
 
@@ -79,7 +95,7 @@ export default function PostComposer({ open, onClose, onCreated, onUpdated, rece
     setContent(initialPost?.content || '');
     setCareerUpdateType(initialPost?.career_update_type || '');
     setAnalysisId(initialPost?.analysis_id || '');
-    setScheduledAt(toDatetimeLocal(initialPost?.scheduled_at));
+    setScheduledAt(isScheduledFuture(initialPost?.scheduled_at) ? toDatetimeLocal(initialPost?.scheduled_at) : '');
     setError('');
     onClose?.();
   }
@@ -100,6 +116,11 @@ export default function PostComposer({ open, onClose, onCreated, onUpdated, rece
 
     if (postType === 'job_share' && (!jobData.title || !jobData.applyUrl)) {
       setError('Add the job title and apply URL.');
+      return;
+    }
+
+    if (isPastScheduleValue(scheduledAt)) {
+      setError('Choose a future date and time, or leave the schedule empty to post immediately.');
       return;
     }
 
@@ -229,6 +250,7 @@ export default function PostComposer({ open, onClose, onCreated, onUpdated, rece
               <input
                 type="datetime-local"
                 className="app-input mt-2"
+                min={getMinScheduleValue()}
                 value={scheduledAt}
                 onChange={(event) => setScheduledAt(event.target.value)}
               />

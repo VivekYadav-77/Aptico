@@ -68,6 +68,10 @@ function parseScheduledAt(value) {
     throw serviceError('Scheduled time is invalid', 400);
   }
 
+  if (scheduledAt.getTime() <= Date.now()) {
+    throw serviceError('Scheduled time must be in the future', 400);
+  }
+
   return scheduledAt;
 }
 

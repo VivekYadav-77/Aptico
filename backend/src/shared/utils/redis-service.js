@@ -86,8 +86,18 @@ export class RedisService {
     return this.request(['EXPIRE', key, ttlSeconds]);
   }
 
-  async del(key) {
-    return this.request(['DEL', key]);
+  async keys(pattern) {
+    return this.request(['KEYS', pattern]);
+  }
+
+  async del(...keys) {
+    const normalizedKeys = keys.flat().filter(Boolean);
+
+    if (!normalizedKeys.length) {
+      return null;
+    }
+
+    return this.request(['DEL', ...normalizedKeys]);
   }
 }
 

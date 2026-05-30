@@ -2,6 +2,8 @@ import crypto from 'node:crypto';
 import { and, desc, eq, lt, or, sql } from 'drizzle-orm';
 import { communityWins, publicJobCache, userProfiles, users } from '../../db/schema.js';
 
+const MAX_WINS_PER_WEEK = 3;
+
 function serviceError(message, statusCode) {
   const error = new Error(message);
   error.statusCode = statusCode;
@@ -21,6 +23,10 @@ function parseScheduledAt(value) {
   const scheduledAt = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(scheduledAt.getTime())) {
     throw serviceError('Scheduled time is invalid', 400);
+  }
+
+  if (scheduledAt.getTime() <= Date.now()) {
+    throw serviceError('Scheduled time must be in the future', 400);
   }
 
   return scheduledAt;
@@ -44,6 +50,44 @@ function selectWinShape() {
       username: userProfiles.username
     }
   };
+}
+
+function getWeekBounds(value) {
+  const date = new Date(value);
+  const start = new Date(date);
+  const day = start.getDay();
+  const daysSinceMonday = (day + 6) % 7;
+
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - daysSinceMonday);
+
+  const end = new Date(start);
+  end.setDate(end.getDate() + 7);
+
+  return { start, end };
+}
+
+async function assertWeeklyWinLimit(db, userId, publicationDate, { excludeWinId = null } = {}) {
+  const { start, end } = getWeekBounds(publicationDate);
+  const filters = [
+    eq(communityWins.userId, userId),
+    eq(communityWins.isVisible, true),
+    sql`coalesce(${communityWins.scheduledAt}, ${communityWins.createdAt}) >= ${start}`,
+    sql`coalesce(${communityWins.scheduledAt}, ${communityWins.createdAt}) < ${end}`
+  ];
+
+  if (excludeWinId) {
+    filters.push(sql`${communityWins.id} <> ${excludeWinId}`);
+  }
+
+  const rows = await db
+    .select({ total: sql`count(*)::int` })
+    .from(communityWins)
+    .where(and(...filters));
+
+  if (Number(rows[0]?.total || 0) >= MAX_WINS_PER_WEEK) {
+    throw serviceError(`You can publish up to ${MAX_WINS_PER_WEEK} community wins per week`, 429);
+  }
 }
 
 function normalizeJobId(job) {
@@ -84,15 +128,7 @@ export async function postWin(db, userId, data) {
     throw serviceError('Message must be 280 characters or less', 400);
   }
 
-  const recentRows = await db
-    .select({ id: communityWins.id })
-    .from(communityWins)
-    .where(and(eq(communityWins.userId, userId), sql`${communityWins.createdAt} > now() - interval '7 days'`))
-    .limit(1);
-
-  if (recentRows[0]) {
-    throw serviceError('You can post one win per week', 429);
-  }
+  await assertWeeklyWinLimit(db, userId, scheduledAt || new Date());
 
   const inserted = await db
     .insert(communityWins)
@@ -165,6 +201,27 @@ export async function updateWin(db, userId, winId, data) {
     throw serviceError('Message must be 280 characters or less', 400);
   }
 
+  const existingRows = await db
+    .select({
+      id: communityWins.id,
+      createdAt: communityWins.createdAt,
+      scheduledAt: communityWins.scheduledAt
+    })
+    .from(communityWins)
+    .where(and(eq(communityWins.id, winId), eq(communityWins.userId, userId), eq(communityWins.isVisible, true)))
+    .limit(1);
+
+  const existingWin = existingRows[0];
+  if (!existingWin) {
+    throw serviceError('You cannot edit this win', 403);
+  }
+
+  const scheduledAt = parseScheduledAt(data.scheduled_at || data.scheduledAt);
+  const existingScheduleIsFuture = existingWin.scheduledAt && new Date(existingWin.scheduledAt).getTime() > Date.now();
+  const publicationDate = scheduledAt || (existingScheduleIsFuture ? new Date() : existingWin.createdAt || new Date());
+
+  await assertWeeklyWinLimit(db, userId, publicationDate, { excludeWinId: winId });
+
   const updated = await db
     .update(communityWins)
     .set({
@@ -172,7 +229,7 @@ export async function updateWin(db, userId, winId, data) {
       companyName,
       searchDurationWeeks: duration === null ? null : Number(duration),
       message,
-      scheduledAt: parseScheduledAt(data.scheduled_at || data.scheduledAt)
+      scheduledAt
     })
     .where(and(eq(communityWins.id, winId), eq(communityWins.userId, userId), eq(communityWins.isVisible, true)))
     .returning({ id: communityWins.id });

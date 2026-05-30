@@ -31,6 +31,12 @@ function isScheduledFuture(value) {
   return value && new Date(value).getTime() > Date.now();
 }
 
+function getMinScheduleValue() {
+  const date = new Date(Date.now() + 60000);
+  date.setSeconds(0, 0);
+  return toDatetimeLocal(date);
+}
+
 function toDatetimeLocal(value) {
   if (!value) return '';
   const date = new Date(value);
@@ -45,6 +51,12 @@ function toScheduledIso(value) {
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
+function isPastScheduleValue(value) {
+  if (!value) return false;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) || date.getTime() <= Date.now();
+}
+
 const emptyForm = { role_title: '', company_name: '', search_duration_weeks: 3, message: '', scheduled_at: '' };
 
 export default function CommunityWins() {
@@ -54,6 +66,7 @@ export default function CommunityWins() {
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
   const [viewMode, setViewMode] = useState('community');
+  const [loadingWins, setLoadingWins] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingWin, setEditingWin] = useState(null);
   const [toast, setToast] = useState('');
@@ -64,11 +77,30 @@ export default function CommunityWins() {
 
   useEffect(() => {
     const loader = viewMode === 'mine' ? getMyWins : getWins;
-    loader({ limit: 20, offset: 0 }).then((result) => {
-      setWins(result.wins || []);
-      setTotal(result.total || 0);
-      setOffset(20);
-    }).catch(() => null);
+    let isActive = true;
+
+    setLoadingWins(true);
+    setWins([]);
+    setTotal(0);
+    setOffset(0);
+
+    loader({ limit: 20, offset: 0 })
+      .then((result) => {
+        if (!isActive) return;
+        setWins(result.wins || []);
+        setTotal(result.total || 0);
+        setOffset(20);
+      })
+      .catch(() => null)
+      .finally(() => {
+        if (isActive) {
+          setLoadingWins(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
   }, [viewMode]);
 
   async function loadMore() {
@@ -104,7 +136,7 @@ export default function CommunityWins() {
       company_name: win.company_name || '',
       search_duration_weeks: win.search_duration_weeks || 3,
       message: win.message || '',
-      scheduled_at: toDatetimeLocal(win.scheduled_at)
+      scheduled_at: isScheduledFuture(win.scheduled_at) ? toDatetimeLocal(win.scheduled_at) : ''
     });
     setHideCompany(!win.company_name);
     setError('');
@@ -121,6 +153,12 @@ export default function CommunityWins() {
   async function handleSubmit(event) {
     event.preventDefault();
     setError('');
+
+    if (isPastScheduleValue(form.scheduled_at)) {
+      setError('Choose a future date and time, or leave the schedule empty to publish immediately.');
+      return;
+    }
+
     const payload = {
       ...form,
       company_name: hideCompany ? null : form.company_name || null,
@@ -198,6 +236,16 @@ export default function CommunityWins() {
         ) : null}
 
         <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {loadingWins ? (
+            [0, 1, 2].map((item) => (
+              <article key={item} className="h-72 animate-pulse rounded-[2rem] border border-[var(--border)] bg-[var(--panel)] p-6">
+                <div className="h-10 w-40 rounded-xl bg-[var(--panel-strong)]" />
+                <div className="mt-8 h-6 w-3/4 rounded-lg bg-[var(--panel-strong)]" />
+                <div className="mt-4 h-4 w-1/2 rounded-lg bg-[var(--panel-strong)]" />
+                <div className="mt-8 h-20 rounded-xl bg-[var(--panel-strong)]" />
+              </article>
+            ))
+          ) : null}
           {wins.map((win) => (
             <article key={win.id} className="group flex flex-col rounded-[2rem] border border-[var(--border)] bg-[var(--panel)] p-6 shadow-xl transition-all hover:border-[var(--accent)]/50 hover:shadow-[0_8px_30px_rgba(78,222,163,0.1)] hover:-translate-y-1">
               <div className="flex items-start justify-between mb-6">
@@ -260,7 +308,7 @@ export default function CommunityWins() {
                   {win.likes_count || 0}
                 </button>
               </div>
-              {viewMode === 'mine' ? (
+              {viewMode === 'mine' && String(win.user_id || '') === String(auth.user?.id || '') ? (
                 <div className="mt-4 grid grid-cols-2 gap-2">
                   <button type="button" className="app-button-secondary px-3 py-2" onClick={() => openEditModal(win)}>
                     <span className="material-symbols-outlined text-[18px]">edit</span>
@@ -276,13 +324,13 @@ export default function CommunityWins() {
           ))}
         </section>
 
-        {wins.length === 0 && !total ? (
+        {!loadingWins && wins.length === 0 && !total ? (
            <div className="flex flex-col items-center justify-center py-20 text-center">
              <span className="material-symbols-outlined text-6xl text-[var(--muted)] mb-4">search_off</span>
              <h3 className="text-xl font-bold text-[var(--text)]">{viewMode === 'mine' ? 'No wins shared yet' : 'No wins recorded yet'}</h3>
              <p className="text-[var(--muted-strong)] mt-2">{viewMode === 'mine' ? 'Your old and scheduled wins will appear here.' : 'Be the first to share your success story.'}</p>
            </div>
-        ) : wins.length < total ? (
+        ) : !loadingWins && wins.length < total ? (
           <div className="mt-12 text-center">
             <button 
               type="button" 
@@ -414,6 +462,7 @@ export default function CommunityWins() {
                 <input
                   type="datetime-local"
                   className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-4 py-3 text-sm font-medium text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]"
+                  min={getMinScheduleValue()}
                   value={form.scheduled_at}
                   onChange={(event) => setForm({ ...form, scheduled_at: event.target.value })}
                 />

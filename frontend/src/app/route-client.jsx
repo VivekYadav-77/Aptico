@@ -12,6 +12,7 @@ import ControlCenter from '../screens/ControlCenter.jsx';
 import DocArticlePage from '../features/docs/pages/DocArticlePage.jsx';
 import DocsHubPage from '../features/docs/pages/DocsHubPage.jsx';
 import GuestDashboard from '../screens/GuestDashboard.jsx';
+import HomeFeed from '../screens/HomeFeed.jsx';
 import InterviewPrepPage from '../screens/InterviewPrepPage.jsx';
 import LatestAnalysisPage from '../screens/LatestAnalysisPage.jsx';
 import MainDashboard from '../screens/MainDashboard.jsx';
@@ -39,6 +40,7 @@ const routes = {
   docArticle: DocArticlePage,
   docsHub: DocsHubPage,
   guest: GuestDashboard,
+  home: HomeFeed,
   interviewPrep: InterviewPrepPage,
   latestAnalysis: LatestAnalysisPage,
   mainDashboard: MainDashboard,

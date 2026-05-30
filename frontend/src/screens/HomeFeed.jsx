@@ -98,36 +98,62 @@ function PostCard({ post, currentUserId, onPostChanged, onDeleted, onEdit }) {
   const [comments, setComments] = useState([]);
   const [comment, setComment] = useState('');
   const [loadingComments, setLoadingComments] = useState(false);
-  const isOwn = post.user_id === currentUserId;
+  const [submittingComment, setSubmittingComment] = useState(false);
+  const [commentError, setCommentError] = useState('');
+  const [actionError, setActionError] = useState('');
+  const isOwn = Boolean(post.user_id && currentUserId && String(post.user_id) === String(currentUserId));
   const [label, className] = typeLabels[post.post_type] || ['Post', 'bg-[var(--panel-soft)] text-[var(--muted-strong)]'];
 
   async function handleLike() {
-    const result = await likePost(post.id);
-    onPostChanged({ ...post, likes_count: result.newLikesCount });
+    setActionError('');
+    try {
+      const result = await likePost(post.id);
+      onPostChanged({ ...post, likes_count: result.newLikesCount });
+    } catch (requestError) {
+      setActionError(requestError.response?.data?.error || requestError.response?.data?.message || 'Could not like this post.');
+    }
   }
 
   async function toggleComments() {
     const next = !commentsOpen;
     setCommentsOpen(next);
     if (next && !comments.length) {
+      setCommentError('');
       setLoadingComments(true);
-      getPostComments(post.id, { limit: 5 }).then(setComments).finally(() => setLoadingComments(false));
+      getPostComments(post.id, { limit: 5 })
+        .then(setComments)
+        .catch((requestError) => setCommentError(requestError.response?.data?.error || 'Could not load comments.'))
+        .finally(() => setLoadingComments(false));
     }
   }
 
   async function submitComment(event) {
     event.preventDefault();
     if (!comment.trim()) return;
-    const created = await addPostComment(post.id, comment);
-    setComments((current) => [...current, created]);
-    setComment('');
-    onPostChanged({ ...post, comments_count: (post.comments_count || 0) + 1 });
+    setCommentError('');
+    setSubmittingComment(true);
+
+    try {
+      const created = await addPostComment(post.id, comment);
+      setComments((current) => [...current, created]);
+      setComment('');
+      onPostChanged({ ...post, comments_count: (post.comments_count || 0) + 1 });
+    } catch (requestError) {
+      setCommentError(requestError.response?.data?.error || requestError.response?.data?.message || 'Could not add this comment.');
+    } finally {
+      setSubmittingComment(false);
+    }
   }
 
   async function handleDelete() {
     if (!window.confirm('Delete this post?')) return;
-    await deleteSocialPost(post.id);
-    onDeleted(post.id);
+    setActionError('');
+    try {
+      await deleteSocialPost(post.id);
+      onDeleted(post.id);
+    } catch (requestError) {
+      setActionError(requestError.response?.data?.error || requestError.response?.data?.message || 'Could not delete this post.');
+    }
   }
 
   return (
@@ -173,10 +199,12 @@ function PostCard({ post, currentUserId, onPostChanged, onDeleted, onEdit }) {
         {isOwn ? <button type="button" className="app-button-secondary px-3 py-2" onClick={() => onEdit?.(post)}><span className="material-symbols-outlined text-[18px]">edit</span>Edit</button> : null}
         {isOwn ? <button type="button" className="app-button-secondary px-3 py-2 text-red-500" onClick={handleDelete}><span className="material-symbols-outlined text-[18px]">delete</span>Delete</button> : null}
       </div>
+      {actionError ? <p className="mt-3 rounded-lg border border-red-500/25 bg-red-500/10 p-3 text-sm font-semibold text-red-500">{actionError}</p> : null}
 
       {commentsOpen ? (
         <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] p-4">
           {loadingComments ? <p className="text-sm text-[var(--muted-strong)]">Loading comments...</p> : null}
+          {commentError ? <p className="mb-3 rounded-lg border border-red-500/25 bg-red-500/10 p-3 text-sm font-semibold text-red-500">{commentError}</p> : null}
           <div className="space-y-3">
             {comments.map((item) => (
               <div key={item.id} className="flex gap-3">
@@ -188,10 +216,10 @@ function PostCard({ post, currentUserId, onPostChanged, onDeleted, onEdit }) {
               </div>
             ))}
           </div>
-          {(post.comments_count || 0) > comments.length ? <button type="button" className="mt-3 text-sm font-bold text-[var(--accent-strong)]" onClick={() => getPostComments(post.id, { limit: 20 }).then(setComments)}>Show all {post.comments_count} comments</button> : null}
+          {(post.comments_count || 0) > comments.length ? <button type="button" className="mt-3 text-sm font-bold text-[var(--accent-strong)]" onClick={() => getPostComments(post.id, { limit: 20 }).then(setComments).catch((requestError) => setCommentError(requestError.response?.data?.error || 'Could not load comments.'))}>Show all {post.comments_count} comments</button> : null}
           <form onSubmit={submitComment} className="mt-4 flex gap-2">
             <input className="app-input" placeholder="Add a comment" value={comment} onChange={(event) => setComment(event.target.value)} maxLength={300} />
-            <button type="submit" className="app-button">Post</button>
+            <button type="submit" className="app-button" disabled={submittingComment}>{submittingComment ? 'Posting...' : 'Post'}</button>
           </form>
         </div>
       ) : null}
