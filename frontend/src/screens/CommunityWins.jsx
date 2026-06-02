@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from '@/lib/router-compat.jsx';
 import { useSelector } from 'react-redux';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
-import { deleteWin, getMyWins, getWins, likeWin, postWin, updateWin } from '../api/socialApi.js';
+import UserListModal from '../components/UserListModal.jsx';
+import { deleteWin, getMyWins, getWins, likeWin, getWinLikers, postWin, updateWin } from '../api/socialApi.js';
 import { selectAuth } from '../store/authSlice.js';
 
 const durationOptions = [
@@ -77,6 +78,7 @@ export default function CommunityWins() {
   const [error, setError] = useState('');
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [likersWinId, setLikersWinId] = useState(null);
 
   useEffect(() => {
     const loader = viewMode === 'mine' ? getMyWins : getWins;
@@ -309,16 +311,24 @@ export default function CommunityWins() {
                   ) : null}
                 </div>
                 
-                <button 
-                  type="button" 
-                  onClick={() => handleLike(win.id)} 
-                  className={`flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider transition-colors group/like ${win.has_liked ? 'text-[var(--accent-strong)]' : 'text-[var(--muted-strong)]'}`}
-                >
-                  <span className={`material-symbols-outlined text-[18px] transition-transform group-hover/like:scale-110 ${win.has_liked ? 'text-[var(--accent-strong)]' : ''}`}>
-                    favorite
-                  </span>
-                  {win.likes_count || 0}
-                </button>
+                <div className="flex items-center">
+                  <button 
+                    type="button" 
+                    onClick={() => handleLike(win.id)} 
+                    className={`flex items-center text-xs font-bold uppercase tracking-wider transition-colors group/like ${win.has_liked ? 'text-[var(--accent-strong)]' : 'text-[var(--muted-strong)] hover:text-[var(--text)]'}`}
+                  >
+                    <span className={`material-symbols-outlined text-[18px] transition-transform group-hover/like:scale-110 ${win.has_liked ? 'text-[var(--accent-strong)]' : ''}`}>
+                      favorite
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLikersWinId(win.id)}
+                    className={`ml-1.5 text-xs font-bold uppercase tracking-wider transition-colors hover:underline ${win.has_liked ? 'text-[var(--accent-strong)]' : 'text-[var(--muted-strong)] hover:text-[var(--text)]'}`}
+                  >
+                    {win.likes_count || 0}
+                  </button>
+                </div>
               </div>
               {viewMode === 'mine' && String(win.user_id || '') === String(auth.user?.id || '') ? (
                 <div className="mt-4 grid grid-cols-2 gap-2">
@@ -516,6 +526,13 @@ export default function CommunityWins() {
         loading={deleting}
         onCancel={() => setDeleteTarget(null)}
         onConfirm={handleDelete}
+      />
+      <UserListModal
+        isOpen={Boolean(likersWinId)}
+        onClose={() => setLikersWinId(null)}
+        title="Liked by"
+        fetchData={() => getWinLikers(likersWinId)}
+        emptyMessage="No one has liked this win yet."
       />
     </main>
   );

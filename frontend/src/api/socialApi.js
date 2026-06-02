@@ -40,6 +40,11 @@ export async function likeWin(winId) {
   return response.data;
 }
 
+export async function getWinLikers(winId, params = {}) {
+  const response = await api.get(`/api/social/wins/${winId}/likes`, { params });
+  return response.data.likers || [];
+}
+
 export async function getPublicProfile(username) {
   const response = await api.get(`/api/social/profile/${username}`);
   return response.data;
@@ -113,6 +118,11 @@ export async function getPublicFeedPosts(params = {}) {
 export async function likePost(postId) {
   const response = await api.post(`/api/social/posts/${postId}/like`);
   return response.data;
+}
+
+export async function getPostLikers(postId, params = {}) {
+  const response = await api.get(`/api/social/posts/${postId}/likes`, { params });
+  return response.data.likers || [];
 }
 
 export async function addPostComment(postId, content, parent_id = null) {

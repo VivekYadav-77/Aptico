@@ -297,6 +297,26 @@ export async function likeWin(db, userId, winId) {
   }
 }
 
+export async function getWinLikers(db, winId, { limit = 20, offset = 0 } = {}) {
+  const rows = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      avatarUrl: users.avatarUrl,
+      username: userProfiles.username,
+      headline: userProfiles.headline
+    })
+    .from(winLikes)
+    .innerJoin(users, eq(winLikes.userId, users.id))
+    .leftJoin(userProfiles, eq(winLikes.userId, userProfiles.userId))
+    .where(eq(winLikes.winId, winId))
+    .orderBy(desc(winLikes.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  return rows;
+}
+
 export async function getPublicJobsFeed(db, { limit = 30, offset = 0, jobType = null } = {}) {
   const filters = [or(lt(publicJobCache.ghostScore, 60), sql`${publicJobCache.ghostScore} is null`)];
 

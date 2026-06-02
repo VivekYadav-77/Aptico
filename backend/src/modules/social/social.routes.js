@@ -29,10 +29,11 @@ import {
   getPostComments,
   getPublicFeedPosts,
   likePost,
+  getPostLikers,
   toggleCommentLike,
   updatePost
 } from './post.service.js';
-import { deleteWin, getMyWins, getPublicJobsFeed, getWinsFeed, likeWin, postWin, updateWin } from './social.service.js';
+import { deleteWin, getMyWins, getPublicJobsFeed, getWinsFeed, likeWin, getWinLikers, postWin, updateWin } from './social.service.js';
 import { getUnreadCount } from '../../shared/utils/notification-helper.js';
 
 const USERNAME_PATTERN = /^[a-z0-9_-]{3,30}$/;
@@ -434,6 +435,16 @@ export default async function socialRoutes(app) {
     }
   });
 
+  app.get('/wins/:winId/likes', { preHandler: optionalAuthenticateRequest }, async (request, reply) => {
+    try {
+      const query = paginationSchema.parse(request.query || {});
+      const likers = await getWinLikers(request.server.db, request.params.winId, query);
+      return reply.send({ likers });
+    } catch (error) {
+      return sendError(reply, error, 'Could not load win likers.');
+    }
+  });
+
   app.get('/public-jobs', async (request, reply) => {
     try {
       const query = paginationSchema.extend({ limit: z.coerce.number().int().min(1).max(50).default(30), jobType: z.string().trim().optional() }).parse(request.query || {});
@@ -550,6 +561,16 @@ export default async function socialRoutes(app) {
       return reply.send(result);
     } catch (error) {
       return sendError(reply, error, 'Could not like post.');
+    }
+  });
+
+  app.get('/posts/:postId/likes', { preHandler: optionalAuthenticateRequest }, async (request, reply) => {
+    try {
+      const query = paginationSchema.parse(request.query || {});
+      const likers = await getPostLikers(request.server.db, request.params.postId, query);
+      return reply.send({ likers });
+    } catch (error) {
+      return sendError(reply, error, 'Could not load post likers.');
     }
   });
 

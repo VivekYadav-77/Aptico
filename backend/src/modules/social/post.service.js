@@ -405,6 +405,26 @@ export async function likePost(db, userId, postId) {
   }
 }
 
+export async function getPostLikers(db, postId, { limit = 20, offset = 0 } = {}) {
+  const rows = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      avatarUrl: users.avatarUrl,
+      username: userProfiles.username,
+      headline: userProfiles.headline
+    })
+    .from(postLikes)
+    .innerJoin(users, eq(postLikes.userId, users.id))
+    .leftJoin(userProfiles, eq(postLikes.userId, userProfiles.userId))
+    .where(eq(postLikes.postId, postId))
+    .orderBy(desc(postLikes.createdAt))
+    .limit(normalizeLimit(limit))
+    .offset(normalizeOffset(offset));
+
+  return rows;
+}
+
 export async function addComment(db, userId, postId, content, parentId = null) {
   const trimmed = String(content || '').trim();
 

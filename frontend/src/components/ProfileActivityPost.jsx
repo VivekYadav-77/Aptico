@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { deleteSocialPost, likePost } from '../api/socialApi.js';
+import { deleteSocialPost, likePost, getPostLikers } from '../api/socialApi.js';
 import ConfirmDialog from './ConfirmDialog.jsx';
 import PostComments from './PostComments.jsx';
+import UserListModal from './UserListModal.jsx';
 
 function initials(name) {
   return String(name || 'U').trim().charAt(0).toUpperCase() || 'U';
@@ -14,6 +15,7 @@ function postTypeLabel(value) {
 export default function ProfileActivityPost({ post, currentUserId, onPostChanged, onDeleted, onEdit }) {
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
   const [hasLiked, setHasLiked] = useState(post.has_liked || false);
+  const [likersOpen, setLikersOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -68,14 +70,22 @@ export default function ProfileActivityPost({ post, currentUserId, onPostChanged
       <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-[var(--text)]">{post.content}</p>
 
       <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[var(--border)]/60 pt-3">
-        <button
-          type="button"
-          onClick={handleLike}
-          className={`flex items-center gap-1.5 text-xs font-bold transition-all ${hasLiked ? 'text-pink-500' : 'text-[var(--muted-strong)]'}`}
-        >
-          <span className="material-symbols-outlined text-[18px]">favorite</span>
-          {likesCount} {likesCount === 1 ? 'Like' : 'Likes'}
-        </button>
+        <div className="flex items-center">
+          <button
+            type="button"
+            onClick={handleLike}
+            className={`flex items-center gap-1.5 py-1 px-2 text-xs font-bold transition-all rounded-l border border-r-0 ${hasLiked ? 'text-pink-500 bg-pink-500/10 border-pink-500/30' : 'text-[var(--muted-strong)] border-transparent hover:bg-[var(--panel)]'}`}
+          >
+            <span className="material-symbols-outlined text-[18px]">favorite</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setLikersOpen(true)}
+            className={`flex items-center py-1 px-2 text-xs font-bold transition-all rounded-r border ${hasLiked ? 'text-pink-500 bg-pink-500/10 border-pink-500/30 border-l-[rgba(236,72,153,0.3)]' : 'text-[var(--muted-strong)] border-transparent hover:bg-[var(--panel)] border-l-[var(--border)]'}`}
+          >
+            {likesCount} {likesCount === 1 ? 'Like' : 'Likes'}
+          </button>
+        </div>
         <button
           type="button"
           onClick={toggleComments}
@@ -110,6 +120,13 @@ export default function ProfileActivityPost({ post, currentUserId, onPostChanged
       loading={deleting}
       onCancel={() => setDeleteOpen(false)}
       onConfirm={handleDelete}
+    />
+    <UserListModal
+      isOpen={likersOpen}
+      onClose={() => setLikersOpen(false)}
+      title="Liked by"
+      fetchData={() => getPostLikers(post.id)}
+      emptyMessage="No one has liked this post yet."
     />
     </>
   );
