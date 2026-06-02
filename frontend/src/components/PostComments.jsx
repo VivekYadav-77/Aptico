@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
-import { addPostComment, getPostComments, likeComment } from '../api/socialApi.js';
+import { useSelector } from 'react-redux';
+import { addPostComment, getPostComments, likeComment, deletePostComment } from '../api/socialApi.js';
+import { selectAuth } from '../store/authSlice.js';
+import ConfirmDialog from './ConfirmDialog.jsx';
 
 function timeAgo(value) {
   if (!value) return '';
@@ -26,7 +29,7 @@ function Avatar({ user, size = 32 }) {
   );
 }
 
-function CommentItem({ comment, onLike, onReply, isReply = false }) {
+function CommentItem({ comment, onLike, onReply, onDelete, isReply = false, currentUserId }) {
   const displayName = comment.user?.name || comment.user?.username || 'Member';
 
   return (
@@ -47,6 +50,11 @@ function CommentItem({ comment, onLike, onReply, isReply = false }) {
               Reply
             </button>
           )}
+          {String(comment.user_id || comment.user?.id) === String(currentUserId) && (
+            <button type="button" onClick={() => onDelete(comment.id)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontWeight: 700, fontSize: 11, color: '#ef4444' }}>
+              Delete
+            </button>
+          )}
         </div>
       </div>
       <button type="button" onClick={() => onLike(comment.id)} style={{ background: 'none', border: 'none', padding: '4px 0 0 0', cursor: 'pointer', flexShrink: 0 }}>
@@ -59,9 +67,13 @@ function CommentItem({ comment, onLike, onReply, isReply = false }) {
 }
 
 export default function PostComments({ postId, initialCommentsCount, onCommentAdded }) {
+  const auth = useSelector(selectAuth);
+  const currentUserId = auth?.user?.id;
   const [comments, setComments] = useState([]);
   const [text, setText] = useState('');
   const [replyingTo, setReplyingTo] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
@@ -106,6 +118,22 @@ export default function PostComments({ postId, initialCommentsCount, onCommentAd
     } catch (err) {}
   }
 
+  function handleDelete(commentId) {
+    setDeleteTarget(commentId);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await deletePostComment(deleteTarget);
+      setComments((cur) => cur.filter((c) => c.id !== deleteTarget));
+      setTotalCount((c) => Math.max(c - 1, 0));
+      setDeleteTarget(null);
+    } catch (err) {}
+    setDeleting(false);
+  }
+
   function handleReply(comment) {
     setReplyingTo(comment);
     setText(`@${comment.user?.username || comment.user?.name || 'user'} `);
@@ -114,6 +142,7 @@ export default function PostComments({ postId, initialCommentsCount, onCommentAd
   const topLevel = comments.filter((c) => !c.parent_id);
 
   return (
+    <>
     <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
       {/* Comments list */}
       {loading && !hasLoaded ? (
@@ -124,11 +153,11 @@ export default function PostComments({ postId, initialCommentsCount, onCommentAd
             const replies = comments.filter((c) => c.parent_id === item.id);
             return (
               <div key={item.id}>
-                <CommentItem comment={item} onLike={handleLike} onReply={handleReply} />
+                <CommentItem comment={item} onLike={handleLike} onReply={handleReply} onDelete={handleDelete} currentUserId={currentUserId} />
                 {replies.length > 0 && (
                   <div style={{ marginLeft: 42, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8, borderLeft: '2px solid var(--border)', paddingLeft: 12 }}>
                     {replies.map((reply) => (
-                      <CommentItem key={reply.id} comment={reply} onLike={handleLike} onReply={handleReply} isReply />
+                      <CommentItem key={reply.id} comment={reply} onLike={handleLike} onReply={handleReply} onDelete={handleDelete} currentUserId={currentUserId} isReply />
                     ))}
                   </div>
                 )}
@@ -184,5 +213,15 @@ export default function PostComments({ postId, initialCommentsCount, onCommentAd
         </button>
       </form>
     </div>
+    <ConfirmDialog
+      open={Boolean(deleteTarget)}
+      title="Delete this comment?"
+      description="This action cannot be undone and the comment will be permanently removed."
+      confirmLabel="Delete"
+      loading={deleting}
+      onCancel={() => setDeleteTarget(null)}
+      onConfirm={confirmDelete}
+    />
+    </>
   );
 }

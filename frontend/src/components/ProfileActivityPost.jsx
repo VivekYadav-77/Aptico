@@ -70,7 +70,7 @@ export default function ProfileActivityPost({ post, currentUserId, onPostChanged
       <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-[var(--text)]">{post.content}</p>
 
       <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[var(--border)]/60 pt-3">
-        <div className="flex items-center">
+        <div className="flex items-stretch">
           <button
             type="button"
             onClick={handleLike}

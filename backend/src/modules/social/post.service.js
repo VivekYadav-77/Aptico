@@ -405,6 +405,28 @@ export async function likePost(db, userId, postId) {
   }
 }
 
+export async function deleteComment(db, userId, commentId) {
+  const commentRows = await db
+    .select({ id: postComments.id, postId: postComments.postId })
+    .from(postComments)
+    .where(and(eq(postComments.id, commentId), eq(postComments.userId, userId)))
+    .limit(1);
+
+  const comment = commentRows[0];
+  if (!comment) {
+    throw serviceError('Comment not found or you do not have permission to delete it', 403);
+  }
+
+  await db.delete(postComments).where(eq(postComments.id, commentId));
+
+  await db
+    .update(posts)
+    .set({ commentsCount: sql`GREATEST(${posts.commentsCount} - 1, 0)`, updatedAt: new Date() })
+    .where(eq(posts.id, comment.postId));
+
+  return { success: true };
+}
+
 export async function getPostLikers(db, postId, { limit = 20, offset = 0 } = {}) {
   const rows = await db
     .select({

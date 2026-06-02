@@ -142,6 +142,11 @@ export async function likeComment(commentId) {
   return response.data;
 }
 
+export async function deletePostComment(commentId) {
+  const response = await api.delete(`/api/social/comments/${commentId}`);
+  return response.data;
+}
+
 export async function deleteSocialPost(postId) {
   const response = await api.delete(`/api/social/posts/${postId}`);
   return response.data;

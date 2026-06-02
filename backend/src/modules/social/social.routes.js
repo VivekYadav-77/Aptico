@@ -23,6 +23,7 @@ import {
 import {
   addComment,
   createPost,
+  deleteComment,
   deletePost,
   getFeedPosts,
   getMyPosts,
@@ -590,6 +591,15 @@ export default async function socialRoutes(app) {
       return reply.send(result);
     } catch (error) {
       return sendError(reply, error, 'Could not like comment.');
+    }
+  });
+
+  app.delete('/comments/:commentId', { preHandler: authenticateRequest, config: socialStrictRateLimit }, async (request, reply) => {
+    try {
+      const result = await deleteComment(request.server.db, request.auth.userId, request.params.commentId);
+      return reply.send(result);
+    } catch (error) {
+      return sendError(reply, error, 'Could not delete comment.');
     }
   });
 
