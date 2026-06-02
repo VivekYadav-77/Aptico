@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { deleteSocialPost, likePost, getPostLikers } from '../api/socialApi.js';
 import ConfirmDialog from './ConfirmDialog.jsx';
 import PostComments from './PostComments.jsx';
@@ -22,16 +22,44 @@ export default function ProfileActivityPost({ post, currentUserId, onPostChanged
   const [error, setError] = useState('');
   const isOwn = Boolean(post.user_id && currentUserId && String(post.user_id) === String(currentUserId));
 
+  const pendingLikeState = useRef(post.has_liked || false);
+  const debounceTimeout = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+    };
+  }, []);
+
   async function handleLike() {
     setError('');
-    try {
-      const result = await likePost(post.id);
-      setLikesCount(result.newLikesCount);
-      setHasLiked(result.liked);
-      onPostChanged?.({ ...post, likes_count: result.newLikesCount, has_liked: result.liked });
-    } catch (requestError) {
-      setError(requestError.response?.data?.error || requestError.response?.data?.message || 'Could not like this post.');
+    
+    // Optimistic Update
+    const nextState = !pendingLikeState.current;
+    pendingLikeState.current = nextState;
+    setHasLiked(nextState);
+    setLikesCount((prev) => (nextState ? prev + 1 : Math.max(prev - 1, 0)));
+
+    if (debounceTimeout.current) {
+      clearTimeout(debounceTimeout.current);
     }
+
+    debounceTimeout.current = setTimeout(async () => {
+      try {
+        const result = await likePost(post.id);
+        setLikesCount(result.newLikesCount);
+        setHasLiked(result.liked);
+        pendingLikeState.current = result.liked;
+        onPostChanged?.({ ...post, likes_count: result.newLikesCount, has_liked: result.liked });
+      } catch (requestError) {
+        // Rollback on failure
+        const rollbackState = !nextState;
+        setHasLiked(rollbackState);
+        setLikesCount((prev) => (rollbackState ? prev + 1 : Math.max(prev - 1, 0)));
+        pendingLikeState.current = rollbackState;
+        setError(requestError.response?.data?.error || requestError.response?.data?.message || 'Could not like this post.');
+      }
+    }, 400);
   }
 
   function toggleComments() {

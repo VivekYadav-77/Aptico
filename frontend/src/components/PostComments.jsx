@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSelector } from 'react-redux';
 import { addPostComment, getPostComments, likeComment, deletePostComment } from '../api/socialApi.js';
 import { selectAuth } from '../store/authSlice.js';
@@ -79,6 +79,15 @@ export default function PostComments({ postId, initialCommentsCount, onCommentAd
   const [hasLoaded, setHasLoaded] = useState(false);
   const [totalCount, setTotalCount] = useState(initialCommentsCount || 0);
 
+  const debounceTimeouts = useRef({});
+  const pendingLikeStates = useRef({});
+
+  useEffect(() => {
+    return () => {
+      Object.values(debounceTimeouts.current).forEach(clearTimeout);
+    };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -112,10 +121,43 @@ export default function PostComments({ postId, initialCommentsCount, onCommentAd
   }
 
   async function handleLike(commentId) {
-    try {
-      const res = await likeComment(commentId);
-      setComments((cur) => cur.map((c) => c.id === commentId ? { ...c, likes_count: res.newLikesCount, has_liked: res.liked } : c));
-    } catch (err) {}
+    const comment = comments.find((c) => c.id === commentId);
+    if (!comment) return;
+
+    const nextState = !comment.has_liked;
+    pendingLikeStates.current[commentId] = nextState;
+
+    setComments((cur) =>
+      cur.map((c) =>
+        c.id === commentId
+          ? { ...c, has_liked: nextState, likes_count: nextState ? c.likes_count + 1 : Math.max(c.likes_count - 1, 0) }
+          : c
+      )
+    );
+
+    if (debounceTimeouts.current[commentId]) {
+      clearTimeout(debounceTimeouts.current[commentId]);
+    }
+
+    debounceTimeouts.current[commentId] = setTimeout(async () => {
+      try {
+        const res = await likeComment(commentId);
+        setComments((cur) =>
+          cur.map((c) => (c.id === commentId ? { ...c, likes_count: res.newLikesCount, has_liked: res.liked } : c))
+        );
+        pendingLikeStates.current[commentId] = res.liked;
+      } catch (err) {
+        const rollbackState = !nextState;
+        setComments((cur) =>
+          cur.map((c) =>
+            c.id === commentId
+              ? { ...c, has_liked: rollbackState, likes_count: rollbackState ? c.likes_count + 1 : Math.max(c.likes_count - 1, 0) }
+              : c
+          )
+        );
+        pendingLikeStates.current[commentId] = rollbackState;
+      }
+    }, 400);
   }
 
   function handleDelete(commentId) {
