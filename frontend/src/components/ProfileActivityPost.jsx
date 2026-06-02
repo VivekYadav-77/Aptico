@@ -13,6 +13,7 @@ function postTypeLabel(value) {
 
 export default function ProfileActivityPost({ post, currentUserId, onPostChanged, onDeleted, onEdit }) {
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
+  const [hasLiked, setHasLiked] = useState(post.has_liked || false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -24,7 +25,8 @@ export default function ProfileActivityPost({ post, currentUserId, onPostChanged
     try {
       const result = await likePost(post.id);
       setLikesCount(result.newLikesCount);
-      onPostChanged?.({ ...post, likes_count: result.newLikesCount });
+      setHasLiked(result.liked);
+      onPostChanged?.({ ...post, likes_count: result.newLikesCount, has_liked: result.liked });
     } catch (requestError) {
       setError(requestError.response?.data?.error || requestError.response?.data?.message || 'Could not like this post.');
     }
@@ -69,7 +71,7 @@ export default function ProfileActivityPost({ post, currentUserId, onPostChanged
         <button
           type="button"
           onClick={handleLike}
-          className="flex items-center gap-1.5 text-xs font-bold text-[var(--muted-strong)] transition-all hover:text-pink-500"
+          className={`flex items-center gap-1.5 text-xs font-bold transition-all ${hasLiked ? 'text-pink-500' : 'text-[var(--muted-strong)]'}`}
         >
           <span className="material-symbols-outlined text-[18px]">favorite</span>
           {likesCount} {likesCount === 1 ? 'Like' : 'Likes'}

@@ -107,7 +107,7 @@ function PostCard({ post, currentUserId, onPostChanged, onDeleted, onEdit }) {
     setActionError('');
     try {
       const result = await likePost(post.id);
-      onPostChanged({ ...post, likes_count: result.newLikesCount });
+      onPostChanged({ ...post, likes_count: result.newLikesCount, has_liked: result.liked });
     } catch (requestError) {
       setActionError(requestError.response?.data?.error || requestError.response?.data?.message || 'Could not like this post.');
     }
@@ -166,7 +166,7 @@ function PostCard({ post, currentUserId, onPostChanged, onDeleted, onEdit }) {
       {post.post_type === 'question' ? <p className="mt-3 text-sm font-semibold text-[var(--muted-strong)]">{post.comments_count || 0} answers</p> : null}
 
       <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-[var(--border)] pt-4">
-        <button type="button" className="app-button-secondary px-3 py-2" onClick={handleLike}>
+        <button type="button" className={`px-3 py-2 ${post.has_liked ? 'app-button' : 'app-button-secondary'}`} onClick={handleLike}>
           <span className="material-symbols-outlined text-[18px]">thumb_up</span>{post.likes_count || 0}
         </button>
         <button type="button" className="app-button-secondary px-3 py-2" onClick={toggleComments}>

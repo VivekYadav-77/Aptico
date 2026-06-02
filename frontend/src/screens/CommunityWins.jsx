@@ -121,7 +121,7 @@ export default function CommunityWins() {
     }
 
     const result = await likeWin(winId);
-    setWins((current) => current.map((win) => win.id === winId ? { ...win, likes_count: result.newLikesCount } : win));
+    setWins((current) => current.map((win) => win.id === winId ? { ...win, likes_count: result.newLikesCount, has_liked: result.liked } : win));
   }
 
   function openCreateModal() {
@@ -312,9 +312,9 @@ export default function CommunityWins() {
                 <button 
                   type="button" 
                   onClick={() => handleLike(win.id)} 
-                  className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[var(--muted-strong)] hover:text-[var(--accent-strong)] transition-colors group/like"
+                  className={`flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider transition-colors group/like ${win.has_liked ? 'text-[var(--accent-strong)]' : 'text-[var(--muted-strong)]'}`}
                 >
-                  <span className={`material-symbols-outlined text-[18px] transition-transform group-hover/like:scale-110 ${win.likes_count > 0 ? 'text-[var(--accent-strong)]' : ''}`}>
+                  <span className={`material-symbols-outlined text-[18px] transition-transform group-hover/like:scale-110 ${win.has_liked ? 'text-[var(--accent-strong)]' : ''}`}>
                     favorite
                   </span>
                   {win.likes_count || 0}
