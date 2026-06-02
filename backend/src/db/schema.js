@@ -532,6 +532,40 @@ export const applicationLogs = pgTable(
   })
 );
 
+export const postLikes = pgTable(
+  'post_likes',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    postId: uuid('post_id')
+      .notNull()
+      .references(() => posts.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
+  },
+  (table) => ({
+    postUserIdx: uniqueIndex('post_likes_post_id_user_id_idx').on(table.postId, table.userId)
+  })
+);
+
+export const winLikes = pgTable(
+  'win_likes',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    winId: uuid('win_id')
+      .notNull()
+      .references(() => communityWins.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
+  },
+  (table) => ({
+    winUserIdx: uniqueIndex('win_likes_win_id_user_id_idx').on(table.winId, table.userId)
+  })
+);
+
 export const usersRelations = relations(users, ({ many }) => ({
   refreshTokens: many(refreshTokens),
   authTokens: many(authTokens),

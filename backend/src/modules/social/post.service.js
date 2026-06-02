@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm';
-import { analyses, follows, postComments, commentLikes, posts, userProfiles, users } from '../../db/schema.js';
+import { analyses, follows, postComments, commentLikes, postLikes, posts, userProfiles, users } from '../../db/schema.js';
 import { createNotification } from '../../shared/utils/notification-helper.js';
 
 const POST_TYPES = new Set(['career_update', 'job_tip', 'job_share', 'analysis_share', 'question']);
@@ -357,30 +357,52 @@ export async function updatePost(db, userId, postId, data) {
 }
 
 export async function likePost(db, userId, postId) {
-  const updated = await db
-    .update(posts)
-    .set({ likesCount: sql`${posts.likesCount} + 1`, updatedAt: new Date() })
-    .where(and(eq(posts.id, postId), eq(posts.isVisible, true), PUBLICATION_FILTER))
-    .returning({ userId: posts.userId, likesCount: posts.likesCount });
+  const existingRows = await db
+    .select({ id: postLikes.id })
+    .from(postLikes)
+    .where(and(eq(postLikes.postId, postId), eq(postLikes.userId, userId)))
+    .limit(1);
 
-  const post = updated[0];
-  if (!post) {
-    throw serviceError('Post not found', 404);
+  const existing = existingRows[0];
+
+  if (existing) {
+    await db.delete(postLikes).where(eq(postLikes.id, existing.id));
+    const updated = await db
+      .update(posts)
+      .set({ likesCount: sql`${posts.likesCount} - 1`, updatedAt: new Date() })
+      .where(and(eq(posts.id, postId), eq(posts.isVisible, true), PUBLICATION_FILTER))
+      .returning({ userId: posts.userId, likesCount: posts.likesCount });
+      
+    if (!updated[0]) throw serviceError('Post not found', 404);
+    
+    return { success: true, liked: false, newLikesCount: updated[0].likesCount };
+  } else {
+    await db.insert(postLikes).values({ postId, userId });
+    const updated = await db
+      .update(posts)
+      .set({ likesCount: sql`${posts.likesCount} + 1`, updatedAt: new Date() })
+      .where(and(eq(posts.id, postId), eq(posts.isVisible, true), PUBLICATION_FILTER))
+      .returning({ userId: posts.userId, likesCount: posts.likesCount });
+
+    const post = updated[0];
+    if (!post) {
+      throw serviceError('Post not found', 404);
+    }
+
+    if (post.userId !== userId) {
+      const actorName = await getActorName(db, userId);
+      createNotification(db, {
+        userId: post.userId,
+        type: 'post_like',
+        actorId: userId,
+        entityId: postId,
+        entityType: 'post',
+        message: `${actorName} liked your post`
+      });
+    }
+
+    return { success: true, liked: true, newLikesCount: post.likesCount };
   }
-
-  if (post.userId !== userId) {
-    const actorName = await getActorName(db, userId);
-    createNotification(db, {
-      userId: post.userId,
-      type: 'post_like',
-      actorId: userId,
-      entityId: postId,
-      entityType: 'post',
-      message: `${actorName} liked your post`
-    });
-  }
-
-  return { success: true, newLikesCount: post.likesCount };
 }
 
 export async function addComment(db, userId, postId, content, parentId = null) {

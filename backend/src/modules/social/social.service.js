@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { and, desc, eq, lt, or, sql } from 'drizzle-orm';
-import { communityWins, publicJobCache, userProfiles, users } from '../../db/schema.js';
+import { communityWins, publicJobCache, userProfiles, users, winLikes } from '../../db/schema.js';
 
 const MAX_WINS_PER_WEEK = 3;
 
@@ -264,17 +264,37 @@ export async function deleteWin(db, userId, winId) {
 }
 
 export async function likeWin(db, userId, winId) {
-  const rows = await db
-    .update(communityWins)
-    .set({ likesCount: sql`${communityWins.likesCount} + 1` })
-    .where(and(eq(communityWins.id, winId), eq(communityWins.isVisible, true), or(sql`${communityWins.scheduledAt} is null`, sql`${communityWins.scheduledAt} <= now()`)))
-    .returning({ likesCount: communityWins.likesCount });
+  const existingRows = await db
+    .select({ id: winLikes.id })
+    .from(winLikes)
+    .where(and(eq(winLikes.winId, winId), eq(winLikes.userId, userId)))
+    .limit(1);
 
-  if (!rows[0]) {
-    throw serviceError('Win not found', 404);
+  const existing = existingRows[0];
+
+  if (existing) {
+    await db.delete(winLikes).where(eq(winLikes.id, existing.id));
+    const rows = await db
+      .update(communityWins)
+      .set({ likesCount: sql`${communityWins.likesCount} - 1` })
+      .where(and(eq(communityWins.id, winId), eq(communityWins.isVisible, true), or(sql`${communityWins.scheduledAt} is null`, sql`${communityWins.scheduledAt} <= now()`)))
+      .returning({ likesCount: communityWins.likesCount });
+
+    if (!rows[0]) throw serviceError('Win not found', 404);
+
+    return { success: true, liked: false, newLikesCount: rows[0].likesCount };
+  } else {
+    await db.insert(winLikes).values({ winId, userId });
+    const rows = await db
+      .update(communityWins)
+      .set({ likesCount: sql`${communityWins.likesCount} + 1` })
+      .where(and(eq(communityWins.id, winId), eq(communityWins.isVisible, true), or(sql`${communityWins.scheduledAt} is null`, sql`${communityWins.scheduledAt} <= now()`)))
+      .returning({ likesCount: communityWins.likesCount });
+
+    if (!rows[0]) throw serviceError('Win not found', 404);
+
+    return { success: true, liked: true, newLikesCount: rows[0].likesCount };
   }
-
-  return { success: true, newLikesCount: rows[0].likesCount };
 }
 
 export async function getPublicJobsFeed(db, { limit = 30, offset = 0, jobType = null } = {}) {
