@@ -3,6 +3,7 @@ import { Link } from '@/lib/router-compat.jsx';
 import { useSelector } from 'react-redux';
 import AppShell from '../components/AppShell.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
+import PostComments from '../components/PostComments.jsx';
 import PostComposer from '../components/PostComposer.jsx';
 import {
   addPostComment,
@@ -96,11 +97,6 @@ function AnalysisCard({ analysis, isOwn }) {
 
 function PostCard({ post, currentUserId, onPostChanged, onDeleted, onEdit }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const [comments, setComments] = useState([]);
-  const [comment, setComment] = useState('');
-  const [loadingComments, setLoadingComments] = useState(false);
-  const [submittingComment, setSubmittingComment] = useState(false);
-  const [commentError, setCommentError] = useState('');
   const [actionError, setActionError] = useState('');
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -117,35 +113,8 @@ function PostCard({ post, currentUserId, onPostChanged, onDeleted, onEdit }) {
     }
   }
 
-  async function toggleComments() {
-    const next = !commentsOpen;
-    setCommentsOpen(next);
-    if (next && !comments.length) {
-      setCommentError('');
-      setLoadingComments(true);
-      getPostComments(post.id, { limit: 5 })
-        .then(setComments)
-        .catch((requestError) => setCommentError(requestError.response?.data?.error || 'Could not load comments.'))
-        .finally(() => setLoadingComments(false));
-    }
-  }
-
-  async function submitComment(event) {
-    event.preventDefault();
-    if (!comment.trim()) return;
-    setCommentError('');
-    setSubmittingComment(true);
-
-    try {
-      const created = await addPostComment(post.id, comment);
-      setComments((current) => [...current, created]);
-      setComment('');
-      onPostChanged({ ...post, comments_count: (post.comments_count || 0) + 1 });
-    } catch (requestError) {
-      setCommentError(requestError.response?.data?.error || requestError.response?.data?.message || 'Could not add this comment.');
-    } finally {
-      setSubmittingComment(false);
-    }
+  function toggleComments() {
+    setCommentsOpen(!commentsOpen);
   }
 
   async function handleDelete() {
@@ -208,28 +177,7 @@ function PostCard({ post, currentUserId, onPostChanged, onDeleted, onEdit }) {
       </div>
       {actionError ? <p className="mt-3 rounded-lg border border-red-500/25 bg-red-500/10 p-3 text-sm font-semibold text-red-500">{actionError}</p> : null}
 
-      {commentsOpen ? (
-        <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] p-4">
-          {loadingComments ? <p className="text-sm text-[var(--muted-strong)]">Loading comments...</p> : null}
-          {commentError ? <p className="mb-3 rounded-lg border border-red-500/25 bg-red-500/10 p-3 text-sm font-semibold text-red-500">{commentError}</p> : null}
-          <div className="space-y-3">
-            {comments.map((item) => (
-              <div key={item.id} className="flex gap-3">
-                <Avatar user={item.user} size="h-8 w-8" />
-                <div>
-                  <p className="text-sm font-bold text-[var(--text)]">{item.user?.name || item.user?.username || 'Member'}</p>
-                  <p className="text-sm text-[var(--muted-strong)]">{item.content}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          {(post.comments_count || 0) > comments.length ? <button type="button" className="mt-3 text-sm font-bold text-[var(--accent-strong)]" onClick={() => getPostComments(post.id, { limit: 20 }).then(setComments).catch((requestError) => setCommentError(requestError.response?.data?.error || 'Could not load comments.'))}>Show all {post.comments_count} comments</button> : null}
-          <form onSubmit={submitComment} className="mt-4 flex gap-2">
-            <input className="app-input" placeholder="Add a comment" value={comment} onChange={(event) => setComment(event.target.value)} maxLength={300} />
-            <button type="submit" className="app-button" disabled={submittingComment}>{submittingComment ? 'Posting...' : 'Post'}</button>
-          </form>
-        </div>
-      ) : null}
+      {commentsOpen ? <PostComments postId={post.id} initialCommentsCount={post.comments_count || 0} onCommentAdded={() => onPostChanged({ ...post, comments_count: (post.comments_count || 0) + 1 })} /> : null}
     </article>
     <ConfirmDialog
       open={deleteOpen}

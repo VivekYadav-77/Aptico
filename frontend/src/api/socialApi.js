@@ -115,14 +115,21 @@ export async function likePost(postId) {
   return response.data;
 }
 
-export async function addPostComment(postId, content) {
-  const response = await api.post(`/api/social/posts/${postId}/comments`, { content });
+export async function addPostComment(postId, content, parent_id = null) {
+  const payload = { content };
+  if (parent_id) payload.parent_id = parent_id;
+  const response = await api.post(`/api/social/posts/${postId}/comments`, payload);
   return response.data;
 }
 
 export async function getPostComments(postId, params = {}) {
   const response = await api.get(`/api/social/posts/${postId}/comments`, { params });
   return response.data.comments || [];
+}
+
+export async function likeComment(commentId) {
+  const response = await api.post(`/api/social/comments/${commentId}/like`);
+  return response.data;
 }
 
 export async function deleteSocialPost(postId) {

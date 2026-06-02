@@ -29,6 +29,7 @@ import {
   getPostComments,
   getPublicFeedPosts,
   likePost,
+  toggleCommentLike,
   updatePost
 } from './post.service.js';
 import { deleteWin, getMyWins, getPublicJobsFeed, getWinsFeed, likeWin, postWin, updateWin } from './social.service.js';
@@ -74,7 +75,8 @@ const feedQuerySchema = paginationSchema.extend({
 });
 
 const commentBodySchema = z.object({
-  content: z.string().trim().min(1).max(300)
+  content: z.string().trim().min(1).max(300),
+  parent_id: z.string().uuid().optional().nullable()
 });
 
 const connectionRequestSchema = z.object({
@@ -554,10 +556,19 @@ export default async function socialRoutes(app) {
   app.post('/posts/:postId/comments', { preHandler: authenticateRequest, config: socialStrictRateLimit }, async (request, reply) => {
     try {
       const body = commentBodySchema.parse(request.body || {});
-      const comment = await addComment(request.server.db, request.auth.userId, request.params.postId, body.content);
+      const comment = await addComment(request.server.db, request.auth.userId, request.params.postId, body.content, body.parent_id || null);
       return reply.code(201).send(comment);
     } catch (error) {
       return sendError(reply, error, 'Could not add comment.');
+    }
+  });
+
+  app.post('/comments/:commentId/like', { preHandler: authenticateRequest, config: socialStrictRateLimit }, async (request, reply) => {
+    try {
+      const result = await toggleCommentLike(request.server.db, request.auth.userId, request.params.commentId);
+      return reply.send(result);
+    } catch (error) {
+      return sendError(reply, error, 'Could not like comment.');
     }
   });
 

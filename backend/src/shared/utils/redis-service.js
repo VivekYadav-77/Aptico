@@ -49,11 +49,11 @@ export class RedisService {
 
       const payload = await response.json();
 
-      this.logger.info(`[RedisService] ${commandName} succeeded.`, payload.result ?? null);
+      this.logger.info({ result: payload.result ?? null }, `[RedisService] ${commandName} succeeded.`);
 
       return payload.result ?? null;
     } catch (error) {
-      this.logger.error(`[RedisService] ${commandName} failed${failOpen ? ' open' : ' closed'}.`, error);
+      this.logger.error({ err: error }, `[RedisService] ${commandName} failed${failOpen ? ' open' : ' closed'}.`);
       if (!failOpen) {
         throw error;
       }

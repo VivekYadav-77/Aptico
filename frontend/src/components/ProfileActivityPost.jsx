@@ -1,11 +1,7 @@
 import { useState } from 'react';
-import {
-  addPostComment,
-  deleteSocialPost,
-  getPostComments,
-  likePost
-} from '../api/socialApi.js';
+import { deleteSocialPost, likePost } from '../api/socialApi.js';
 import ConfirmDialog from './ConfirmDialog.jsx';
+import PostComments from './PostComments.jsx';
 
 function initials(name) {
   return String(name || 'U').trim().charAt(0).toUpperCase() || 'U';
@@ -18,10 +14,6 @@ function postTypeLabel(value) {
 export default function ProfileActivityPost({ post, currentUserId, onPostChanged, onDeleted, onEdit }) {
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const [comments, setComments] = useState([]);
-  const [comment, setComment] = useState('');
-  const [loadingComments, setLoadingComments] = useState(false);
-  const [submittingComment, setSubmittingComment] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState('');
@@ -38,37 +30,8 @@ export default function ProfileActivityPost({ post, currentUserId, onPostChanged
     }
   }
 
-  async function toggleComments() {
-    const next = !commentsOpen;
-    setCommentsOpen(next);
-
-    if (next && !comments.length) {
-      setError('');
-      setLoadingComments(true);
-      getPostComments(post.id, { limit: 5 })
-        .then(setComments)
-        .catch((requestError) => setError(requestError.response?.data?.error || 'Could not load comments.'))
-        .finally(() => setLoadingComments(false));
-    }
-  }
-
-  async function submitComment(event) {
-    event.preventDefault();
-    const trimmed = comment.trim();
-    if (!trimmed) return;
-
-    setError('');
-    setSubmittingComment(true);
-    try {
-      const created = await addPostComment(post.id, trimmed);
-      setComments((current) => [...current, created]);
-      setComment('');
-      onPostChanged?.({ ...post, comments_count: (post.comments_count || 0) + 1 });
-    } catch (requestError) {
-      setError(requestError.response?.data?.error || requestError.response?.data?.message || 'Could not add this comment.');
-    } finally {
-      setSubmittingComment(false);
-    }
+  function toggleComments() {
+    setCommentsOpen(!commentsOpen);
   }
 
   async function handleDelete() {
@@ -135,37 +98,7 @@ export default function ProfileActivityPost({ post, currentUserId, onPostChanged
 
       {error ? <p className="mt-3 rounded-lg border border-red-500/25 bg-red-500/10 p-3 text-sm font-semibold text-red-500">{error}</p> : null}
 
-      {commentsOpen ? (
-        <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--panel)]/70 p-4">
-          {loadingComments ? <p className="text-sm text-[var(--muted-strong)]">Loading comments...</p> : null}
-          <div className="space-y-3">
-            {comments.map((item) => (
-              <div key={item.id} className="flex gap-3">
-                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-xs font-black text-[var(--accent-strong)]">
-                  {initials(item.user?.name || item.user?.username)}
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-[var(--text)]">{item.user?.name || item.user?.username || 'Member'}</p>
-                  <p className="text-sm text-[var(--muted-strong)]">{item.content}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          {(post.comments_count || 0) > comments.length ? (
-            <button
-              type="button"
-              className="mt-3 text-sm font-bold text-[var(--accent-strong)]"
-              onClick={() => getPostComments(post.id, { limit: 20 }).then(setComments).catch((requestError) => setError(requestError.response?.data?.error || 'Could not load comments.'))}
-            >
-              Show all {post.comments_count} comments
-            </button>
-          ) : null}
-          <form onSubmit={submitComment} className="mt-4 flex gap-2">
-            <input className="app-input" placeholder="Add a comment" value={comment} onChange={(event) => setComment(event.target.value)} maxLength={300} />
-            <button type="submit" className="app-button" disabled={submittingComment}>{submittingComment ? 'Posting...' : 'Post'}</button>
-          </form>
-        </div>
-      ) : null}
+      {commentsOpen ? <PostComments postId={post.id} initialCommentsCount={post.comments_count || 0} onCommentAdded={() => onPostChanged?.({ ...post, comments_count: (post.comments_count || 0) + 1 })} /> : null}
     </article>
     <ConfirmDialog
       open={deleteOpen}

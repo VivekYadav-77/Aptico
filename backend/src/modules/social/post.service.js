@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm';
-import { analyses, follows, postComments, posts, userProfiles, users } from '../../db/schema.js';
+import { analyses, follows, postComments, commentLikes, posts, userProfiles, users } from '../../db/schema.js';
 import { createNotification } from '../../shared/utils/notification-helper.js';
 
 const POST_TYPES = new Set(['career_update', 'job_tip', 'job_share', 'analysis_share', 'question']);
@@ -383,7 +383,7 @@ export async function likePost(db, userId, postId) {
   return { success: true, newLikesCount: post.likesCount };
 }
 
-export async function addComment(db, userId, postId, content) {
+export async function addComment(db, userId, postId, content, parentId = null) {
   const trimmed = String(content || '').trim();
 
   if (!trimmed) {
@@ -405,9 +405,12 @@ export async function addComment(db, userId, postId, content) {
     throw serviceError('Post not found', 404);
   }
 
+  const insertData = { postId, userId, content: trimmed };
+  if (parentId) insertData.parentId = parentId;
+
   const inserted = await db
     .insert(postComments)
-    .values({ postId, userId, content: trimmed })
+    .values(insertData)
     .returning({ id: postComments.id });
 
   await db
@@ -432,7 +435,9 @@ export async function addComment(db, userId, postId, content) {
       id: postComments.id,
       post_id: postComments.postId,
       user_id: postComments.userId,
+      parent_id: postComments.parentId,
       content: postComments.content,
+      likes_count: postComments.likesCount,
       created_at: postComments.createdAt,
       user: {
         name: users.name,
@@ -455,7 +460,9 @@ export async function getPostComments(db, postId, { limit = 20, offset = 0 } = {
       id: postComments.id,
       post_id: postComments.postId,
       user_id: postComments.userId,
+      parent_id: postComments.parentId,
       content: postComments.content,
+      likes_count: postComments.likesCount,
       created_at: postComments.createdAt,
       user: {
         name: users.name,
@@ -490,3 +497,34 @@ export async function deletePost(db, userId, postId) {
 
   return { success: true };
 }
+
+export async function toggleCommentLike(db, userId, commentId) {
+  const existingRows = await db
+    .select({ id: commentLikes.id })
+    .from(commentLikes)
+    .where(and(eq(commentLikes.commentId, commentId), eq(commentLikes.userId, userId)))
+    .limit(1);
+
+  const existing = existingRows[0];
+
+  if (existing) {
+    await db.delete(commentLikes).where(eq(commentLikes.id, existing.id));
+    const updated = await db
+      .update(postComments)
+      .set({ likesCount: sql`${postComments.likesCount} - 1` })
+      .where(eq(postComments.id, commentId))
+      .returning({ likesCount: postComments.likesCount });
+
+    return { success: true, liked: false, newLikesCount: updated[0]?.likesCount || 0 };
+  } else {
+    await db.insert(commentLikes).values({ commentId, userId });
+    const updated = await db
+      .update(postComments)
+      .set({ likesCount: sql`${postComments.likesCount} + 1` })
+      .where(eq(postComments.id, commentId))
+      .returning({ likesCount: postComments.likesCount });
+
+    return { success: true, liked: true, newLikesCount: updated[0]?.likesCount || 0 };
+  }
+}
+
