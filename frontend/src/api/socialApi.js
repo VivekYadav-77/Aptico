@@ -15,6 +15,11 @@ export async function getWins(params = {}) {
   return response.data;
 }
 
+export async function getWinById(winId) {
+  const response = await api.get(`/api/social/wins/${winId}`);
+  return response.data.win;
+}
+
 export async function postWin(payload) {
   const response = await api.post('/api/social/wins', payload);
   return response.data;
@@ -115,6 +120,11 @@ export async function getPublicFeedPosts(params = {}) {
   return response.data;
 }
 
+export async function getPostById(postId) {
+  const response = await api.get(`/api/social/posts/${postId}`);
+  return response.data.post;
+}
+
 export async function likePost(postId) {
   const response = await api.post(`/api/social/posts/${postId}/like`);
   return response.data;
@@ -200,6 +210,31 @@ export async function getUnreadNotificationCount() {
 export async function searchPeople(params = {}) {
   const response = await api.get('/api/social/people/search', { params });
   return response.data.people || [];
+}
+
+export async function getActivityLikes(params = {}) {
+  const response = await api.get('/api/users/activity/likes', { params });
+  return response.data;
+}
+
+export async function getActivityComments(params = {}) {
+  const response = await api.get('/api/users/activity/comments', { params });
+  return response.data;
+}
+
+export async function getActivityReplies(params = {}) {
+  const response = await api.get('/api/users/activity/replies', { params });
+  return response.data;
+}
+
+export async function bulkUnlikeActivity(items) {
+  const response = await api.post('/api/users/activity/bulk-unlike', { items });
+  return response.data;
+}
+
+export async function bulkDeleteActivity(ids) {
+  const response = await api.post('/api/users/activity/bulk-delete', { ids });
+  return response.data;
 }
 
 export async function getProfileFollowers(username) {

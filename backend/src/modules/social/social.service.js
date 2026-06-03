@@ -175,6 +175,22 @@ export async function getWinsFeed(db, viewerId, { limit = 20, offset = 0 } = {})
   return rows;
 }
 
+export async function getWinById(db, viewerId, winId) {
+  const rows = await db
+    .select(selectWinShape(viewerId))
+    .from(communityWins)
+    .innerJoin(users, eq(communityWins.userId, users.id))
+    .leftJoin(userProfiles, eq(communityWins.userId, userProfiles.userId))
+    .where(and(eq(communityWins.id, winId), eq(communityWins.isVisible, true), or(sql`${communityWins.scheduledAt} is null`, sql`${communityWins.scheduledAt} <= now()`)))
+    .limit(1);
+
+  if (!rows[0]) {
+    throw serviceError('Win not found', 404);
+  }
+
+  return rows[0];
+}
+
 export async function getMyWins(db, userId, { limit = 20, offset = 0 } = {}) {
   return db
     .select(selectWinShape(userId))

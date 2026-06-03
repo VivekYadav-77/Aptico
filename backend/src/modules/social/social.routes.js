@@ -27,6 +27,7 @@ import {
   deletePost,
   getFeedPosts,
   getMyPosts,
+  getPostById,
   getPostComments,
   getPublicFeedPosts,
   likePost,
@@ -34,7 +35,7 @@ import {
   toggleCommentLike,
   updatePost
 } from './post.service.js';
-import { deleteWin, getMyWins, getPublicJobsFeed, getWinsFeed, likeWin, getWinLikers, postWin, updateWin } from './social.service.js';
+import { deleteWin, getMyWins, getPublicJobsFeed, getWinById, getWinsFeed, likeWin, getWinLikers, postWin, updateWin } from './social.service.js';
 import { getUnreadCount } from '../../shared/utils/notification-helper.js';
 
 const USERNAME_PATTERN = /^[a-z0-9_-]{3,30}$/;
@@ -428,6 +429,16 @@ export default async function socialRoutes(app) {
     }
   });
 
+  app.get('/wins/:winId', { preHandler: optionalAuthenticateRequest }, async (request, reply) => {
+    try {
+      const viewerId = request.auth?.userId || null;
+      const win = await getWinById(request.server.db, viewerId, request.params.winId);
+      return reply.send({ win });
+    } catch (error) {
+      return sendError(reply, error, 'Could not load win.');
+    }
+  });
+
   app.post('/wins/:winId/like', { preHandler: authenticateRequest, config: socialWriteRateLimit }, async (request, reply) => {
     try {
       const result = await likeWin(request.server.db, request.auth.userId, request.params.winId);
@@ -555,6 +566,16 @@ export default async function socialRoutes(app) {
       return reply.send(payload);
     } catch (error) {
       return sendError(reply, error, 'Could not load public feed.');
+    }
+  });
+
+  app.get('/posts/:postId', { preHandler: optionalAuthenticateRequest }, async (request, reply) => {
+    try {
+      const viewerId = request.auth?.userId || null;
+      const post = await getPostById(request.server.db, viewerId, request.params.postId);
+      return reply.send({ post });
+    } catch (error) {
+      return sendError(reply, error, 'Could not load post.');
     }
   });
 

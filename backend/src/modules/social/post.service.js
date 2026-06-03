@@ -256,6 +256,29 @@ export async function getPublicFeedPosts(db, viewerId, { limit = 20, offset = 0,
   }));
 }
 
+export async function getPostById(db, viewerId, postId) {
+  const rows = await db
+    .select(selectPostShape(viewerId))
+    .from(posts)
+    .innerJoin(users, eq(posts.userId, users.id))
+    .leftJoin(userProfiles, eq(posts.userId, userProfiles.userId))
+    .leftJoin(analyses, eq(posts.analysisId, analyses.id))
+    .where(and(eq(posts.id, postId), eq(posts.isVisible, true), PUBLICATION_FILTER))
+    .limit(1);
+
+  const row = rows[0];
+  if (!row) {
+    throw serviceError('Post not found', 404);
+  }
+
+  return {
+    ...row,
+    analysis: row.analysis?.company_name || row.analysis?.confidence_score != null
+      ? { ...row.analysis, top_skill_gaps: topSkillGaps({ gapAnalysisJson: row.analysis.gap_analysis_json }) }
+      : null
+  };
+}
+
 export async function getMyPosts(db, userId, { limit = 20, offset = 0, filterType = null } = {}) {
   const filters = [eq(posts.userId, userId), eq(posts.isVisible, true)];
 
