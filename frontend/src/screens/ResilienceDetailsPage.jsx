@@ -281,14 +281,15 @@ export default function ResilienceDetailsPage() {
   const [selectedDate, setSelectedDate] = useState(null);
   const itemRefs = useRef({});
 
+  const routeActiveTab = location.state?.activeTab;
   const selectedItemKey = location.state?.selectedItemKey;
 
   // Sync tab with location state (e.g. when navigating from Profile)
   useEffect(() => {
-    if (location.state?.activeTab) {
-      setActiveTab(location.state.activeTab);
+    if (routeActiveTab) {
+      setActiveTab(routeActiveTab);
     }
-  }, [location.state]);
+  }, [routeActiveTab]);
 
   // Handle auto-scroll to selected item
   useEffect(() => {
@@ -461,12 +462,14 @@ export default function ResilienceDetailsPage() {
           <section>
             <div className="mb-6 flex gap-2 rounded-2xl border border-[var(--border)] bg-[var(--panel)]/60 p-1.5 backdrop-blur-sm">
               <button
+                type="button"
                 onClick={() => setActiveTab('applications')}
                 className={`flex-1 rounded-xl px-4 py-3 text-sm font-black tracking-tight transition-all ${activeTab === 'applications' ? 'bg-emerald-500/15 text-emerald-700 shadow-sm dark:text-emerald-400' : 'text-[var(--muted-strong)] hover:text-[var(--text)]'}`}
               >
                 Applications ({applicationHistory.length})
               </button>
               <button
+                type="button"
                 onClick={() => setActiveTab('rejections')}
                 className={`flex-1 rounded-xl px-4 py-3 text-sm font-black tracking-tight transition-all ${activeTab === 'rejections' ? 'bg-rose-500/15 text-rose-700 shadow-sm dark:text-rose-400' : 'text-[var(--muted-strong)] hover:text-[var(--text)]'}`}
               >
