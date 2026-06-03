@@ -353,8 +353,17 @@ export default function ResilienceDetailsPage() {
             </svg>
           </div>
           <h1 className="text-2xl font-black tracking-tight text-[var(--text)]">{error}</h1>
-          <Link to={`/u/${username}`} className="app-button mt-8 inline-flex w-full justify-center">
-            Back to Profile
+          <Link
+            to={`/u/${username}`}
+            onClick={(e) => {
+              if (typeof window !== 'undefined' && window.history.length > 1) {
+                e.preventDefault();
+                window.history.back();
+              }
+            }}
+            className="app-button mt-8 inline-flex w-full justify-center"
+          >
+            Back
           </Link>
         </div>
       </main>
@@ -382,12 +391,18 @@ export default function ResilienceDetailsPage() {
           <div className="flex items-center justify-between">
             <Link
               to={`/u/${username}`}
+              onClick={(e) => {
+                if (typeof window !== 'undefined' && window.history.length > 1) {
+                  e.preventDefault();
+                  window.history.back();
+                }
+              }}
               className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--panel)]/50 px-3 py-1.5 text-sm font-bold text-[var(--muted-strong)] backdrop-blur-md transition-colors hover:text-[var(--text)]"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-              Back to Profile
+              Back
             </Link>
           </div>
         </AnimatedSection>

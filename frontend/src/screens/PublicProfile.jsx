@@ -497,9 +497,18 @@ export default function PublicProfile() {
         
         {/* Top bar */}
         <div className="flex items-center justify-between mb-4">
-            <Link to="/" className="inline-flex items-center gap-2 text-sm font-bold text-[var(--muted-strong)] hover:text-[var(--text)] transition-all bg-[var(--panel)]/40 hover:bg-[var(--panel)]/80 backdrop-blur-xl px-4 py-2.5 rounded-xl border border-[var(--border)] hover:border-[var(--muted)] shadow-sm hover:shadow-md group">
+            <Link
+              to="/"
+              onClick={(e) => {
+                if (typeof window !== 'undefined' && window.history.length > 1) {
+                  e.preventDefault();
+                  window.history.back();
+                }
+              }}
+              className="inline-flex items-center gap-2 text-sm font-bold text-[var(--muted-strong)] hover:text-[var(--text)] transition-all bg-[var(--panel)]/40 hover:bg-[var(--panel)]/80 backdrop-blur-xl px-4 py-2.5 rounded-xl border border-[var(--border)] hover:border-[var(--muted)] shadow-sm hover:shadow-md group"
+            >
                <svg className="w-4 h-4 transition-transform group-hover:-translate-x-1" autoFocus fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
-               Back to Workspace
+               Back
             </Link>
             {toast ? <div className="rounded-xl border border-[var(--accent)]/30 bg-[var(--accent-soft)] px-5 py-2 text-sm font-black text-[var(--accent-strong)] animate-fade-in-up shadow-lg shadow-[var(--accent)]/10">{toast}</div> : null}
         </div>
