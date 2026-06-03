@@ -59,6 +59,14 @@ const profileSettingsSchema = z.object({
     type: z.string().max(50).default('project')
   })).max(20).optional().default([]),
 
+  topProjects: z.array(z.object({
+    title: z.string().trim().min(1).max(100),
+    description: z.string().trim().min(1).max(280),
+    techStack: z.array(z.string().trim().max(40)).max(8).optional().default([]),
+    githubUrl: z.string().trim().max(300).optional().default(''),
+    liveUrl: z.string().trim().max(300).optional().default('')
+  })).max(3).optional().default([]),
+
   experiences: z.array(z.object({
     id: z.string().uuid().optional(),
     title: z.string().max(200).default(''),
@@ -162,6 +170,38 @@ function normalizeFeaturedProjects(featured) {
         }))
         .filter((item) => item.title || item.description || item.link)
     : [];
+}
+
+function normalizeTopProjects(topProjects, featured = []) {
+  const normalizedTopProjects = Array.isArray(topProjects)
+    ? topProjects
+        .map((item) => ({
+          title: String(item?.title || '').trim(),
+          description: String(item?.description || '').trim(),
+          techStack: Array.isArray(item?.techStack)
+            ? item.techStack.map((skill) => String(skill || '').trim()).filter(Boolean).slice(0, 8)
+            : [],
+          githubUrl: String(item?.githubUrl || '').trim(),
+          liveUrl: String(item?.liveUrl || '').trim()
+        }))
+        .filter((item) => item.title && item.description)
+        .slice(0, 3)
+    : [];
+
+  if (normalizedTopProjects.length) {
+    return normalizedTopProjects;
+  }
+
+  return normalizeFeaturedProjects(featured)
+    .filter((item) => !item.type || item.type === 'project')
+    .slice(0, 3)
+    .map((item) => ({
+      title: item.title,
+      description: item.description,
+      techStack: [],
+      githubUrl: '',
+      liveUrl: item.link
+    }));
 }
 
 async function getStoredExperiences(db, userId) {
@@ -274,7 +314,7 @@ async function getPortfolioReadmePayload(db, userId) {
       profileSkills: Array.isArray(publicProfile?.skills) ? publicProfile.skills : []
     },
     experiences,
-    projects: normalizeFeaturedProjects(settingsJson.featured),
+    projects: normalizeTopProjects(settingsJson.topProjects, settingsJson.featured),
     links: {
       badgeUrl,
       shadowResumeUrl

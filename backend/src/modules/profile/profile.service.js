@@ -131,6 +131,44 @@ function formatDisplayDate(value) {
   });
 }
 
+function normalizeTopProjects(topProjects, featured = []) {
+  const normalizedTopProjects = Array.isArray(topProjects)
+    ? topProjects
+        .map((item) => ({
+          title: String(item?.title || '').trim(),
+          description: String(item?.description || '').trim(),
+          techStack: Array.isArray(item?.techStack)
+            ? item.techStack.map((skill) => String(skill || '').trim()).filter(Boolean).slice(0, 8)
+            : [],
+          githubUrl: String(item?.githubUrl || '').trim(),
+          liveUrl: String(item?.liveUrl || '').trim()
+        }))
+        .filter((item) => item.title && item.description)
+        .slice(0, 3)
+    : [];
+
+  if (normalizedTopProjects.length) {
+    return normalizedTopProjects;
+  }
+
+  return Array.isArray(featured)
+    ? featured
+        .filter((item) => {
+          const type = String(item?.type || 'project').trim().toLowerCase();
+          return !type || type === 'project';
+        })
+        .map((item) => ({
+          title: String(item?.title || '').trim(),
+          description: String(item?.description || '').trim(),
+          techStack: [],
+          githubUrl: '',
+          liveUrl: String(item?.link || '').trim()
+        }))
+        .filter((item) => item.title && item.description)
+        .slice(0, 3)
+    : [];
+}
+
 function calculateLongestStreak(dateKeys) {
   if (!dateKeys.length) {
     return 0;
@@ -677,6 +715,11 @@ export async function getPublicProfile(db, username, viewerId = null) {
   // Featured section
   if (canViewSection('featured')) {
     enrichedSettings.featured = Array.isArray(rawSettings.featured) ? rawSettings.featured : [];
+  }
+
+  // Dedicated top projects, with legacy featured-project fallback
+  if (canViewSection('topProjects')) {
+    enrichedSettings.topProjects = normalizeTopProjects(rawSettings.topProjects, rawSettings.featured);
   }
 
   // Digital footprint / public links

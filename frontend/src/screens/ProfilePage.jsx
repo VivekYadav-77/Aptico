@@ -195,6 +195,50 @@ function Pill({ children, tone = 'default' }) {
   return <span className={`rounded-full border px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] ${tones[tone]}`}>{children}</span>;
 }
 
+function TopProjectCard({ project }) {
+  const links = [
+    project.githubUrl ? { label: 'GitHub', url: project.githubUrl } : null,
+    project.liveUrl ? { label: 'Live Demo', url: project.liveUrl } : null
+  ].filter(Boolean);
+
+  return (
+    <article className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-5 transition-all hover:border-[#14b8a6]/50 hover:shadow-md">
+      <div className="flex items-start gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#14b8a6]/20 bg-[#14b8a6]/10 text-[#14b8a6]">
+          <span className="material-symbols-outlined text-[20px]">code_blocks</span>
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-black leading-tight text-[var(--text)]">{project.title}</h3>
+          <p className="mt-2 text-sm font-medium leading-relaxed text-[var(--muted-strong)]">{project.description}</p>
+        </div>
+      </div>
+
+      {project.techStack?.length ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {project.techStack.map((tech) => <Pill key={tech} tone="success">{tech}</Pill>)}
+        </div>
+      ) : null}
+
+      {links.length ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {links.map((link) => (
+            <a
+              key={`${link.label}-${link.url}`}
+              href={normalizeUrl(link.url)}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-xs font-bold text-[var(--text)] transition-all hover:border-[#14b8a6]/50 hover:text-[#14b8a6]"
+            >
+              <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+              {link.label}
+            </a>
+          ))}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
 export default function ProfilePage() {
   const auth = useSelector(selectAuth);
   const analysis = useSelector(selectCurrentAnalysis);
@@ -231,6 +275,7 @@ export default function ProfilePage() {
     profile.website ? { name: 'Website', url: profile.website } : null
   ].filter(Boolean);
   const resiliencePortfolio = socialProfile?.resilience_portfolio || null;
+  const topProjects = Array.isArray(profile.topProjects) ? profile.topProjects : [];
   const followerCount = socialProfile?.follower_count || 0;
   const followingCount = socialProfile?.following_count || 0;
   const connectionCount = socialProfile?.connection_count || 0;
@@ -666,6 +711,22 @@ export default function ProfilePage() {
                       </div>
                     </div>
                   ) : null}
+                </div>
+              </SectionCard>
+            </AnimatedSection>
+
+            <AnimatedSection delay={170}>
+              <SectionCard
+                id="top-projects"
+                title="Top Projects"
+                accentColor="#14b8a6"
+                isEmpty={!topProjects.length}
+                emptyMessage="Add up to three projects to strengthen your profile and resume."
+              >
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {topProjects.map((project, index) => (
+                    <TopProjectCard key={`${project.title || 'project'}-${index}`} project={project} />
+                  ))}
                 </div>
               </SectionCard>
             </AnimatedSection>

@@ -15,9 +15,26 @@ function serviceError(message, statusCode) {
 }
 
 function normalizeProjects(settingsJson) {
+  const topProjects = Array.isArray(settingsJson?.topProjects) ? settingsJson.topProjects : [];
+  const normalizedTopProjects = topProjects
+    .map((item) => ({
+      title: String(item?.title || '').trim(),
+      description: String(item?.description || '').trim(),
+      techStack: Array.isArray(item?.techStack) ? item.techStack.map((skill) => String(skill || '').trim()).filter(Boolean) : [],
+      githubUrl: String(item?.githubUrl || '').trim(),
+      liveUrl: String(item?.liveUrl || '').trim(),
+      type: 'project'
+    }))
+    .filter((item) => item.title || item.description || item.githubUrl || item.liveUrl)
+    .slice(0, 3);
+
+  if (normalizedTopProjects.length) {
+    return { projects: normalizedTopProjects, source: 'profile_settings.topProjects' };
+  }
+
   const featured = Array.isArray(settingsJson?.featured) ? settingsJson.featured : [];
 
-  return featured
+  const projects = featured
     .filter((item) => {
       const type = String(item?.type || '').trim().toLowerCase();
       return !type || type === 'project';
@@ -29,6 +46,8 @@ function normalizeProjects(settingsJson) {
       type: String(item?.type || 'project').trim()
     }))
     .filter((item) => item.title || item.description || item.link);
+
+  return { projects, source: projects.length ? 'profile_settings.featured' : 'none' };
 }
 
 async function getShadowResumePayload(db, username) {
@@ -87,7 +106,7 @@ async function getShadowResumePayload(db, username) {
   ]);
 
   const settingsJson = settingsRows[0]?.settingsJson || {};
-  const projects = normalizeProjects(settingsJson);
+  const { projects, source: projectSource } = normalizeProjects(settingsJson);
 
   return {
     profile: {
@@ -110,7 +129,7 @@ async function getShadowResumePayload(db, username) {
     educations: educationRows,
     projects,
     metadata: {
-      projectSource: projects.length ? 'profile_settings.featured' : 'none'
+      projectSource
     }
   };
 }

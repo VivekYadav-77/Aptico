@@ -41,6 +41,7 @@ export default function ResumeTemplate({ profile }) {
   const educationEntries = es.educationEntries || [];
   const licenses = es.licenses || [];
   const honorsAwards = es.honorsAwards || [];
+  const topProjects = es.topProjects || profile.topProjects || [];
   
   // Legacy support for single entries if arrays are empty
   if (experiences.length === 0 && profile.currentCompany) {
@@ -149,6 +150,27 @@ export default function ResumeTemplate({ profile }) {
           <p className="text-[11pt] leading-snug">
             {uniqueSkills.join(', ')}
           </p>
+        </section>
+      )}
+
+      {/* Projects */}
+      {topProjects.length > 0 && (
+        <section>
+          <SectionTitle>Projects</SectionTitle>
+          {topProjects.map((project, idx) => (
+            <div key={`${project.title}-${idx}`} className="mb-3">
+              <h3 className="font-bold text-[11pt] m-0">{project.title}</h3>
+              {project.techStack?.length ? (
+                <p className="italic text-[10pt] m-0">{project.techStack.join(', ')}</p>
+              ) : null}
+              <p className="text-[11pt] mt-1 m-0">{project.description}</p>
+              {(project.githubUrl || project.liveUrl) ? (
+                <p className="text-[10pt] mt-1 m-0">
+                  {[project.githubUrl ? `GitHub: ${project.githubUrl.replace('https://','')}` : null, project.liveUrl ? `Live: ${project.liveUrl.replace('https://','')}` : null].filter(Boolean).join(' | ')}
+                </p>
+              ) : null}
+            </div>
+          ))}
         </section>
       )}
 

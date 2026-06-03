@@ -37,6 +37,11 @@ function formatLabel(value) {
     .join(' ');
 }
 
+function normalizeUrl(url) {
+  if (!url) return '';
+  return url.startsWith('http') ? url : `https://${url}`;
+}
+
 /* ── Animated Section Wrapper ── */
 function AnimatedSection({ children, delay = 0 }) {
   const [isVisible, setIsVisible] = useState(false);
@@ -98,6 +103,49 @@ function SectionCard({ id, title, icon, accentColor = 'var(--accent)', children,
 }
 
 /* ── Mini Post Card ── */
+function TopProjectCard({ project }) {
+  const links = [
+    project.githubUrl ? { label: 'GitHub', url: project.githubUrl } : null,
+    project.liveUrl ? { label: 'Live Demo', url: project.liveUrl } : null
+  ].filter(Boolean);
+
+  return (
+    <article className="group flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)]/40 p-5 transition-all duration-300 hover:border-[#14b8a6]/50 hover:bg-[#14b8a6]/5 hover:shadow-xl">
+      <div className="mb-4 flex items-start justify-between gap-4">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#14b8a6]/20 bg-[#14b8a6]/10 text-[#14b8a6] shadow-inner transition-transform group-hover:scale-110">
+          <span className="material-symbols-outlined text-[22px]">code_blocks</span>
+        </div>
+        {links.length ? <span className="text-[10px] font-black uppercase tracking-widest text-[#14b8a6]">Project</span> : null}
+      </div>
+      <h3 className="text-base font-black leading-tight text-[var(--text)] transition-colors group-hover:text-[#14b8a6]">{project.title}</h3>
+      <p className="mt-2 line-clamp-4 text-sm font-medium leading-relaxed text-[var(--muted-strong)]">{project.description}</p>
+      {project.techStack?.length ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {project.techStack.map((tech) => (
+            <span key={tech} className="rounded-lg border border-[#14b8a6]/20 bg-[#14b8a6]/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-[#14b8a6]">{tech}</span>
+          ))}
+        </div>
+      ) : null}
+      {links.length ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {links.map((link) => (
+            <a
+              key={`${link.label}-${link.url}`}
+              href={normalizeUrl(link.url)}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-xs font-bold text-[var(--text)] transition-all hover:border-[#14b8a6]/50 hover:text-[#14b8a6]"
+            >
+              <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+              {link.label}
+            </a>
+          ))}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
 function MiniPost({ post }) {
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(post.likes_count || 0);
@@ -457,6 +505,7 @@ export default function PublicProfile() {
   const resiliencePortfolio = profile.resilience_portfolio || null;
   const sectionVis = es.sectionVisibility || {};
   const viewerRel = viewingOwnProfile ? 'self' : (es.viewerRelationship || 'public');
+  const topProjects = Array.isArray(es.topProjects) ? es.topProjects : [];
   const publicLinks = [
     (es.linkedin || profile.linkedin) ? { name: 'LinkedIn', url: es.linkedin || profile.linkedin, icon: <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19 0H5a5 5 0 00-5 5v14a5 5 0 005 5h14a5 5 0 005-5V5a5 5 0 00-5-5zM8 19H5V8h3v11zM6.5 6.732c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zM20 19h-3v-5.604c0-3.368-4-3.113-4 0V19h-3V8h3v1.765c1.396-2.586 7-2.777 7 2.476V19z"/></svg> } : null,
     (es.github || profile.github) ? { name: 'GitHub', url: es.github || profile.github, icon: <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg> } : null,
@@ -829,6 +878,20 @@ export default function PublicProfile() {
                 </AnimatedSection>
 
                 {/* ════ FEATURED ════ */}
+                <AnimatedSection delay={335}>
+                  {isSectionLocked('topProjects') ? (
+                    <SectionCard id="top-projects" title="Top Projects" accentColor="#14b8a6" locked lockedMessage="Connect to see top projects" />
+                  ) : isSectionVisible('topProjects') && topProjects.length > 0 ? (
+                    <SectionCard id="top-projects" title="Top Projects" accentColor="#14b8a6">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        {topProjects.map((project, idx) => (
+                          <TopProjectCard key={`${project.title || 'project'}-${idx}`} project={project} />
+                        ))}
+                      </div>
+                    </SectionCard>
+                  ) : null}
+                </AnimatedSection>
+
                 <AnimatedSection delay={340}>
                   {isSectionLocked('featured') ? (
                     <SectionCard id="featured" title="Featured" accentColor="#f97316" locked lockedMessage={`Connect to see featured`} />
@@ -1357,7 +1420,8 @@ export default function PublicProfile() {
                honorsAwards: isSectionVisible('honorsAwards') ? profile?.enriched_settings?.honorsAwards : [],
                topSkills: isSectionVisible('skills') ? profile?.enriched_settings?.topSkills : [],
                tools: isSectionVisible('skills') ? profile?.enriched_settings?.tools : [],
-               languages: isSectionVisible('skills') ? profile?.enriched_settings?.languages : []
+               languages: isSectionVisible('skills') ? profile?.enriched_settings?.languages : [],
+               topProjects: isSectionVisible('topProjects') ? profile?.enriched_settings?.topProjects : []
             }
          }} />
       </div>
