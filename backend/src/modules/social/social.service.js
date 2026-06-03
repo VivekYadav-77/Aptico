@@ -32,8 +32,8 @@ function parseScheduledAt(value) {
   return scheduledAt;
 }
 
-function selectWinShape() {
-  return {
+function selectWinShape(viewerId = null) {
+  const shape = {
     id: communityWins.id,
     user_id: communityWins.userId,
     role_title: communityWins.roleTitle,
@@ -50,6 +50,14 @@ function selectWinShape() {
       username: userProfiles.username
     }
   };
+
+  if (viewerId) {
+    shape.has_liked = sql`exists(select 1 from win_likes where win_id = community_wins.id and user_id = ${viewerId})`.mapWith(Boolean);
+  } else {
+    shape.has_liked = sql`false`.mapWith(Boolean);
+  }
+
+  return shape;
 }
 
 function getWeekBounds(value) {
@@ -143,7 +151,7 @@ export async function postWin(db, userId, data) {
     .returning();
 
   const rows = await db
-    .select(selectWinShape())
+    .select(selectWinShape(userId))
     .from(communityWins)
     .innerJoin(users, eq(communityWins.userId, users.id))
     .leftJoin(userProfiles, eq(communityWins.userId, userProfiles.userId))
@@ -153,9 +161,9 @@ export async function postWin(db, userId, data) {
   return rows[0];
 }
 
-export async function getWinsFeed(db, { limit = 20, offset = 0 } = {}) {
+export async function getWinsFeed(db, viewerId, { limit = 20, offset = 0 } = {}) {
   const rows = await db
-    .select(selectWinShape())
+    .select(selectWinShape(viewerId))
     .from(communityWins)
     .innerJoin(users, eq(communityWins.userId, users.id))
     .leftJoin(userProfiles, eq(communityWins.userId, userProfiles.userId))
@@ -169,7 +177,7 @@ export async function getWinsFeed(db, { limit = 20, offset = 0 } = {}) {
 
 export async function getMyWins(db, userId, { limit = 20, offset = 0 } = {}) {
   return db
-    .select(selectWinShape())
+    .select(selectWinShape(userId))
     .from(communityWins)
     .innerJoin(users, eq(communityWins.userId, users.id))
     .leftJoin(userProfiles, eq(communityWins.userId, userProfiles.userId))
@@ -239,7 +247,7 @@ export async function updateWin(db, userId, winId, data) {
   }
 
   const rows = await db
-    .select(selectWinShape())
+    .select(selectWinShape(userId))
     .from(communityWins)
     .innerJoin(users, eq(communityWins.userId, users.id))
     .leftJoin(userProfiles, eq(communityWins.userId, userProfiles.userId))

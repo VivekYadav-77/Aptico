@@ -78,6 +78,11 @@ export default function PostComments({ postId, initialCommentsCount, onCommentAd
   const [submitting, setSubmitting] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const [totalCount, setTotalCount] = useState(initialCommentsCount || 0);
+  const [expandedReplies, setExpandedReplies] = useState({});
+
+  const toggleReplies = (id) => {
+    setExpandedReplies((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const debounceTimeouts = useRef({});
   const pendingLikeStates = useRef({});
@@ -197,10 +202,26 @@ export default function PostComments({ postId, initialCommentsCount, onCommentAd
               <div key={item.id}>
                 <CommentItem comment={item} onLike={handleLike} onReply={handleReply} onDelete={handleDelete} currentUserId={currentUserId} />
                 {replies.length > 0 && (
-                  <div style={{ marginLeft: 42, marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8, borderLeft: '2px solid var(--border)', paddingLeft: 12 }}>
-                    {replies.map((reply) => (
-                      <CommentItem key={reply.id} comment={reply} onLike={handleLike} onReply={handleReply} onDelete={handleDelete} currentUserId={currentUserId} isReply />
-                    ))}
+                  <div style={{ marginLeft: 42, marginTop: 8 }}>
+                    <button
+                      type="button"
+                      onClick={() => toggleReplies(item.id)}
+                      style={{
+                        background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+                        fontSize: 12, fontWeight: 700, color: 'var(--muted-strong)',
+                        display: 'flex', alignItems: 'center', gap: 8, marginBottom: expandedReplies[item.id] ? 12 : 0
+                      }}
+                    >
+                      <span style={{ width: 24, height: 1, background: 'var(--muted-strong)' }}></span>
+                      {expandedReplies[item.id] ? 'Hide replies' : `View replies (${replies.length})`}
+                    </button>
+                    {expandedReplies[item.id] && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderLeft: '2px solid var(--border)', paddingLeft: 12 }}>
+                        {replies.map((reply) => (
+                          <CommentItem key={reply.id} comment={reply} onLike={handleLike} onReply={handleReply} onDelete={handleDelete} currentUserId={currentUserId} isReply />
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

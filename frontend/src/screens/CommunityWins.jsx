@@ -81,6 +81,13 @@ export default function CommunityWins() {
   const [likersWinId, setLikersWinId] = useState(null);
 
   useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(''), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  useEffect(() => {
     const loader = viewMode === 'mine' ? getMyWins : getWins;
     let isActive = true;
 
@@ -230,9 +237,12 @@ export default function CommunityWins() {
         </header>
 
         {toast ? (
-           <div className="mb-8 flex items-center gap-3 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 p-5 text-sm font-medium text-[var(--accent-strong)] animate-in fade-in slide-in-from-top-4">
-             <span className="material-symbols-outlined">celebration</span>
+           <div className="fixed bottom-8 right-8 z-50 flex max-w-sm items-center gap-3 rounded-2xl border border-[var(--accent)]/30 bg-[var(--panel)] p-4 shadow-[0_8px_30px_rgba(78,222,163,0.15)] text-sm font-medium text-[var(--text)] animate-in slide-in-from-bottom-8 fade-in duration-300">
+             <span className="material-symbols-outlined text-[var(--accent-strong)]">info</span>
              {toast}
+             <button onClick={() => setToast('')} className="ml-auto flex items-center justify-center rounded-full p-1 text-[var(--muted-strong)] hover:bg-[var(--panel-strong)] hover:text-[var(--text)] transition-colors">
+               <span className="material-symbols-outlined text-[16px]">close</span>
+             </button>
            </div>
         ) : null}
 
@@ -317,7 +327,10 @@ export default function CommunityWins() {
                     onClick={() => handleLike(win.id)} 
                     className={`flex items-center text-xs font-bold uppercase tracking-wider transition-colors group/like ${win.has_liked ? 'text-[var(--accent-strong)]' : 'text-[var(--muted-strong)] hover:text-[var(--text)]'}`}
                   >
-                    <span className={`material-symbols-outlined text-[18px] transition-transform group-hover/like:scale-110 ${win.has_liked ? 'text-[var(--accent-strong)]' : ''}`}>
+                    <span 
+                      className={`material-symbols-outlined text-[18px] transition-transform group-hover/like:scale-110 ${win.has_liked ? 'text-[var(--accent-strong)]' : ''}`}
+                      style={{ fontVariationSettings: win.has_liked ? '"FILL" 1' : '"FILL" 0' }}
+                    >
                       favorite
                     </span>
                   </button>

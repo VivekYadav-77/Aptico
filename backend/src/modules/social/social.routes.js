@@ -402,10 +402,11 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.get('/wins', async (request, reply) => {
+  app.get('/wins', { preHandler: optionalAuthenticateRequest }, async (request, reply) => {
     try {
       const query = paginationSchema.parse(request.query || {});
-      const cacheKey = `wins:feed:${query.limit}:${query.offset}`;
+      const viewerId = request.auth?.userId || null;
+      const cacheKey = `wins:feed:${query.limit}:${query.offset}:${viewerId || 'anon'}`;
       const redis = request.server.services?.redis;
       const cached = parseCachedJson(await redis?.get(cacheKey));
 
@@ -413,14 +414,14 @@ export default async function socialRoutes(app) {
         return reply.send(cached);
       }
 
-      const wins = await getWinsFeed(request.server.db, query);
+      const wins = await getWinsFeed(request.server.db, viewerId, query);
       const totalRows = await request.server.db
         .select({ total: sql`count(*)::int` })
         .from(communityWins)
         .where(and(eq(communityWins.isVisible, true), or(sql`${communityWins.scheduledAt} is null`, sql`${communityWins.scheduledAt} <= now()`)));
       const payload = { wins, total: totalRows[0]?.total || 0 };
 
-      await redis?.set(cacheKey, JSON.stringify(payload), 120);
+      await redis?.set(cacheKey, JSON.stringify(payload), viewerId ? 10 : 120);
       return reply.send(payload);
     } catch (error) {
       return sendError(reply, error, 'Could not load wins.');
