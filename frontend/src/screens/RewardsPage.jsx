@@ -145,9 +145,19 @@ export default function RewardsPage() {
     >
       {confetti && <ConfettiOverlay onDone={() => setConfetti(false)} />}
 
+      {toast ? (
+        <div className="fixed inset-x-0 bottom-5 z-[260] flex justify-center px-4 pointer-events-none sm:bottom-6">
+          <div
+            role="status"
+            aria-live="polite"
+            className="max-w-[min(100%,32rem)] rounded-xl border border-[var(--accent)]/30 bg-[var(--panel)] px-4 py-3 text-center text-sm font-bold text-[var(--accent-strong)] shadow-2xl shadow-black/15 backdrop-blur-xl animate-fade-in-up"
+          >
+            {toast}
+          </div>
+        </div>
+      ) : null}
+
       <div className="mx-auto max-w-5xl space-y-8">
-        {/* Toast */}
-        {toast && <div className="rounded-full border border-[var(--accent)]/30 bg-[var(--accent-soft)] px-5 py-2 text-center text-sm font-bold text-[var(--accent-strong)] animate-fade-in-up">{toast}</div>}
 
         {/* ── XP Overview Card ── */}
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)]/70 backdrop-blur-xl p-6 shadow-sm">
