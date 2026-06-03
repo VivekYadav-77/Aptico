@@ -65,7 +65,8 @@ const envSchema = z.object({
   REQUIRE_AUTH_FOR_AI: z.coerce.boolean().default(true),
   SERPER_API_KEY: z.string().trim().min(1).optional(),
   UPSTASH_REDIS_REST_URL: z.string().trim().url().optional(),
-  UPSTASH_REDIS_REST_TOKEN: z.string().trim().min(1).optional()
+  UPSTASH_REDIS_REST_TOKEN: z.string().trim().min(1).optional(),
+  UPSTASH_REDIS_TIMEOUT_MS: z.coerce.number().int().positive().default(5000)
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
@@ -244,7 +245,8 @@ export const env = {
   serperApiKey: serperApiKeys[0] || parsedEnv.data.SERPER_API_KEY || null,
   serperApiKeys,
   upstashRedisRestUrl: parsedEnv.data.UPSTASH_REDIS_REST_URL || null,
-  upstashRedisRestToken: parsedEnv.data.UPSTASH_REDIS_REST_TOKEN || null
+  upstashRedisRestToken: parsedEnv.data.UPSTASH_REDIS_REST_TOKEN || null,
+  upstashRedisTimeoutMs: parsedEnv.data.UPSTASH_REDIS_TIMEOUT_MS
 };
 
 export function hasDatabaseConfig() {

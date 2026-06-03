@@ -1,4 +1,5 @@
 import { Navigate, useLocation } from '@/lib/router-compat.jsx';
+import { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { selectAuth } from '../store/authSlice.js';
 
@@ -16,8 +17,13 @@ function AuthGateShell({ message }) {
 export function ProtectedRoute({ children }) {
   const auth = useSelector(selectAuth);
   const location = useLocation();
+  const [isMounted, setIsMounted] = useState(false);
 
-  if (!auth.authReady) {
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted || !auth.authReady) {
     return <AuthGateShell message="Restoring your secure session..." />;
   }
 
@@ -30,8 +36,13 @@ export function ProtectedRoute({ children }) {
 
 export function AdminRoute({ children }) {
   const auth = useSelector(selectAuth);
+  const [isMounted, setIsMounted] = useState(false);
 
-  if (!auth.authReady) {
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted || !auth.authReady) {
     return <AuthGateShell message="Checking your access..." />;
   }
 

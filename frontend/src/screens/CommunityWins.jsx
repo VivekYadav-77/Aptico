@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from '@/lib/router-compat.jsx';
 import { useSelector } from 'react-redux';
-import { getWins, likeWin, postWin } from '../api/socialApi.js';
+import ConfirmDialog from '../components/ConfirmDialog.jsx';
+import UserListModal from '../components/UserListModal.jsx';
+import { deleteWin, getMyWins, getWins, likeWin, getWinLikers, postWin, updateWin } from '../api/socialApi.js';
 import { selectAuth } from '../store/authSlice.js';
 
 const durationOptions = [
@@ -27,27 +29,104 @@ function timeAgo(value) {
   return `${days} day${days === 1 ? '' : 's'} ago`;
 }
 
+function isScheduledFuture(value) {
+  return value && new Date(value).getTime() > Date.now();
+}
+
+function getMinScheduleValue() {
+  const date = new Date(Date.now() + 60000);
+  date.setSeconds(0, 0);
+  return toDatetimeLocal(date);
+}
+
+function toDatetimeLocal(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
+function toScheduledIso(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function isPastScheduleValue(value) {
+  if (!value) return false;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) || date.getTime() <= Date.now();
+}
+
+const emptyForm = { role_title: '', company_name: '', search_duration_weeks: 3, message: '', scheduled_at: '' };
+
 export default function CommunityWins() {
   const auth = useSelector(selectAuth);
   const navigate = useNavigate();
   const [wins, setWins] = useState([]);
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
+  const [viewMode, setViewMode] = useState('community');
+  const [loadingWins, setLoadingWins] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingWin, setEditingWin] = useState(null);
   const [toast, setToast] = useState('');
-  const [form, setForm] = useState({ role_title: '', company_name: '', search_duration_weeks: 3, message: '' });
+  const [form, setForm] = useState(emptyForm);
   const [hideCompany, setHideCompany] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [likersWinId, setLikersWinId] = useState(null);
+
+  const debounceTimeouts = useRef({});
+  const pendingLikeStates = useRef({});
 
   useEffect(() => {
-    getWins({ limit: 20, offset: 0 }).then((result) => {
-      setWins(result.wins || []);
-      setTotal(result.total || 0);
-      setOffset(20);
-    }).catch(() => null);
+    return () => {
+      Object.values(debounceTimeouts.current).forEach(clearTimeout);
+    };
   }, []);
 
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(''), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    const loader = viewMode === 'mine' ? getMyWins : getWins;
+    let isActive = true;
+
+    setLoadingWins(true);
+    setWins([]);
+    setTotal(0);
+    setOffset(0);
+
+    loader({ limit: 20, offset: 0 })
+      .then((result) => {
+        if (!isActive) return;
+        setWins(result.wins || []);
+        setTotal(result.total || 0);
+        setOffset(20);
+      })
+      .catch(() => null)
+      .finally(() => {
+        if (isActive) {
+          setLoadingWins(false);
+        }
+      });
+
+    return () => {
+      isActive = false;
+    };
+  }, [viewMode]);
+
   async function loadMore() {
-    const result = await getWins({ limit: 20, offset });
+    const loader = viewMode === 'mine' ? getMyWins : getWins;
+    const result = await loader({ limit: 20, offset });
     setWins((current) => [...current, ...(result.wins || [])]);
     setTotal(result.total || total);
     setOffset((current) => current + 20);
@@ -59,20 +138,117 @@ export default function CommunityWins() {
       return;
     }
 
-    const result = await likeWin(winId);
-    setWins((current) => current.map((win) => win.id === winId ? { ...win, likes_count: result.newLikesCount } : win));
+    const win = wins.find((w) => w.id === winId);
+    if (!win) return;
+
+    const nextState = !win.has_liked;
+    pendingLikeStates.current[winId] = nextState;
+
+    setWins((current) =>
+      current.map((w) =>
+        w.id === winId
+          ? { ...w, has_liked: nextState, likes_count: nextState ? (w.likes_count || 0) + 1 : Math.max((w.likes_count || 0) - 1, 0) }
+          : w
+      )
+    );
+
+    if (debounceTimeouts.current[winId]) {
+      clearTimeout(debounceTimeouts.current[winId]);
+    }
+
+    debounceTimeouts.current[winId] = setTimeout(async () => {
+      try {
+        const result = await likeWin(winId);
+        setWins((current) =>
+          current.map((w) => (w.id === winId ? { ...w, likes_count: result.newLikesCount, has_liked: result.liked } : w))
+        );
+        pendingLikeStates.current[winId] = result.liked;
+      } catch (err) {
+        const rollbackState = !nextState;
+        setWins((current) =>
+          current.map((w) =>
+            w.id === winId
+              ? { ...w, has_liked: rollbackState, likes_count: rollbackState ? (w.likes_count || 0) + 1 : Math.max((w.likes_count || 0) - 1, 0) }
+              : w
+          )
+        );
+        pendingLikeStates.current[winId] = rollbackState;
+        setToast('Could not update like status.');
+      }
+    }, 400);
+  }
+
+  function openCreateModal() {
+    setEditingWin(null);
+    setForm(emptyForm);
+    setHideCompany(false);
+    setError('');
+    setModalOpen(true);
+  }
+
+  function openEditModal(win) {
+    setEditingWin(win);
+    setForm({
+      role_title: win.role_title || '',
+      company_name: win.company_name || '',
+      search_duration_weeks: win.search_duration_weeks || 3,
+      message: win.message || '',
+      scheduled_at: isScheduledFuture(win.scheduled_at) ? toDatetimeLocal(win.scheduled_at) : ''
+    });
+    setHideCompany(!win.company_name);
+    setError('');
+    setModalOpen(true);
+  }
+
+  async function handleDelete() {
+    if (!deleteTarget?.id) return;
+
+    setDeleting(true);
+    try {
+      await deleteWin(deleteTarget.id);
+      setWins((current) => current.filter((win) => win.id !== deleteTarget.id));
+      setDeleteTarget(null);
+      setToast('Win removed.');
+    } catch (requestError) {
+      setToast(requestError.response?.data?.error || 'Could not delete this win.');
+    } finally {
+      setDeleting(false);
+    }
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
-    const created = await postWin({
+    setError('');
+
+    if (isPastScheduleValue(form.scheduled_at)) {
+      setError('Choose a future date and time, or leave the schedule empty to publish immediately.');
+      return;
+    }
+
+    const payload = {
       ...form,
-      company_name: hideCompany ? null : form.company_name || null
-    });
-    setWins((current) => [created, ...current]);
-    setModalOpen(false);
-    setToast('Congratulations! Your win has been shared.');
-    setForm({ role_title: '', company_name: '', search_duration_weeks: 3, message: '' });
+      company_name: hideCompany ? null : form.company_name || null,
+      scheduled_at: toScheduledIso(form.scheduled_at)
+    };
+    setSubmitting(true);
+
+    try {
+      const saved = editingWin ? await updateWin(editingWin.id, payload) : await postWin(payload);
+      setWins((current) => {
+        if (editingWin) {
+          return current.map((win) => win.id === saved.id ? saved : win);
+        }
+        return viewMode === 'mine' || !isScheduledFuture(saved.scheduled_at) ? [saved, ...current] : current;
+      });
+      setModalOpen(false);
+      setToast(isScheduledFuture(saved.scheduled_at) ? 'Your win has been scheduled.' : editingWin ? 'Win updated.' : 'Congratulations! Your win has been shared.');
+      setForm(emptyForm);
+      setEditingWin(null);
+    } catch (requestError) {
+      setError(requestError.response?.data?.error || 'Could not save this win.');
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -93,7 +269,7 @@ export default function CommunityWins() {
             </p>
           </div>
           {auth.isAuthenticated ? (
-            <button type="button" onClick={() => setModalOpen(true)} className="group relative flex items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-8 py-3.5 text-sm font-black uppercase tracking-widest text-[#003824] shadow-[0_0_20px_rgba(78,222,163,0.3)] transition-transform hover:scale-[1.02] active:scale-[0.98]">
+            <button type="button" onClick={openCreateModal} className="group relative flex items-center justify-center gap-2 rounded-full bg-[var(--accent)] px-8 py-3.5 text-sm font-black uppercase tracking-widest text-[#003824] shadow-[0_0_20px_rgba(78,222,163,0.3)] transition-transform hover:scale-[1.02] active:scale-[0.98]">
               Share Your Win
               <span className="material-symbols-outlined text-[18px] transition-transform group-hover:translate-x-1">add</span>
             </button>
@@ -106,13 +282,39 @@ export default function CommunityWins() {
         </header>
 
         {toast ? (
-           <div className="mb-8 flex items-center gap-3 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/10 p-5 text-sm font-medium text-[var(--accent-strong)] animate-in fade-in slide-in-from-top-4">
-             <span className="material-symbols-outlined">celebration</span>
+           <div className="fixed bottom-8 right-8 z-50 flex max-w-sm items-center gap-3 rounded-2xl border border-[var(--accent)]/30 bg-[var(--panel)] p-4 shadow-[0_8px_30px_rgba(78,222,163,0.15)] text-sm font-medium text-[var(--text)] animate-in slide-in-from-bottom-8 fade-in duration-300">
+             <span className="material-symbols-outlined text-[var(--accent-strong)]">info</span>
              {toast}
+             <button onClick={() => setToast('')} className="ml-auto flex items-center justify-center rounded-full p-1 text-[var(--muted-strong)] hover:bg-[var(--panel-strong)] hover:text-[var(--text)] transition-colors">
+               <span className="material-symbols-outlined text-[16px]">close</span>
+             </button>
            </div>
         ) : null}
 
+        {auth.isAuthenticated ? (
+          <div className="mb-8 grid grid-cols-2 gap-2 rounded-lg border border-[var(--border)] bg-[var(--panel)] p-2">
+            <button type="button" onClick={() => setViewMode('community')} className={viewMode === 'community' ? 'app-button py-2' : 'app-button-secondary py-2'}>
+              <span className="material-symbols-outlined text-[18px]">groups</span>
+              Community
+            </button>
+            <button type="button" onClick={() => setViewMode('mine')} className={viewMode === 'mine' ? 'app-button py-2' : 'app-button-secondary py-2'}>
+              <span className="material-symbols-outlined text-[18px]">workspace_premium</span>
+              My Wins
+            </button>
+          </div>
+        ) : null}
+
         <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {loadingWins ? (
+            [0, 1, 2].map((item) => (
+              <article key={item} className="h-72 animate-pulse rounded-[2rem] border border-[var(--border)] bg-[var(--panel)] p-6">
+                <div className="h-10 w-40 rounded-xl bg-[var(--panel-strong)]" />
+                <div className="mt-8 h-6 w-3/4 rounded-lg bg-[var(--panel-strong)]" />
+                <div className="mt-4 h-4 w-1/2 rounded-lg bg-[var(--panel-strong)]" />
+                <div className="mt-8 h-20 rounded-xl bg-[var(--panel-strong)]" />
+              </article>
+            ))
+          ) : null}
           {wins.map((win) => (
             <article key={win.id} className="group flex flex-col rounded-[2rem] border border-[var(--border)] bg-[var(--panel)] p-6 shadow-xl transition-all hover:border-[var(--accent)]/50 hover:shadow-[0_8px_30px_rgba(78,222,163,0.1)] hover:-translate-y-1">
               <div className="flex items-start justify-between mb-6">
@@ -130,9 +332,12 @@ export default function CommunityWins() {
                     ) : (
                       <p className="font-bold text-[var(--text)]">{win.user?.name || 'Aptico member'}</p>
                     )}
-                    <p className="text-xs font-mono text-[var(--muted)]">{timeAgo(win.created_at)}</p>
+                    <p className="text-xs font-mono text-[var(--muted)]">{isScheduledFuture(win.scheduled_at) ? `Scheduled ${new Date(win.scheduled_at).toLocaleString()}` : timeAgo(win.created_at)}</p>
                   </div>
                 </div>
+                {isScheduledFuture(win.scheduled_at) ? (
+                  <span className="rounded-full bg-amber-500/10 px-3 py-1 text-xs font-black uppercase tracking-wider text-amber-600">Scheduled</span>
+                ) : null}
               </div>
               
               <div className="flex-1">
@@ -161,28 +366,51 @@ export default function CommunityWins() {
                   ) : null}
                 </div>
                 
-                <button 
-                  type="button" 
-                  onClick={() => handleLike(win.id)} 
-                  className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[var(--muted-strong)] hover:text-[var(--accent-strong)] transition-colors group/like"
-                >
-                  <span className={`material-symbols-outlined text-[18px] transition-transform group-hover/like:scale-110 ${win.likes_count > 0 ? 'text-[var(--accent-strong)]' : ''}`}>
-                    favorite
-                  </span>
-                  {win.likes_count || 0}
-                </button>
+                <div className="flex items-center">
+                  <button 
+                    type="button" 
+                    onClick={() => handleLike(win.id)} 
+                    className={`flex items-center text-xs font-bold uppercase tracking-wider transition-colors group/like ${win.has_liked ? 'text-[var(--accent-strong)]' : 'text-[var(--muted-strong)] hover:text-[var(--text)]'}`}
+                  >
+                    <span 
+                      className={`material-symbols-outlined text-[18px] transition-transform group-hover/like:scale-110 ${win.has_liked ? 'text-[var(--accent-strong)]' : ''}`}
+                      style={{ fontVariationSettings: win.has_liked ? '"FILL" 1' : '"FILL" 0' }}
+                    >
+                      favorite
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLikersWinId(win.id)}
+                    className={`ml-1.5 text-xs font-bold uppercase tracking-wider transition-colors hover:underline ${win.has_liked ? 'text-[var(--accent-strong)]' : 'text-[var(--muted-strong)] hover:text-[var(--text)]'}`}
+                  >
+                    {win.likes_count || 0}
+                  </button>
+                </div>
               </div>
+              {viewMode === 'mine' && String(win.user_id || '') === String(auth.user?.id || '') ? (
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  <button type="button" className="app-button-secondary px-3 py-2" onClick={() => openEditModal(win)}>
+                    <span className="material-symbols-outlined text-[18px]">edit</span>
+                    Edit
+                  </button>
+                  <button type="button" className="app-button-secondary px-3 py-2 text-red-500" onClick={() => setDeleteTarget(win)}>
+                    <span className="material-symbols-outlined text-[18px]">delete</span>
+                    Delete
+                  </button>
+                </div>
+              ) : null}
             </article>
           ))}
         </section>
 
-        {wins.length === 0 && !total ? (
+        {!loadingWins && wins.length === 0 && !total ? (
            <div className="flex flex-col items-center justify-center py-20 text-center">
              <span className="material-symbols-outlined text-6xl text-[var(--muted)] mb-4">search_off</span>
-             <h3 className="text-xl font-bold text-[var(--text)]">No wins recorded yet</h3>
-             <p className="text-[var(--muted-strong)] mt-2">Be the first to share your success story.</p>
+             <h3 className="text-xl font-bold text-[var(--text)]">{viewMode === 'mine' ? 'No wins shared yet' : 'No wins recorded yet'}</h3>
+             <p className="text-[var(--muted-strong)] mt-2">{viewMode === 'mine' ? 'Your old and scheduled wins will appear here.' : 'Be the first to share your success story.'}</p>
            </div>
-        ) : wins.length < total ? (
+        ) : !loadingWins && wins.length < total ? (
           <div className="mt-12 text-center">
             <button 
               type="button" 
@@ -204,8 +432,8 @@ export default function CommunityWins() {
           >
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h2 className="text-2xl font-black text-[var(--text)] tracking-tight">Share Your Win</h2>
-                <p className="text-sm text-[var(--muted-strong)] mt-1">Broadcast your success to the Aptico network.</p>
+                <h2 className="text-2xl font-black text-[var(--text)] tracking-tight">{editingWin ? 'Edit Your Win' : 'Share Your Win'}</h2>
+                <p className="text-sm text-[var(--muted-strong)] mt-1">{editingWin ? 'Update the details or schedule.' : 'Broadcast your success to the Aptico network.'}</p>
               </div>
               <button 
                 type="button" 
@@ -305,6 +533,27 @@ export default function CommunityWins() {
                   onChange={(event) => setForm({ ...form, message: event.target.value })} 
                 />
               </label>
+
+              <label className="block group">
+                <span className="app-field-label flex items-center gap-2 mb-2">
+                  <span className="material-symbols-outlined text-[16px] text-[var(--muted)]">event_upcoming</span>
+                  Schedule
+                </span>
+                <input
+                  type="datetime-local"
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-4 py-3 text-sm font-medium text-[var(--text)] outline-none transition-colors focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]"
+                  min={getMinScheduleValue()}
+                  value={form.scheduled_at}
+                  onChange={(event) => setForm({ ...form, scheduled_at: event.target.value })}
+                />
+                <span className="mt-2 block text-xs text-[var(--muted-strong)]">Leave empty to publish immediately.</span>
+              </label>
+
+              {error ? (
+                <p className="rounded-xl border border-red-500/25 bg-red-500/10 p-3 text-sm font-semibold text-red-500">
+                  {error}
+                </p>
+              ) : null}
             </div>
 
             <div className="mt-8 flex gap-4">
@@ -317,15 +566,32 @@ export default function CommunityWins() {
               </button>
               <button 
                 type="submit" 
+                disabled={submitting}
                 className="group relative flex-[2] flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-3.5 text-sm font-black uppercase tracking-widest text-[#003824] shadow-[0_0_20px_rgba(78,222,163,0.3)] transition-transform hover:scale-[1.02] active:scale-[0.98]"
               >
-                Broadcast Win
+                {submitting ? 'Saving...' : form.scheduled_at ? 'Schedule Win' : editingWin ? 'Save Win' : 'Broadcast Win'}
                 <span className="material-symbols-outlined text-[18px] transition-transform group-hover:translate-x-1">send</span>
               </button>
             </div>
           </form>
         </div>
       ) : null}
+      <ConfirmDialog
+        open={Boolean(deleteTarget)}
+        title="Delete this win?"
+        description="This removes the win from your profile and the community wins board. This action cannot be undone."
+        confirmLabel="Delete Win"
+        loading={deleting}
+        onCancel={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+      />
+      <UserListModal
+        isOpen={Boolean(likersWinId)}
+        onClose={() => setLikersWinId(null)}
+        title="Liked by"
+        fetchData={() => getWinLikers(likersWinId)}
+        emptyMessage="No one has liked this win yet."
+      />
     </main>
   );
 }

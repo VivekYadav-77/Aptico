@@ -1,9 +1,10 @@
-import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm';
-import { analyses, follows, postComments, posts, userProfiles, users } from '../../db/schema.js';
+import { and, asc, desc, eq, inArray, or, sql } from 'drizzle-orm';
+import { analyses, follows, postComments, commentLikes, postLikes, posts, userProfiles, users } from '../../db/schema.js';
 import { createNotification } from '../../shared/utils/notification-helper.js';
 
 const POST_TYPES = new Set(['career_update', 'job_tip', 'job_share', 'analysis_share', 'question']);
 const CAREER_UPDATE_TYPES = new Set(['got_hired', 'got_promoted', 'started_learning', 'completed_course', 'new_project']);
+const PUBLICATION_FILTER = or(sql`${posts.scheduledAt} is null`, sql`${posts.scheduledAt} <= now()`);
 
 function serviceError(message, statusCode) {
   const error = new Error(message);
@@ -28,8 +29,8 @@ function topSkillGaps(analysis) {
     .filter(Boolean);
 }
 
-function selectPostShape() {
-  return {
+function selectPostShape(viewerId = null) {
+  const shape = {
     id: posts.id,
     user_id: posts.userId,
     post_type: posts.postType,
@@ -40,6 +41,7 @@ function selectPostShape() {
     likes_count: posts.likesCount,
     comments_count: posts.commentsCount,
     is_visible: posts.isVisible,
+    scheduled_at: posts.scheduledAt,
     created_at: posts.createdAt,
     updated_at: posts.updatedAt,
     user: {
@@ -54,6 +56,31 @@ function selectPostShape() {
       gap_analysis_json: analyses.gapAnalysisJson
     }
   };
+
+  if (viewerId) {
+    shape.has_liked = sql`exists(select 1 from post_likes where post_id = posts.id and user_id = ${viewerId})`.mapWith(Boolean);
+  } else {
+    shape.has_liked = sql`false`.mapWith(Boolean);
+  }
+
+  return shape;
+}
+
+function parseScheduledAt(value) {
+  if (!value) {
+    return null;
+  }
+
+  const scheduledAt = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(scheduledAt.getTime())) {
+    throw serviceError('Scheduled time is invalid', 400);
+  }
+
+  if (scheduledAt.getTime() <= Date.now()) {
+    throw serviceError('Scheduled time must be in the future', 400);
+  }
+
+  return scheduledAt;
 }
 
 async function getActorName(db, userId) {
@@ -61,9 +88,9 @@ async function getActorName(db, userId) {
   return rows[0]?.name || 'Someone';
 }
 
-async function getEnrichedPost(db, postId) {
+async function getEnrichedPost(db, postId, viewerId = null) {
   const rows = await db
-    .select(selectPostShape())
+    .select(selectPostShape(viewerId))
     .from(posts)
     .innerJoin(users, eq(posts.userId, users.id))
     .leftJoin(userProfiles, eq(posts.userId, userProfiles.userId))
@@ -129,6 +156,8 @@ export async function createPost(db, userId, data) {
     }
   }
 
+  const scheduledAt = parseScheduledAt(data.scheduled_at || data.scheduledAt);
+
   const recentRows = await db
     .select({ total: sql`count(*)::int` })
     .from(posts)
@@ -146,11 +175,12 @@ export async function createPost(db, userId, data) {
       content,
       analysisId: postType === 'analysis_share' ? data.analysis_id : null,
       jobData: postType === 'job_share' ? data.job_data : null,
-      careerUpdateType: postType === 'career_update' ? data.career_update_type : null
+      careerUpdateType: postType === 'career_update' ? data.career_update_type : null,
+      scheduledAt
     })
     .returning({ id: posts.id });
 
-  const post = await getEnrichedPost(db, inserted[0].id);
+  const post = await getEnrichedPost(db, inserted[0].id, userId);
 
   if (post && analysisRow) {
     post.analysis = {
@@ -171,14 +201,14 @@ export async function getFeedPosts(db, userId, { limit = 20, offset = 0, filterT
     .where(eq(follows.followerId, userId));
 
   const feedUserIds = [...new Set([userId, ...followingRows.map((row) => row.followingId)])];
-  const filters = [inArray(posts.userId, feedUserIds), eq(posts.isVisible, true)];
+  const filters = [inArray(posts.userId, feedUserIds), eq(posts.isVisible, true), PUBLICATION_FILTER];
 
   if (filterType) {
     filters.push(eq(posts.postType, filterType));
   }
 
   const rows = await db
-    .select(selectPostShape())
+    .select(selectPostShape(userId))
     .from(posts)
     .innerJoin(users, eq(posts.userId, users.id))
     .leftJoin(userProfiles, eq(posts.userId, userProfiles.userId))
@@ -196,8 +226,8 @@ export async function getFeedPosts(db, userId, { limit = 20, offset = 0, filterT
   }));
 }
 
-export async function getPublicFeedPosts(db, { limit = 20, offset = 0, filterType = null, userId = null } = {}) {
-  const filters = [eq(posts.isVisible, true)];
+export async function getPublicFeedPosts(db, viewerId, { limit = 20, offset = 0, filterType = null, userId = null } = {}) {
+  const filters = [eq(posts.isVisible, true), PUBLICATION_FILTER];
 
   if (filterType) {
     filters.push(eq(posts.postType, filterType));
@@ -208,7 +238,7 @@ export async function getPublicFeedPosts(db, { limit = 20, offset = 0, filterTyp
   }
 
   const rows = await db
-    .select(selectPostShape())
+    .select(selectPostShape(viewerId))
     .from(posts)
     .innerJoin(users, eq(posts.userId, users.id))
     .leftJoin(userProfiles, eq(posts.userId, userProfiles.userId))
@@ -226,34 +256,206 @@ export async function getPublicFeedPosts(db, { limit = 20, offset = 0, filterTyp
   }));
 }
 
-export async function likePost(db, userId, postId) {
-  const updated = await db
-    .update(posts)
-    .set({ likesCount: sql`${posts.likesCount} + 1`, updatedAt: new Date() })
-    .where(and(eq(posts.id, postId), eq(posts.isVisible, true)))
-    .returning({ userId: posts.userId, likesCount: posts.likesCount });
+export async function getMyPosts(db, userId, { limit = 20, offset = 0, filterType = null } = {}) {
+  const filters = [eq(posts.userId, userId), eq(posts.isVisible, true)];
 
-  const post = updated[0];
-  if (!post) {
-    throw serviceError('Post not found', 404);
+  if (filterType) {
+    filters.push(eq(posts.postType, filterType));
   }
 
-  if (post.userId !== userId) {
-    const actorName = await getActorName(db, userId);
-    createNotification(db, {
-      userId: post.userId,
-      type: 'post_like',
-      actorId: userId,
-      entityId: postId,
-      entityType: 'post',
-      message: `${actorName} liked your post`
-    });
-  }
+  const rows = await db
+    .select(selectPostShape(userId))
+    .from(posts)
+    .innerJoin(users, eq(posts.userId, users.id))
+    .leftJoin(userProfiles, eq(posts.userId, userProfiles.userId))
+    .leftJoin(analyses, eq(posts.analysisId, analyses.id))
+    .where(and(...filters))
+    .orderBy(desc(sql`coalesce(${posts.scheduledAt}, ${posts.createdAt})`))
+    .limit(normalizeLimit(limit))
+    .offset(normalizeOffset(offset));
 
-  return { success: true, newLikesCount: post.likesCount };
+  return rows.map((row) => ({
+    ...row,
+    analysis: row.analysis?.company_name || row.analysis?.confidence_score != null
+      ? { ...row.analysis, top_skill_gaps: topSkillGaps({ gapAnalysisJson: row.analysis.gap_analysis_json }) }
+      : null
+  }));
 }
 
-export async function addComment(db, userId, postId, content) {
+export async function updatePost(db, userId, postId, data) {
+  const existingRows = await db
+    .select({ id: posts.id, postType: posts.postType })
+    .from(posts)
+    .where(and(eq(posts.id, postId), eq(posts.userId, userId), eq(posts.isVisible, true)))
+    .limit(1);
+
+  const existing = existingRows[0];
+  if (!existing) {
+    throw serviceError('You cannot edit this post', 403);
+  }
+
+  const postType = data.post_type || data.postType || existing.postType;
+  const content = String(data.content || '').trim();
+
+  if (!POST_TYPES.has(postType)) {
+    throw serviceError('Invalid post type', 400);
+  }
+
+  if (!content) {
+    throw serviceError('Post content is required', 400);
+  }
+
+  if (content.length > 500) {
+    throw serviceError('Post content cannot exceed 500 characters', 400);
+  }
+
+  if (postType === 'career_update' && !CAREER_UPDATE_TYPES.has(data.career_update_type)) {
+    throw serviceError('Career update type is required', 400);
+  }
+
+  if (postType === 'job_share') {
+    const jobData = data.job_data;
+    if (!jobData || typeof jobData !== 'object' || !jobData.title || !jobData.applyUrl) {
+      throw serviceError('Job title and apply URL are required', 400);
+    }
+  }
+
+  let analysisRow = null;
+  if (postType === 'analysis_share') {
+    if (!data.analysis_id) {
+      throw serviceError('Analysis is required for this post type', 400);
+    }
+
+    const analysisRows = await db
+      .select()
+      .from(analyses)
+      .where(and(eq(analyses.id, data.analysis_id), eq(analyses.userId, userId)))
+      .limit(1);
+
+    analysisRow = analysisRows[0];
+    if (!analysisRow) {
+      throw serviceError('Analysis not found or does not belong to you', 403);
+    }
+  }
+
+  await db
+    .update(posts)
+    .set({
+      postType,
+      content,
+      analysisId: postType === 'analysis_share' ? data.analysis_id : null,
+      jobData: postType === 'job_share' ? data.job_data : null,
+      careerUpdateType: postType === 'career_update' ? data.career_update_type : null,
+      scheduledAt: parseScheduledAt(data.scheduled_at || data.scheduledAt),
+      updatedAt: new Date()
+    })
+    .where(eq(posts.id, postId));
+
+  const post = await getEnrichedPost(db, postId, userId);
+  if (post && analysisRow) {
+    post.analysis = {
+      company_name: analysisRow.companyName,
+      confidence_score: analysisRow.confidenceScore,
+      gap_analysis_json: analysisRow.gapAnalysisJson,
+      top_skill_gaps: topSkillGaps(analysisRow)
+    };
+  }
+
+  return post;
+}
+
+export async function likePost(db, userId, postId) {
+  const existingRows = await db
+    .select({ id: postLikes.id })
+    .from(postLikes)
+    .where(and(eq(postLikes.postId, postId), eq(postLikes.userId, userId)))
+    .limit(1);
+
+  const existing = existingRows[0];
+
+  if (existing) {
+    await db.delete(postLikes).where(eq(postLikes.id, existing.id));
+    const updated = await db
+      .update(posts)
+      .set({ likesCount: sql`${posts.likesCount} - 1`, updatedAt: new Date() })
+      .where(and(eq(posts.id, postId), eq(posts.isVisible, true), PUBLICATION_FILTER))
+      .returning({ userId: posts.userId, likesCount: posts.likesCount });
+      
+    if (!updated[0]) throw serviceError('Post not found', 404);
+    
+    return { success: true, liked: false, newLikesCount: updated[0].likesCount };
+  } else {
+    await db.insert(postLikes).values({ postId, userId });
+    const updated = await db
+      .update(posts)
+      .set({ likesCount: sql`${posts.likesCount} + 1`, updatedAt: new Date() })
+      .where(and(eq(posts.id, postId), eq(posts.isVisible, true), PUBLICATION_FILTER))
+      .returning({ userId: posts.userId, likesCount: posts.likesCount });
+
+    const post = updated[0];
+    if (!post) {
+      throw serviceError('Post not found', 404);
+    }
+
+    if (post.userId !== userId) {
+      const actorName = await getActorName(db, userId);
+      createNotification(db, {
+        userId: post.userId,
+        type: 'post_like',
+        actorId: userId,
+        entityId: postId,
+        entityType: 'post',
+        message: `${actorName} liked your post`
+      });
+    }
+
+    return { success: true, liked: true, newLikesCount: post.likesCount };
+  }
+}
+
+export async function deleteComment(db, userId, commentId) {
+  const commentRows = await db
+    .select({ id: postComments.id, postId: postComments.postId })
+    .from(postComments)
+    .where(and(eq(postComments.id, commentId), eq(postComments.userId, userId)))
+    .limit(1);
+
+  const comment = commentRows[0];
+  if (!comment) {
+    throw serviceError('Comment not found or you do not have permission to delete it', 403);
+  }
+
+  await db.delete(postComments).where(eq(postComments.id, commentId));
+
+  await db
+    .update(posts)
+    .set({ commentsCount: sql`GREATEST(${posts.commentsCount} - 1, 0)`, updatedAt: new Date() })
+    .where(eq(posts.id, comment.postId));
+
+  return { success: true };
+}
+
+export async function getPostLikers(db, postId, { limit = 20, offset = 0 } = {}) {
+  const rows = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      avatarUrl: users.avatarUrl,
+      username: userProfiles.username,
+      headline: userProfiles.headline
+    })
+    .from(postLikes)
+    .innerJoin(users, eq(postLikes.userId, users.id))
+    .leftJoin(userProfiles, eq(postLikes.userId, userProfiles.userId))
+    .where(eq(postLikes.postId, postId))
+    .orderBy(desc(postLikes.createdAt))
+    .limit(normalizeLimit(limit))
+    .offset(normalizeOffset(offset));
+
+  return rows;
+}
+
+export async function addComment(db, userId, postId, content, parentId = null) {
   const trimmed = String(content || '').trim();
 
   if (!trimmed) {
@@ -267,7 +469,7 @@ export async function addComment(db, userId, postId, content) {
   const postRows = await db
     .select({ userId: posts.userId })
     .from(posts)
-    .where(and(eq(posts.id, postId), eq(posts.isVisible, true)))
+    .where(and(eq(posts.id, postId), eq(posts.isVisible, true), PUBLICATION_FILTER))
     .limit(1);
 
   const post = postRows[0];
@@ -275,9 +477,12 @@ export async function addComment(db, userId, postId, content) {
     throw serviceError('Post not found', 404);
   }
 
+  const insertData = { postId, userId, content: trimmed };
+  if (parentId) insertData.parentId = parentId;
+
   const inserted = await db
     .insert(postComments)
-    .values({ postId, userId, content: trimmed })
+    .values(insertData)
     .returning({ id: postComments.id });
 
   await db
@@ -302,7 +507,9 @@ export async function addComment(db, userId, postId, content) {
       id: postComments.id,
       post_id: postComments.postId,
       user_id: postComments.userId,
+      parent_id: postComments.parentId,
       content: postComments.content,
+      likes_count: postComments.likesCount,
       created_at: postComments.createdAt,
       user: {
         name: users.name,
@@ -319,20 +526,30 @@ export async function addComment(db, userId, postId, content) {
   return rows[0];
 }
 
-export async function getPostComments(db, postId, { limit = 20, offset = 0 } = {}) {
+export async function getPostComments(db, viewerId, postId, { limit = 20, offset = 0 } = {}) {
+  const shape = {
+    id: postComments.id,
+    post_id: postComments.postId,
+    user_id: postComments.userId,
+    parent_id: postComments.parentId,
+    content: postComments.content,
+    likes_count: postComments.likesCount,
+    created_at: postComments.createdAt,
+    user: {
+      name: users.name,
+      avatar_url: users.avatarUrl,
+      username: userProfiles.username
+    }
+  };
+
+  if (viewerId) {
+    shape.has_liked = sql`exists(select 1 from comment_likes where comment_id = post_comments.id and user_id = ${viewerId})`.mapWith(Boolean);
+  } else {
+    shape.has_liked = sql`false`.mapWith(Boolean);
+  }
+
   return db
-    .select({
-      id: postComments.id,
-      post_id: postComments.postId,
-      user_id: postComments.userId,
-      content: postComments.content,
-      created_at: postComments.createdAt,
-      user: {
-        name: users.name,
-        avatar_url: users.avatarUrl,
-        username: userProfiles.username
-      }
-    })
+    .select(shape)
     .from(postComments)
     .innerJoin(users, eq(postComments.userId, users.id))
     .leftJoin(userProfiles, eq(postComments.userId, userProfiles.userId))
@@ -360,3 +577,34 @@ export async function deletePost(db, userId, postId) {
 
   return { success: true };
 }
+
+export async function toggleCommentLike(db, userId, commentId) {
+  const existingRows = await db
+    .select({ id: commentLikes.id })
+    .from(commentLikes)
+    .where(and(eq(commentLikes.commentId, commentId), eq(commentLikes.userId, userId)))
+    .limit(1);
+
+  const existing = existingRows[0];
+
+  if (existing) {
+    await db.delete(commentLikes).where(eq(commentLikes.id, existing.id));
+    const updated = await db
+      .update(postComments)
+      .set({ likesCount: sql`${postComments.likesCount} - 1` })
+      .where(eq(postComments.id, commentId))
+      .returning({ likesCount: postComments.likesCount });
+
+    return { success: true, liked: false, newLikesCount: updated[0]?.likesCount || 0 };
+  } else {
+    await db.insert(commentLikes).values({ commentId, userId });
+    const updated = await db
+      .update(postComments)
+      .set({ likesCount: sql`${postComments.likesCount} + 1` })
+      .where(eq(postComments.id, commentId))
+      .returning({ likesCount: postComments.likesCount });
+
+    return { success: true, liked: true, newLikesCount: updated[0]?.likesCount || 0 };
+  }
+}
+

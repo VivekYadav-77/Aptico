@@ -76,6 +76,15 @@ export function useNavigate() {
   const router = useRouter();
 
   return (to, options = {}) => {
+    if (typeof to === 'number') {
+      if (to === -1) {
+        router.back();
+      } else if (typeof window !== 'undefined') {
+        window.history.go(to);
+      }
+      return;
+    }
+
     const href = normalizeHref(to);
     saveNavigationState(href, options.state);
 

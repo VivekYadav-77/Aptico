@@ -128,9 +128,18 @@ export default function RewardsPage() {
       title="Rewards"
       description="Collect stickers by hitting milestones. Equip your favorites to showcase on your profile."
       actions={
-        <Link to="/profile" className="app-button-secondary flex items-center gap-2 hover:bg-[var(--panel-soft)]">
+        <Link
+          to="/profile"
+          onClick={(e) => {
+            if (typeof window !== 'undefined' && window.history.length > 1) {
+              e.preventDefault();
+              window.history.back();
+            }
+          }}
+          className="app-button-secondary flex items-center gap-2 hover:bg-[var(--panel-soft)]"
+        >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-          Back to Profile
+          Back
         </Link>
       }
     >

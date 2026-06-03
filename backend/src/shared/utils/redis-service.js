@@ -49,11 +49,11 @@ export class RedisService {
 
       const payload = await response.json();
 
-      this.logger.info(`[RedisService] ${commandName} succeeded.`, payload.result ?? null);
+      this.logger.info({ result: payload.result ?? null }, `[RedisService] ${commandName} succeeded.`);
 
       return payload.result ?? null;
     } catch (error) {
-      this.logger.error(`[RedisService] ${commandName} failed${failOpen ? ' open' : ' closed'}.`, error);
+      this.logger.error({ err: error }, `[RedisService] ${commandName} failed${failOpen ? ' open' : ' closed'}.`);
       if (!failOpen) {
         throw error;
       }
@@ -86,8 +86,18 @@ export class RedisService {
     return this.request(['EXPIRE', key, ttlSeconds]);
   }
 
-  async del(key) {
-    return this.request(['DEL', key]);
+  async keys(pattern) {
+    return this.request(['KEYS', pattern]);
+  }
+
+  async del(...keys) {
+    const normalizedKeys = keys.flat().filter(Boolean);
+
+    if (!normalizedKeys.length) {
+      return null;
+    }
+
+    return this.request(['DEL', ...normalizedKeys]);
   }
 }
 

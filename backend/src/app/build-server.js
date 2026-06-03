@@ -46,6 +46,7 @@ export function buildServer() {
   const redisService = createRedisService({
     url: env.upstashRedisRestUrl,
     token: env.upstashRedisRestToken,
+    timeoutMs: env.upstashRedisTimeoutMs,
     logger: app.log
   });
 

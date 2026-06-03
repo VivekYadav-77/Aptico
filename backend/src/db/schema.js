@@ -272,10 +272,12 @@ export const communityWins = pgTable(
     message: text('message'),
     likesCount: integer('likes_count').default(0),
     isVisible: boolean('is_visible').default(true),
+    scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
   },
   (table) => ({
     visibleCreatedAtIdx: index('community_wins_is_visible_created_at_idx').on(table.isVisible, table.createdAt),
+    visibleScheduledAtIdx: index('community_wins_is_visible_scheduled_at_idx').on(table.isVisible, table.scheduledAt),
     userIdIdx: index('community_wins_user_id_idx').on(table.userId)
   })
 );
@@ -319,12 +321,14 @@ export const posts = pgTable(
     likesCount: integer('likes_count').default(0),
     commentsCount: integer('comments_count').default(0),
     isVisible: boolean('is_visible').default(true),
+    scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow()
   },
   (table) => ({
     userCreatedAtIdx: index('posts_user_id_created_at_idx').on(table.userId, table.createdAt),
     visibleCreatedAtIdx: index('posts_is_visible_created_at_idx').on(table.isVisible, table.createdAt),
+    visibleScheduledAtIdx: index('posts_is_visible_scheduled_at_idx').on(table.isVisible, table.scheduledAt),
     postTypeCheck: check(
       'posts_post_type_check',
       sql`${table.postType} in ('career_update', 'job_tip', 'job_share', 'analysis_share', 'question')`
@@ -346,11 +350,31 @@ export const postComments = pgTable(
     userId: uuid('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
+    parentId: uuid('parent_id'),
     content: text('content').notNull(),
+    likesCount: integer('likes_count').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
   },
   (table) => ({
     postCreatedAtIdx: index('post_comments_post_id_created_at_idx').on(table.postId, table.createdAt)
+  })
+);
+
+
+export const commentLikes = pgTable(
+  'comment_likes',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    commentId: uuid('comment_id')
+      .notNull()
+      .references(() => postComments.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
+  },
+  (table) => ({
+    commentUserIdx: uniqueIndex('comment_likes_comment_id_user_id_idx').on(table.commentId, table.userId)
   })
 );
 
@@ -505,6 +529,40 @@ export const applicationLogs = pgTable(
     userIdIdx: index('application_logs_user_id_idx').on(table.userId),
     userIdCreatedAtIdx: index('application_logs_user_id_created_at_idx').on(table.userId, table.createdAt),
     squadIdIdx: index('application_logs_squad_id_idx').on(table.squadId)
+  })
+);
+
+export const postLikes = pgTable(
+  'post_likes',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    postId: uuid('post_id')
+      .notNull()
+      .references(() => posts.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
+  },
+  (table) => ({
+    postUserIdx: uniqueIndex('post_likes_post_id_user_id_idx').on(table.postId, table.userId)
+  })
+);
+
+export const winLikes = pgTable(
+  'win_likes',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    winId: uuid('win_id')
+      .notNull()
+      .references(() => communityWins.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
+  },
+  (table) => ({
+    winUserIdx: uniqueIndex('win_likes_win_id_user_id_idx').on(table.winId, table.userId)
   })
 );
 

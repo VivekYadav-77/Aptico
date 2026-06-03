@@ -1,6 +1,8 @@
 import crypto from 'node:crypto';
 import { and, desc, eq, lt, or, sql } from 'drizzle-orm';
-import { communityWins, publicJobCache, userProfiles, users } from '../../db/schema.js';
+import { communityWins, publicJobCache, userProfiles, users, winLikes } from '../../db/schema.js';
+
+const MAX_WINS_PER_WEEK = 3;
 
 function serviceError(message, statusCode) {
   const error = new Error(message);
@@ -11,6 +13,89 @@ function serviceError(message, statusCode) {
 function trimOrNull(value) {
   const trimmed = String(value || '').trim();
   return trimmed || null;
+}
+
+function parseScheduledAt(value) {
+  if (!value) {
+    return null;
+  }
+
+  const scheduledAt = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(scheduledAt.getTime())) {
+    throw serviceError('Scheduled time is invalid', 400);
+  }
+
+  if (scheduledAt.getTime() <= Date.now()) {
+    throw serviceError('Scheduled time must be in the future', 400);
+  }
+
+  return scheduledAt;
+}
+
+function selectWinShape(viewerId = null) {
+  const shape = {
+    id: communityWins.id,
+    user_id: communityWins.userId,
+    role_title: communityWins.roleTitle,
+    company_name: communityWins.companyName,
+    search_duration_weeks: communityWins.searchDurationWeeks,
+    message: communityWins.message,
+    likes_count: communityWins.likesCount,
+    is_visible: communityWins.isVisible,
+    scheduled_at: communityWins.scheduledAt,
+    created_at: communityWins.createdAt,
+    user: {
+      name: users.name,
+      avatar_url: users.avatarUrl,
+      username: userProfiles.username
+    }
+  };
+
+  if (viewerId) {
+    shape.has_liked = sql`exists(select 1 from win_likes where win_id = community_wins.id and user_id = ${viewerId})`.mapWith(Boolean);
+  } else {
+    shape.has_liked = sql`false`.mapWith(Boolean);
+  }
+
+  return shape;
+}
+
+function getWeekBounds(value) {
+  const date = new Date(value);
+  const start = new Date(date);
+  const day = start.getDay();
+  const daysSinceMonday = (day + 6) % 7;
+
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - daysSinceMonday);
+
+  const end = new Date(start);
+  end.setDate(end.getDate() + 7);
+
+  return { start, end };
+}
+
+async function assertWeeklyWinLimit(db, userId, publicationDate, { excludeWinId = null } = {}) {
+  const { start, end } = getWeekBounds(publicationDate);
+  const filters = [
+    eq(communityWins.userId, userId),
+    eq(communityWins.isVisible, true),
+    sql`coalesce(${communityWins.scheduledAt}, ${communityWins.createdAt}) >= ${start}`,
+    sql`coalesce(${communityWins.scheduledAt}, ${communityWins.createdAt}) < ${end}`
+  ];
+
+  if (excludeWinId) {
+    filters.push(sql`${communityWins.id} <> ${excludeWinId}`);
+  }
+
+  const rows = await db
+    .select({ total: sql`count(*)::int` })
+    .from(communityWins)
+    .where(and(...filters));
+
+  if (Number(rows[0]?.total || 0) >= MAX_WINS_PER_WEEK) {
+    throw serviceError(`You can publish up to ${MAX_WINS_PER_WEEK} community wins per week`, 429);
+  }
 }
 
 function normalizeJobId(job) {
@@ -33,6 +118,7 @@ export async function postWin(db, userId, data) {
   const companyName = trimOrNull(data.company_name || data.companyName);
   const message = trimOrNull(data.message);
   const duration = data.search_duration_weeks ?? data.searchDurationWeeks ?? null;
+  const scheduledAt = parseScheduledAt(data.scheduled_at || data.scheduledAt);
 
   if (!roleTitle || roleTitle.length > 100) {
     throw serviceError('Role title is required and must be 100 characters or less', 400);
@@ -50,15 +136,7 @@ export async function postWin(db, userId, data) {
     throw serviceError('Message must be 280 characters or less', 400);
   }
 
-  const recentRows = await db
-    .select({ id: communityWins.id })
-    .from(communityWins)
-    .where(and(eq(communityWins.userId, userId), sql`${communityWins.createdAt} > now() - interval '7 days'`))
-    .limit(1);
-
-  if (recentRows[0]) {
-    throw serviceError('You can post one win per week', 429);
-  }
+  await assertWeeklyWinLimit(db, userId, scheduledAt || new Date());
 
   const inserted = await db
     .insert(communityWins)
@@ -67,25 +145,13 @@ export async function postWin(db, userId, data) {
       roleTitle,
       companyName,
       searchDurationWeeks: duration === null ? null : Number(duration),
-      message
+      message,
+      scheduledAt
     })
     .returning();
 
   const rows = await db
-    .select({
-      id: communityWins.id,
-      role_title: communityWins.roleTitle,
-      company_name: communityWins.companyName,
-      search_duration_weeks: communityWins.searchDurationWeeks,
-      message: communityWins.message,
-      likes_count: communityWins.likesCount,
-      created_at: communityWins.createdAt,
-      user: {
-        name: users.name,
-        avatar_url: users.avatarUrl,
-        username: userProfiles.username
-      }
-    })
+    .select(selectWinShape(userId))
     .from(communityWins)
     .innerJoin(users, eq(communityWins.userId, users.id))
     .leftJoin(userProfiles, eq(communityWins.userId, userProfiles.userId))
@@ -95,26 +161,13 @@ export async function postWin(db, userId, data) {
   return rows[0];
 }
 
-export async function getWinsFeed(db, { limit = 20, offset = 0 } = {}) {
+export async function getWinsFeed(db, viewerId, { limit = 20, offset = 0 } = {}) {
   const rows = await db
-    .select({
-      id: communityWins.id,
-      role_title: communityWins.roleTitle,
-      company_name: communityWins.companyName,
-      search_duration_weeks: communityWins.searchDurationWeeks,
-      message: communityWins.message,
-      likes_count: communityWins.likesCount,
-      created_at: communityWins.createdAt,
-      user: {
-        name: users.name,
-        avatar_url: users.avatarUrl,
-        username: userProfiles.username
-      }
-    })
+    .select(selectWinShape(viewerId))
     .from(communityWins)
     .innerJoin(users, eq(communityWins.userId, users.id))
     .leftJoin(userProfiles, eq(communityWins.userId, userProfiles.userId))
-    .where(eq(communityWins.isVisible, true))
+    .where(and(eq(communityWins.isVisible, true), or(sql`${communityWins.scheduledAt} is null`, sql`${communityWins.scheduledAt} <= now()`)))
     .orderBy(desc(communityWins.createdAt))
     .limit(limit)
     .offset(offset);
@@ -122,18 +175,154 @@ export async function getWinsFeed(db, { limit = 20, offset = 0 } = {}) {
   return rows;
 }
 
-export async function likeWin(db, userId, winId) {
-  const rows = await db
-    .update(communityWins)
-    .set({ likesCount: sql`${communityWins.likesCount} + 1` })
-    .where(and(eq(communityWins.id, winId), eq(communityWins.isVisible, true)))
-    .returning({ likesCount: communityWins.likesCount });
+export async function getMyWins(db, userId, { limit = 20, offset = 0 } = {}) {
+  return db
+    .select(selectWinShape(userId))
+    .from(communityWins)
+    .innerJoin(users, eq(communityWins.userId, users.id))
+    .leftJoin(userProfiles, eq(communityWins.userId, userProfiles.userId))
+    .where(and(eq(communityWins.userId, userId), eq(communityWins.isVisible, true)))
+    .orderBy(desc(sql`coalesce(${communityWins.scheduledAt}, ${communityWins.createdAt})`))
+    .limit(limit)
+    .offset(offset);
+}
 
-  if (!rows[0]) {
-    throw serviceError('Win not found', 404);
+export async function updateWin(db, userId, winId, data) {
+  const roleTitle = trimOrNull(data.role_title || data.roleTitle);
+  const companyName = trimOrNull(data.company_name || data.companyName);
+  const message = trimOrNull(data.message);
+  const duration = data.search_duration_weeks ?? data.searchDurationWeeks ?? null;
+
+  if (!roleTitle || roleTitle.length > 100) {
+    throw serviceError('Role title is required and must be 100 characters or less', 400);
   }
 
-  return { success: true, newLikesCount: rows[0].likesCount };
+  if (companyName && companyName.length > 100) {
+    throw serviceError('Company name must be 100 characters or less', 400);
+  }
+
+  if (duration !== null && (!Number.isInteger(Number(duration)) || Number(duration) < 1 || Number(duration) > 200)) {
+    throw serviceError('Search duration must be an integer from 1 to 200 weeks', 400);
+  }
+
+  if (message && message.length > 280) {
+    throw serviceError('Message must be 280 characters or less', 400);
+  }
+
+  const existingRows = await db
+    .select({
+      id: communityWins.id,
+      createdAt: communityWins.createdAt,
+      scheduledAt: communityWins.scheduledAt
+    })
+    .from(communityWins)
+    .where(and(eq(communityWins.id, winId), eq(communityWins.userId, userId), eq(communityWins.isVisible, true)))
+    .limit(1);
+
+  const existingWin = existingRows[0];
+  if (!existingWin) {
+    throw serviceError('You cannot edit this win', 403);
+  }
+
+  const scheduledAt = parseScheduledAt(data.scheduled_at || data.scheduledAt);
+  const existingScheduleIsFuture = existingWin.scheduledAt && new Date(existingWin.scheduledAt).getTime() > Date.now();
+  const publicationDate = scheduledAt || (existingScheduleIsFuture ? new Date() : existingWin.createdAt || new Date());
+
+  await assertWeeklyWinLimit(db, userId, publicationDate, { excludeWinId: winId });
+
+  const updated = await db
+    .update(communityWins)
+    .set({
+      roleTitle,
+      companyName,
+      searchDurationWeeks: duration === null ? null : Number(duration),
+      message,
+      scheduledAt
+    })
+    .where(and(eq(communityWins.id, winId), eq(communityWins.userId, userId), eq(communityWins.isVisible, true)))
+    .returning({ id: communityWins.id });
+
+  if (!updated[0]) {
+    throw serviceError('You cannot edit this win', 403);
+  }
+
+  const rows = await db
+    .select(selectWinShape(userId))
+    .from(communityWins)
+    .innerJoin(users, eq(communityWins.userId, users.id))
+    .leftJoin(userProfiles, eq(communityWins.userId, userProfiles.userId))
+    .where(eq(communityWins.id, updated[0].id))
+    .limit(1);
+
+  return rows[0];
+}
+
+export async function deleteWin(db, userId, winId) {
+  const updated = await db
+    .update(communityWins)
+    .set({ isVisible: false })
+    .where(and(eq(communityWins.id, winId), eq(communityWins.userId, userId), eq(communityWins.isVisible, true)))
+    .returning({ id: communityWins.id });
+
+  if (!updated[0]) {
+    throw serviceError('You cannot delete this win', 403);
+  }
+
+  return { success: true };
+}
+
+export async function likeWin(db, userId, winId) {
+  const existingRows = await db
+    .select({ id: winLikes.id })
+    .from(winLikes)
+    .where(and(eq(winLikes.winId, winId), eq(winLikes.userId, userId)))
+    .limit(1);
+
+  const existing = existingRows[0];
+
+  if (existing) {
+    await db.delete(winLikes).where(eq(winLikes.id, existing.id));
+    const rows = await db
+      .update(communityWins)
+      .set({ likesCount: sql`${communityWins.likesCount} - 1` })
+      .where(and(eq(communityWins.id, winId), eq(communityWins.isVisible, true), or(sql`${communityWins.scheduledAt} is null`, sql`${communityWins.scheduledAt} <= now()`)))
+      .returning({ likesCount: communityWins.likesCount });
+
+    if (!rows[0]) throw serviceError('Win not found', 404);
+
+    return { success: true, liked: false, newLikesCount: rows[0].likesCount };
+  } else {
+    await db.insert(winLikes).values({ winId, userId });
+    const rows = await db
+      .update(communityWins)
+      .set({ likesCount: sql`${communityWins.likesCount} + 1` })
+      .where(and(eq(communityWins.id, winId), eq(communityWins.isVisible, true), or(sql`${communityWins.scheduledAt} is null`, sql`${communityWins.scheduledAt} <= now()`)))
+      .returning({ likesCount: communityWins.likesCount });
+
+    if (!rows[0]) throw serviceError('Win not found', 404);
+
+    return { success: true, liked: true, newLikesCount: rows[0].likesCount };
+  }
+}
+
+export async function getWinLikers(db, winId, { limit = 20, offset = 0 } = {}) {
+  const rows = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      avatarUrl: users.avatarUrl,
+      username: userProfiles.username,
+      headline: userProfiles.headline
+    })
+    .from(winLikes)
+    .innerJoin(users, eq(winLikes.userId, users.id))
+    .leftJoin(userProfiles, eq(winLikes.userId, userProfiles.userId))
+    .where(eq(winLikes.winId, winId))
+    .orderBy(desc(winLikes.createdAt))
+    .limit(limit)
+    .offset(offset);
+
+  return rows;
 }
 
 export async function getPublicJobsFeed(db, { limit = 30, offset = 0, jobType = null } = {}) {

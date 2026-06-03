@@ -20,9 +20,29 @@ export async function postWin(payload) {
   return response.data;
 }
 
+export async function getMyWins(params = {}) {
+  const response = await api.get('/api/social/wins/mine', { params });
+  return response.data;
+}
+
+export async function updateWin(winId, payload) {
+  const response = await api.put(`/api/social/wins/${winId}`, payload);
+  return response.data;
+}
+
+export async function deleteWin(winId) {
+  const response = await api.delete(`/api/social/wins/${winId}`);
+  return response.data;
+}
+
 export async function likeWin(winId) {
   const response = await api.post(`/api/social/wins/${winId}/like`);
   return response.data;
+}
+
+export async function getWinLikers(winId, params = {}) {
+  const response = await api.get(`/api/social/wins/${winId}/likes`, { params });
+  return response.data.likers || [];
 }
 
 export async function getPublicProfile(username) {
@@ -85,6 +105,11 @@ export async function getFeedPosts(params = {}) {
   return response.data;
 }
 
+export async function getMyPosts(params = {}) {
+  const response = await api.get('/api/social/posts/mine', { params });
+  return response.data;
+}
+
 export async function getPublicFeedPosts(params = {}) {
   const response = await api.get('/api/social/feed/public', { params });
   return response.data;
@@ -95,8 +120,15 @@ export async function likePost(postId) {
   return response.data;
 }
 
-export async function addPostComment(postId, content) {
-  const response = await api.post(`/api/social/posts/${postId}/comments`, { content });
+export async function getPostLikers(postId, params = {}) {
+  const response = await api.get(`/api/social/posts/${postId}/likes`, { params });
+  return response.data.likers || [];
+}
+
+export async function addPostComment(postId, content, parent_id = null) {
+  const payload = { content };
+  if (parent_id) payload.parent_id = parent_id;
+  const response = await api.post(`/api/social/posts/${postId}/comments`, payload);
   return response.data;
 }
 
@@ -105,8 +137,23 @@ export async function getPostComments(postId, params = {}) {
   return response.data.comments || [];
 }
 
+export async function likeComment(commentId) {
+  const response = await api.post(`/api/social/comments/${commentId}/like`);
+  return response.data;
+}
+
+export async function deletePostComment(commentId) {
+  const response = await api.delete(`/api/social/comments/${commentId}`);
+  return response.data;
+}
+
 export async function deleteSocialPost(postId) {
   const response = await api.delete(`/api/social/posts/${postId}`);
+  return response.data;
+}
+
+export async function updateSocialPost(postId, payload) {
+  const response = await api.put(`/api/social/posts/${postId}`, payload);
   return response.data;
 }
 

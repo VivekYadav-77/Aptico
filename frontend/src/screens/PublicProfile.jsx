@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from '@/lib/router-compat.jsx';
 import { useSelector } from 'react-redux';
 import PostComposer from '../components/PostComposer.jsx';
+import ProfileActivityPost from '../components/ProfileActivityPost.jsx';
 import {
   followProfile,
   getConnectionStatus,
@@ -232,6 +233,7 @@ export default function PublicProfile() {
   const [connectOpen, setConnectOpen] = useState(false);
   const [connectNote, setConnectNote] = useState('');
   const [composerOpen, setComposerOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState(null);
   const [toast, setToast] = useState('');
   const [aboutExpanded, setAboutExpanded] = useState(false);
 
@@ -495,9 +497,18 @@ export default function PublicProfile() {
         
         {/* Top bar */}
         <div className="flex items-center justify-between mb-4">
-            <Link to="/" className="inline-flex items-center gap-2 text-sm font-bold text-[var(--muted-strong)] hover:text-[var(--text)] transition-all bg-[var(--panel)]/40 hover:bg-[var(--panel)]/80 backdrop-blur-xl px-4 py-2.5 rounded-xl border border-[var(--border)] hover:border-[var(--muted)] shadow-sm hover:shadow-md group">
+            <Link
+              to="/"
+              onClick={(e) => {
+                if (typeof window !== 'undefined' && window.history.length > 1) {
+                  e.preventDefault();
+                  window.history.back();
+                }
+              }}
+              className="inline-flex items-center gap-2 text-sm font-bold text-[var(--muted-strong)] hover:text-[var(--text)] transition-all bg-[var(--panel)]/40 hover:bg-[var(--panel)]/80 backdrop-blur-xl px-4 py-2.5 rounded-xl border border-[var(--border)] hover:border-[var(--muted)] shadow-sm hover:shadow-md group"
+            >
                <svg className="w-4 h-4 transition-transform group-hover:-translate-x-1" autoFocus fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M15 19l-7-7 7-7" /></svg>
-               Back to Workspace
+               Back
             </Link>
             {toast ? <div className="rounded-xl border border-[var(--accent)]/30 bg-[var(--accent-soft)] px-5 py-2 text-sm font-black text-[var(--accent-strong)] animate-fade-in-up shadow-lg shadow-[var(--accent)]/10">{toast}</div> : null}
         </div>
@@ -915,7 +926,16 @@ export default function PublicProfile() {
                   ) : isSectionVisible('activity') ? (
                     <SectionCard id="activity" title="Activity" accentColor="#8b5cf6" isEmpty={!posts.length} emptyMessage="No recent activity.">
                       <div className="space-y-3">
-                        {posts.map((post) => <MiniPost key={post.id} post={post} />)}
+                        {posts.map((post) => (
+                          <ProfileActivityPost
+                            key={post.id}
+                            post={post}
+                            currentUserId={auth.user?.id}
+                            onPostChanged={(next) => setPosts((current) => current.map((item) => item.id === next.id ? next : item))}
+                            onDeleted={(postId) => setPosts((current) => current.filter((item) => item.id !== postId))}
+                            onEdit={viewingOwnProfile ? setEditingPost : undefined}
+                          />
+                        ))}
                         {posts.length >= 5 && <Link to="/home" className="block text-center text-xs font-black uppercase tracking-widest text-[#8b5cf6] hover:text-[var(--text)] transition-colors mt-4 py-2 border border-[#8b5cf6]/20 bg-[#8b5cf6]/5 rounded-xl">View all activity</Link>}
                       </div>
                     </SectionCard>
@@ -1216,6 +1236,15 @@ export default function PublicProfile() {
       </div>
 
       <PostComposer open={composerOpen} onClose={() => setComposerOpen(false)} onCreated={(post) => setPosts((current) => [post, ...current].slice(0, 5))} />
+      <PostComposer
+        open={Boolean(editingPost)}
+        initialPost={editingPost}
+        onClose={() => setEditingPost(null)}
+        onUpdated={(post) => {
+          setPosts((current) => current.map((item) => item.id === post.id ? post : item));
+          setToast('Post updated.');
+        }}
+      />
       
       {connectOpen ? (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4 backdrop-blur-md animate-fade-in">

@@ -2,15 +2,20 @@ import { useEffect, useState } from 'react';
 import { Link } from '@/lib/router-compat.jsx';
 import { useSelector } from 'react-redux';
 import AppShell from '../components/AppShell.jsx';
+import ConfirmDialog from '../components/ConfirmDialog.jsx';
+import PostComments from '../components/PostComments.jsx';
 import PostComposer from '../components/PostComposer.jsx';
+import UserListModal from '../components/UserListModal.jsx';
 import {
   addPostComment,
   deleteSocialPost,
   getConnections,
   getFeedPosts,
+  getMyPosts,
   getMyProfile,
   getPendingConnections,
   getPostComments,
+  getPostLikers,
   likePost,
   respondToConnection,
   searchPeople,
@@ -58,6 +63,10 @@ function timeAgo(value) {
   return `${days}d ago`;
 }
 
+function isScheduledFuture(value) {
+  return value && new Date(value).getTime() > Date.now();
+}
+
 function Avatar({ user, size = 'h-11 w-11' }) {
   return user?.avatar_url ? (
     <img src={user.avatar_url} alt="" className={`${size} rounded-full object-cover`} />
@@ -88,54 +97,59 @@ function AnalysisCard({ analysis, isOwn }) {
   );
 }
 
-function PostCard({ post, currentUserId, onPostChanged, onDeleted }) {
+function PostCard({ post, currentUserId, onPostChanged, onDeleted, onEdit, onShowLikers }) {
   const [commentsOpen, setCommentsOpen] = useState(false);
-  const [comments, setComments] = useState([]);
-  const [comment, setComment] = useState('');
-  const [loadingComments, setLoadingComments] = useState(false);
-  const isOwn = post.user_id === currentUserId;
+  const [actionError, setActionError] = useState('');
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const isOwn = Boolean(post.user_id && currentUserId && String(post.user_id) === String(currentUserId));
   const [label, className] = typeLabels[post.post_type] || ['Post', 'bg-[var(--panel-soft)] text-[var(--muted-strong)]'];
 
   async function handleLike() {
-    const result = await likePost(post.id);
-    onPostChanged({ ...post, likes_count: result.newLikesCount });
-  }
-
-  async function toggleComments() {
-    const next = !commentsOpen;
-    setCommentsOpen(next);
-    if (next && !comments.length) {
-      setLoadingComments(true);
-      getPostComments(post.id, { limit: 5 }).then(setComments).finally(() => setLoadingComments(false));
+    setActionError('');
+    try {
+      const result = await likePost(post.id);
+      onPostChanged({ ...post, likes_count: result.newLikesCount, has_liked: result.liked });
+    } catch (requestError) {
+      setActionError(requestError.response?.data?.error || requestError.response?.data?.message || 'Could not like this post.');
     }
   }
 
-  async function submitComment(event) {
-    event.preventDefault();
-    if (!comment.trim()) return;
-    const created = await addPostComment(post.id, comment);
-    setComments((current) => [...current, created]);
-    setComment('');
-    onPostChanged({ ...post, comments_count: (post.comments_count || 0) + 1 });
+  function toggleComments() {
+    setCommentsOpen(!commentsOpen);
   }
 
   async function handleDelete() {
-    if (!window.confirm('Delete this post?')) return;
-    await deleteSocialPost(post.id);
-    onDeleted(post.id);
+    setActionError('');
+    setDeleting(true);
+    try {
+      await deleteSocialPost(post.id);
+      setDeleteOpen(false);
+      onDeleted(post.id);
+    } catch (requestError) {
+      setActionError(requestError.response?.data?.error || requestError.response?.data?.message || 'Could not delete this post.');
+    } finally {
+      setDeleting(false);
+    }
   }
 
   return (
+    <>
     <article id={`post-${post.id}`} className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5">
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 gap-3">
           <Avatar user={post.user} />
           <div className="min-w-0">
             {post.user?.username ? <Link to={`/u/${post.user.username}`} className="font-black text-[var(--text)] hover:text-[var(--accent-strong)]">{post.user?.name || post.user.username}</Link> : <p className="font-black text-[var(--text)]">{post.user?.name || 'Aptico member'}</p>}
-            <p className="truncate text-xs text-[var(--muted-strong)]">{post.user?.headline || 'Career builder'} - {timeAgo(post.created_at)}</p>
+            <p className="truncate text-xs text-[var(--muted-strong)]">
+              {post.user?.headline || 'Career builder'} - {isScheduledFuture(post.scheduled_at) ? `Scheduled ${new Date(post.scheduled_at).toLocaleString()}` : timeAgo(post.created_at)}
+            </p>
           </div>
         </div>
-        <span className={`rounded-full px-3 py-1 text-xs font-black ${className}`}>{label}</span>
+        <div className="flex flex-wrap justify-end gap-2">
+          {isScheduledFuture(post.scheduled_at) ? <span className="rounded-full bg-amber-500/10 px-3 py-1 text-xs font-black text-amber-600">Scheduled</span> : null}
+          <span className={`rounded-full px-3 py-1 text-xs font-black ${className}`}>{label}</span>
+        </div>
       </div>
 
       {post.career_update_type ? <span className="mt-4 inline-flex rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-bold text-[var(--accent-strong)]">{careerLabels[post.career_update_type] || post.career_update_type}</span> : null}
@@ -154,37 +168,34 @@ function PostCard({ post, currentUserId, onPostChanged, onDeleted }) {
       {post.post_type === 'question' ? <p className="mt-3 text-sm font-semibold text-[var(--muted-strong)]">{post.comments_count || 0} answers</p> : null}
 
       <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-[var(--border)] pt-4">
-        <button type="button" className="app-button-secondary px-3 py-2" onClick={handleLike}>
-          <span className="material-symbols-outlined text-[18px]">thumb_up</span>{post.likes_count || 0}
-        </button>
+        <div className="flex" role="group">
+          <button type="button" className={`px-3 py-2 rounded-r-none border-r-0 ${post.has_liked ? 'app-button' : 'app-button-secondary'}`} onClick={handleLike}>
+            <span className="material-symbols-outlined text-[18px]">thumb_up</span>
+          </button>
+          <button type="button" className={`px-3 py-2 rounded-l-none border-l-[rgba(0,0,0,0.1)] ${post.has_liked ? 'app-button' : 'app-button-secondary'}`} onClick={() => onShowLikers?.(post.id)}>
+            {post.likes_count || 0}
+          </button>
+        </div>
         <button type="button" className="app-button-secondary px-3 py-2" onClick={toggleComments}>
           <span className="material-symbols-outlined text-[18px]">chat</span>{post.comments_count || 0}
         </button>
-        {isOwn ? <button type="button" className="app-button-secondary px-3 py-2 text-red-500" onClick={handleDelete}><span className="material-symbols-outlined text-[18px]">delete</span>Delete</button> : null}
+        {isOwn ? <button type="button" className="app-button-secondary px-3 py-2" onClick={() => onEdit?.(post)}><span className="material-symbols-outlined text-[18px]">edit</span>Edit</button> : null}
+        {isOwn ? <button type="button" className="app-button-secondary px-3 py-2 text-red-500" onClick={() => setDeleteOpen(true)}><span className="material-symbols-outlined text-[18px]">delete</span>Delete</button> : null}
       </div>
+      {actionError ? <p className="mt-3 rounded-lg border border-red-500/25 bg-red-500/10 p-3 text-sm font-semibold text-red-500">{actionError}</p> : null}
 
-      {commentsOpen ? (
-        <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] p-4">
-          {loadingComments ? <p className="text-sm text-[var(--muted-strong)]">Loading comments...</p> : null}
-          <div className="space-y-3">
-            {comments.map((item) => (
-              <div key={item.id} className="flex gap-3">
-                <Avatar user={item.user} size="h-8 w-8" />
-                <div>
-                  <p className="text-sm font-bold text-[var(--text)]">{item.user?.name || item.user?.username || 'Member'}</p>
-                  <p className="text-sm text-[var(--muted-strong)]">{item.content}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-          {(post.comments_count || 0) > comments.length ? <button type="button" className="mt-3 text-sm font-bold text-[var(--accent-strong)]" onClick={() => getPostComments(post.id, { limit: 20 }).then(setComments)}>Show all {post.comments_count} comments</button> : null}
-          <form onSubmit={submitComment} className="mt-4 flex gap-2">
-            <input className="app-input" placeholder="Add a comment" value={comment} onChange={(event) => setComment(event.target.value)} maxLength={300} />
-            <button type="submit" className="app-button">Post</button>
-          </form>
-        </div>
-      ) : null}
+      {commentsOpen ? <PostComments postId={post.id} initialCommentsCount={post.comments_count || 0} onCommentAdded={() => onPostChanged({ ...post, comments_count: (post.comments_count || 0) + 1 })} /> : null}
     </article>
+    <ConfirmDialog
+      open={deleteOpen}
+      title="Delete this post?"
+      description="This removes the post from your feed, profile activity, and any connected conversations."
+      confirmLabel="Delete Post"
+      loading={deleting}
+      onCancel={() => setDeleteOpen(false)}
+      onConfirm={handleDelete}
+    />
+    </>
   );
 }
 
@@ -196,10 +207,13 @@ export default function HomeFeed() {
   const [people, setPeople] = useState([]);
   const [posts, setPosts] = useState([]);
   const [filterType, setFilterType] = useState(null);
+  const [viewMode, setViewMode] = useState('feed');
   const [offset, setOffset] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [editingPost, setEditingPost] = useState(null);
+  const [likersPostId, setLikersPostId] = useState(null);
   const [connectUser, setConnectUser] = useState(null);
   const [connectNote, setConnectNote] = useState('');
   const [toast, setToast] = useState('');
@@ -213,17 +227,19 @@ export default function HomeFeed() {
 
   useEffect(() => {
     setLoading(true);
-    getFeedPosts({ limit: 20, offset: 0, filterType })
+    const loader = viewMode === 'mine' ? getMyPosts : getFeedPosts;
+    loader({ limit: 20, offset: 0, filterType })
       .then((result) => {
         setPosts(result.posts || []);
         setHasMore(Boolean(result.hasMore));
         setOffset(20);
       })
       .finally(() => setLoading(false));
-  }, [filterType]);
+  }, [filterType, viewMode]);
 
   async function loadMore() {
-    const result = await getFeedPosts({ limit: 20, offset, filterType });
+    const loader = viewMode === 'mine' ? getMyPosts : getFeedPosts;
+    const result = await loader({ limit: 20, offset, filterType });
     setPosts((current) => [...current, ...(result.posts || [])]);
     setHasMore(Boolean(result.hasMore));
     setOffset((current) => current + 20);
@@ -317,6 +333,16 @@ export default function HomeFeed() {
             <Avatar user={{ ...auth.user, avatar_url: auth.user?.avatarUrl }} />
             <span className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-3 text-sm text-[var(--muted-strong)]">Share a career update...</span>
           </button>
+          <div className="grid grid-cols-2 gap-2 rounded-lg border border-[var(--border)] bg-[var(--panel)] p-2">
+            <button type="button" onClick={() => setViewMode('feed')} className={viewMode === 'feed' ? 'app-button py-2' : 'app-button-secondary py-2'}>
+              <span className="material-symbols-outlined text-[18px]">dynamic_feed</span>
+              Feed
+            </button>
+            <button type="button" onClick={() => setViewMode('mine')} className={viewMode === 'mine' ? 'app-button py-2' : 'app-button-secondary py-2'}>
+              <span className="material-symbols-outlined text-[18px]">inventory_2</span>
+              My Posts
+            </button>
+          </div>
           <div className="flex gap-2 overflow-x-auto rounded-lg border border-[var(--border)] bg-[var(--panel)] p-3">
             {filters.map(([label, value]) => (
               <button key={label} type="button" onClick={() => setFilterType(value)} className={filterType === value ? 'app-button whitespace-nowrap px-3 py-2' : 'app-button-secondary whitespace-nowrap px-3 py-2'}>{label}</button>
@@ -333,16 +359,36 @@ export default function HomeFeed() {
                   currentUserId={auth.user?.id}
                   onPostChanged={(next) => setPosts((current) => current.map((item) => item.id === next.id ? next : item))}
                   onDeleted={(postId) => setPosts((current) => current.filter((item) => item.id !== postId))}
+                  onEdit={setEditingPost}
+                  onShowLikers={setLikersPostId}
                 />
               ))}
-              {!posts.length ? <p className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-6 text-center text-sm text-[var(--muted-strong)]">No posts yet. Share the first useful update.</p> : null}
+              {!posts.length ? <p className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-6 text-center text-sm text-[var(--muted-strong)]">{viewMode === 'mine' ? 'You have not shared anything yet. Your old and scheduled posts will appear here.' : 'No posts yet. Share the first useful update.'}</p> : null}
             </div>
           )}
           {hasMore ? <div className="text-center"><button type="button" className="app-button-secondary" onClick={loadMore}>Load more</button></div> : null}
         </section>
         {rightCard}
       </div>
-      <PostComposer open={composerOpen} onClose={() => setComposerOpen(false)} onCreated={(post) => { setPosts((current) => [post, ...current]); setToast('Posted!'); }} />
+      <PostComposer
+        open={composerOpen}
+        onClose={() => setComposerOpen(false)}
+        onCreated={(post) => {
+          if (viewMode === 'mine' || !isScheduledFuture(post.scheduled_at)) {
+            setPosts((current) => [post, ...current]);
+          }
+          setToast(isScheduledFuture(post.scheduled_at) ? 'Post scheduled.' : 'Posted!');
+        }}
+      />
+      <PostComposer
+        open={Boolean(editingPost)}
+        initialPost={editingPost}
+        onClose={() => setEditingPost(null)}
+        onUpdated={(post) => {
+          setPosts((current) => current.map((item) => item.id === post.id ? post : item));
+          setToast(isScheduledFuture(post.scheduled_at) ? 'Post scheduled.' : 'Post updated.');
+        }}
+      />
       {connectUser ? (
         <div className="fixed inset-0 z-[210] flex items-center justify-center bg-black/55 p-4">
           <form onSubmit={submitConnection} className="w-full max-w-md rounded-lg border border-[var(--border)] bg-[var(--panel)] p-6">
@@ -355,6 +401,13 @@ export default function HomeFeed() {
           </form>
         </div>
       ) : null}
+      <UserListModal
+        isOpen={Boolean(likersPostId)}
+        onClose={() => setLikersPostId(null)}
+        title="Liked by"
+        fetchData={() => getPostLikers(likersPostId)}
+        emptyMessage="No one has liked this post yet."
+      />
     </AppShell>
   );
 }
