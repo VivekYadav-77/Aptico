@@ -1,9 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
-import { Link, useNavigate } from '@/lib/router-compat.jsx';
+import { Link, useNavigate, useSearchParams } from '@/lib/router-compat.jsx';
 import { useSelector } from 'react-redux';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import UserListModal from '../components/UserListModal.jsx';
-import { deleteWin, getMyWins, getWins, likeWin, getWinLikers, postWin, updateWin } from '../api/socialApi.js';
+import { deleteWin, getMyWins, getWinById, getWins, likeWin, getWinLikers, postWin, updateWin } from '../api/socialApi.js';
 import { selectAuth } from '../store/authSlice.js';
 
 const durationOptions = [
@@ -64,6 +64,8 @@ const emptyForm = { role_title: '', company_name: '', search_duration_weeks: 3, 
 export default function CommunityWins() {
   const auth = useSelector(selectAuth);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const focusedWinId = searchParams.get('winId');
   const [wins, setWins] = useState([]);
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
@@ -79,6 +81,7 @@ export default function CommunityWins() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
   const [likersWinId, setLikersWinId] = useState(null);
+  const [highlightedWinId, setHighlightedWinId] = useState(null);
 
   const debounceTimeouts = useRef({});
   const pendingLikeStates = useRef({});
@@ -123,6 +126,40 @@ export default function CommunityWins() {
       isActive = false;
     };
   }, [viewMode]);
+
+  useEffect(() => {
+    if (!focusedWinId) return;
+
+    let cancelled = false;
+    const existing = wins.find((win) => String(win.id) === String(focusedWinId));
+
+    async function ensureFocusedWin() {
+      if (!existing) {
+        try {
+          const win = await getWinById(focusedWinId);
+          if (!cancelled && win) {
+            setWins((current) => [win, ...current.filter((item) => String(item.id) !== String(win.id))]);
+          }
+        } catch {
+          if (!cancelled) setToast('Could not load the linked win.');
+          return;
+        }
+      }
+
+      setHighlightedWinId(focusedWinId);
+      setTimeout(() => {
+        document.getElementById(`win-${focusedWinId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 160);
+      setTimeout(() => {
+        if (!cancelled) setHighlightedWinId(null);
+      }, 3400);
+    }
+
+    void ensureFocusedWin();
+    return () => {
+      cancelled = true;
+    };
+  }, [focusedWinId, wins]);
 
   async function loadMore() {
     const loader = viewMode === 'mine' ? getMyWins : getWins;
@@ -316,7 +353,13 @@ export default function CommunityWins() {
             ))
           ) : null}
           {wins.map((win) => (
-            <article key={win.id} className="group flex flex-col rounded-[2rem] border border-[var(--border)] bg-[var(--panel)] p-6 shadow-xl transition-all hover:border-[var(--accent)]/50 hover:shadow-[0_8px_30px_rgba(78,222,163,0.1)] hover:-translate-y-1">
+            <article
+              key={win.id}
+              id={`win-${win.id}`}
+              className={`group flex flex-col rounded-[2rem] border bg-[var(--panel)] p-6 shadow-xl transition-all hover:border-[var(--accent)]/50 hover:shadow-[0_8px_30px_rgba(78,222,163,0.1)] hover:-translate-y-1 ${
+                String(highlightedWinId) === String(win.id) ? 'border-[var(--accent)] ring-2 ring-[var(--accent)]/30 shadow-[0_8px_35px_rgba(78,222,163,0.24)]' : 'border-[var(--border)]'
+              }`}
+            >
               <div className="flex items-start justify-between mb-6">
                 <div className="flex gap-3 items-center">
                   {win.user?.avatar_url ? (

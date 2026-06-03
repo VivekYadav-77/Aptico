@@ -29,11 +29,23 @@ function Avatar({ user, size = 32 }) {
   );
 }
 
-function CommentItem({ comment, onLike, onReply, onDelete, isReply = false, currentUserId }) {
+function CommentItem({ comment, onLike, onReply, onDelete, isReply = false, currentUserId, highlighted = false }) {
   const displayName = comment.user?.name || comment.user?.username || 'Member';
 
   return (
-    <div style={{ display: 'flex', gap: isReply ? 8 : 10, alignItems: 'flex-start' }}>
+    <div
+      id={`comment-${comment.id}`}
+      style={{
+        display: 'flex',
+        gap: isReply ? 8 : 10,
+        alignItems: 'flex-start',
+        borderRadius: 12,
+        padding: highlighted ? 8 : 0,
+        background: highlighted ? 'var(--accent-soft)' : 'transparent',
+        boxShadow: highlighted ? '0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent)' : 'none',
+        transition: 'background 0.2s, box-shadow 0.2s, padding 0.2s'
+      }}
+    >
       <Avatar user={comment.user} size={isReply ? 24 : 32} />
       <div style={{ flex: 1, minWidth: 0 }}>
         <div>
@@ -74,7 +86,7 @@ function CommentItem({ comment, onLike, onReply, onDelete, isReply = false, curr
   );
 }
 
-export default function PostComments({ postId, initialCommentsCount, onCommentAdded }) {
+export default function PostComments({ postId, initialCommentsCount, onCommentAdded, focusCommentId = null }) {
   const auth = useSelector(selectAuth);
   const currentUserId = auth?.user?.id;
   const [comments, setComments] = useState([]);
@@ -87,6 +99,7 @@ export default function PostComments({ postId, initialCommentsCount, onCommentAd
   const [hasLoaded, setHasLoaded] = useState(false);
   const [totalCount, setTotalCount] = useState(initialCommentsCount || 0);
   const [expandedReplies, setExpandedReplies] = useState({});
+  const [highlightedCommentId, setHighlightedCommentId] = useState(null);
 
   const toggleReplies = (id) => {
     setExpandedReplies((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -115,6 +128,29 @@ export default function PostComments({ postId, initialCommentsCount, onCommentAd
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [postId]);
+
+  useEffect(() => {
+    if (!focusCommentId || !comments.length) return;
+
+    const focused = comments.find((comment) => String(comment.id) === String(focusCommentId));
+    if (!focused) return;
+
+    if (focused.parent_id) {
+      setExpandedReplies((prev) => ({ ...prev, [focused.parent_id]: true }));
+    }
+
+    setHighlightedCommentId(focused.id);
+    const scrollTimer = setTimeout(() => {
+      const element = document.getElementById(`comment-${focused.id}`);
+      element?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 120);
+    const clearTimer = setTimeout(() => setHighlightedCommentId(null), 3200);
+
+    return () => {
+      clearTimeout(scrollTimer);
+      clearTimeout(clearTimer);
+    };
+  }, [comments, focusCommentId]);
 
   async function submit(e) {
     e.preventDefault();
@@ -208,7 +244,7 @@ export default function PostComments({ postId, initialCommentsCount, onCommentAd
             const replies = comments.filter((c) => c.parent_id === item.id);
             return (
               <div key={item.id}>
-                <CommentItem comment={item} onLike={handleLike} onReply={handleReply} onDelete={handleDelete} currentUserId={currentUserId} />
+                <CommentItem comment={item} onLike={handleLike} onReply={handleReply} onDelete={handleDelete} currentUserId={currentUserId} highlighted={String(highlightedCommentId) === String(item.id)} />
                 {replies.length > 0 && (
                   <div style={{ marginLeft: 42, marginTop: 8 }}>
                     <button
@@ -226,7 +262,7 @@ export default function PostComments({ postId, initialCommentsCount, onCommentAd
                     {expandedReplies[item.id] && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, borderLeft: '2px solid var(--border)', paddingLeft: 12 }}>
                         {replies.map((reply) => (
-                          <CommentItem key={reply.id} comment={reply} onLike={handleLike} onReply={handleReply} onDelete={handleDelete} currentUserId={currentUserId} isReply />
+                          <CommentItem key={reply.id} comment={reply} onLike={handleLike} onReply={handleReply} onDelete={handleDelete} currentUserId={currentUserId} isReply highlighted={String(highlightedCommentId) === String(reply.id)} />
                         ))}
                       </div>
                     )}

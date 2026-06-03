@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from '@/lib/router-compat.jsx';
+import { Link, useSearchParams } from '@/lib/router-compat.jsx';
 import { useSelector } from 'react-redux';
 import AppShell from '../components/AppShell.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
@@ -13,6 +13,7 @@ import {
   getFeedPosts,
   getMyPosts,
   getMyProfile,
+  getPostById,
   getPendingConnections,
   getPostComments,
   getPostLikers,
@@ -97,13 +98,17 @@ function AnalysisCard({ analysis, isOwn }) {
   );
 }
 
-function PostCard({ post, currentUserId, onPostChanged, onDeleted, onEdit, onShowLikers }) {
-  const [commentsOpen, setCommentsOpen] = useState(false);
+function PostCard({ post, currentUserId, onPostChanged, onDeleted, onEdit, onShowLikers, focusCommentId = null, highlighted = false }) {
+  const [commentsOpen, setCommentsOpen] = useState(Boolean(focusCommentId));
   const [actionError, setActionError] = useState('');
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const isOwn = Boolean(post.user_id && currentUserId && String(post.user_id) === String(currentUserId));
   const [label, className] = typeLabels[post.post_type] || ['Post', 'bg-[var(--panel-soft)] text-[var(--muted-strong)]'];
+
+  useEffect(() => {
+    if (focusCommentId) setCommentsOpen(true);
+  }, [focusCommentId]);
 
   async function handleLike() {
     setActionError('');
@@ -135,7 +140,7 @@ function PostCard({ post, currentUserId, onPostChanged, onDeleted, onEdit, onSho
 
   return (
     <>
-    <article id={`post-${post.id}`} className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5">
+    <article id={`post-${post.id}`} className={`rounded-lg border bg-[var(--panel)] p-5 transition-all ${highlighted ? 'border-[var(--accent)] shadow-lg shadow-[var(--accent)]/20 ring-2 ring-[var(--accent)]/30' : 'border-[var(--border)]'}`}>
       <div className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 gap-3">
           <Avatar user={post.user} />
@@ -184,7 +189,7 @@ function PostCard({ post, currentUserId, onPostChanged, onDeleted, onEdit, onSho
       </div>
       {actionError ? <p className="mt-3 rounded-lg border border-red-500/25 bg-red-500/10 p-3 text-sm font-semibold text-red-500">{actionError}</p> : null}
 
-      {commentsOpen ? <PostComments postId={post.id} initialCommentsCount={post.comments_count || 0} onCommentAdded={() => onPostChanged({ ...post, comments_count: (post.comments_count || 0) + 1 })} /> : null}
+      {commentsOpen ? <PostComments postId={post.id} initialCommentsCount={post.comments_count || 0} focusCommentId={focusCommentId} onCommentAdded={() => onPostChanged({ ...post, comments_count: (post.comments_count || 0) + 1 })} /> : null}
     </article>
     <ConfirmDialog
       open={deleteOpen}
@@ -201,6 +206,9 @@ function PostCard({ post, currentUserId, onPostChanged, onDeleted, onEdit, onSho
 
 export default function HomeFeed() {
   const auth = useSelector(selectAuth);
+  const [searchParams] = useSearchParams();
+  const focusedPostId = searchParams.get('postId');
+  const focusedCommentId = searchParams.get('commentId');
   const [profile, setProfile] = useState(null);
   const [connections, setConnections] = useState([]);
   const [pending, setPending] = useState([]);
@@ -217,6 +225,7 @@ export default function HomeFeed() {
   const [connectUser, setConnectUser] = useState(null);
   const [connectNote, setConnectNote] = useState('');
   const [toast, setToast] = useState('');
+  const [highlightedPostId, setHighlightedPostId] = useState(null);
 
   useEffect(() => {
     getMyProfile().then(setProfile).catch(() => null);
@@ -236,6 +245,40 @@ export default function HomeFeed() {
       })
       .finally(() => setLoading(false));
   }, [filterType, viewMode]);
+
+  useEffect(() => {
+    if (!focusedPostId) return;
+
+    let cancelled = false;
+    const existing = posts.find((post) => String(post.id) === String(focusedPostId));
+
+    async function ensureFocusedPost() {
+      if (!existing) {
+        try {
+          const post = await getPostById(focusedPostId);
+          if (!cancelled && post) {
+            setPosts((current) => [post, ...current.filter((item) => String(item.id) !== String(post.id))]);
+          }
+        } catch {
+          if (!cancelled) setToast('Could not load the linked post.');
+          return;
+        }
+      }
+
+      setHighlightedPostId(focusedPostId);
+      setTimeout(() => {
+        document.getElementById(`post-${focusedPostId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 160);
+      setTimeout(() => {
+        if (!cancelled) setHighlightedPostId(null);
+      }, 3400);
+    }
+
+    void ensureFocusedPost();
+    return () => {
+      cancelled = true;
+    };
+  }, [focusedPostId, posts]);
 
   async function loadMore() {
     const loader = viewMode === 'mine' ? getMyPosts : getFeedPosts;
@@ -361,6 +404,8 @@ export default function HomeFeed() {
                   onDeleted={(postId) => setPosts((current) => current.filter((item) => item.id !== postId))}
                   onEdit={setEditingPost}
                   onShowLikers={setLikersPostId}
+                  focusCommentId={String(post.id) === String(focusedPostId) ? focusedCommentId : null}
+                  highlighted={String(post.id) === String(highlightedPostId)}
                 />
               ))}
               {!posts.length ? <p className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-6 text-center text-sm text-[var(--muted-strong)]">{viewMode === 'mine' ? 'You have not shared anything yet. Your old and scheduled posts will appear here.' : 'No posts yet. Share the first useful update.'}</p> : null}

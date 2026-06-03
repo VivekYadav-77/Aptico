@@ -356,7 +356,9 @@ export const postComments = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
   },
   (table) => ({
-    postCreatedAtIdx: index('post_comments_post_id_created_at_idx').on(table.postId, table.createdAt)
+    postCreatedAtIdx: index('post_comments_post_id_created_at_idx').on(table.postId, table.createdAt),
+    userCreatedAtIdx: index('post_comments_user_id_created_at_idx').on(table.userId, table.createdAt),
+    userParentCreatedAtIdx: index('post_comments_user_id_parent_id_created_at_idx').on(table.userId, table.parentId, table.createdAt)
   })
 );
 
@@ -545,7 +547,8 @@ export const postLikes = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
   },
   (table) => ({
-    postUserIdx: uniqueIndex('post_likes_post_id_user_id_idx').on(table.postId, table.userId)
+    postUserIdx: uniqueIndex('post_likes_post_id_user_id_idx').on(table.postId, table.userId),
+    userCreatedAtIdx: index('post_likes_user_id_created_at_idx').on(table.userId, table.createdAt)
   })
 );
 
@@ -562,7 +565,8 @@ export const winLikes = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow()
   },
   (table) => ({
-    winUserIdx: uniqueIndex('win_likes_win_id_user_id_idx').on(table.winId, table.userId)
+    winUserIdx: uniqueIndex('win_likes_win_id_user_id_idx').on(table.winId, table.userId),
+    userCreatedAtIdx: index('win_likes_user_id_created_at_idx').on(table.userId, table.createdAt)
   })
 );
 

@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
+import { useSearchParams } from '@/lib/router-compat.jsx';
 import { useDispatch, useSelector } from 'react-redux';
 import { bootstrapAuthSession } from '../api/authApi.js';
 import AppShell from '../components/AppShell.jsx';
 import ThemeToggle from '../components/ThemeToggle.jsx';
+import YourActivityPanel from '../components/YourActivityPanel.jsx';
 import { useTheme } from '../app/theme.jsx';
 import {
   employmentTypeOptions,
@@ -32,6 +34,7 @@ const Icons = {
 
 const settingSections = [
   { id: 'Profile', icon: Icons.Profile, description: 'Basic identity & links' },
+  { id: 'Your Activity', icon: Icons.Featured, description: 'Likes, comments & replies' },
   { id: 'Career', icon: Icons.Career, description: 'Job status & experience' },
   { id: 'Experience', icon: Icons.Career, description: 'Work history entries' },
   { id: 'Education', icon: Icons.Education, description: 'Schools & learning' },
@@ -137,6 +140,7 @@ function createEmptyExperience() {
 
 export default function SettingsWorkspace() {
   const dispatch = useDispatch();
+  const [searchParams, setSearchParams] = useSearchParams();
   const auth = useSelector(selectAuth);
   const analysis = useSelector(selectCurrentAnalysis);
   const { theme, setTheme } = useTheme();
@@ -146,6 +150,13 @@ export default function SettingsWorkspace() {
   const [draft, setDraft] = useState(profile);
   const [statusMessage, setStatusMessage] = useState(null); // { type: 'success'|'error', text: '' }
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const sectionParam = searchParams.get('section');
+    if (sectionParam === 'activity') {
+      setActiveSection('Your Activity');
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     setDraft(profile);
@@ -259,7 +270,14 @@ export default function SettingsWorkspace() {
                 <button
                   key={id}
                   type="button"
-                  onClick={() => setActiveSection(id)}
+                  onClick={() => {
+                    setActiveSection(id);
+                    if (id === 'Your Activity') {
+                      setSearchParams({ section: 'activity' }, { replace: true });
+                    } else if (searchParams.get('section')) {
+                      setSearchParams({}, { replace: true });
+                    }
+                  }}
                   className={`group shrink-0 lg:w-full flex items-center gap-3 lg:gap-4 rounded-xl px-4 py-3.5 transition-all duration-300 outline-none focus:ring-2 focus:ring-[var(--accent)]/50 snap-start relative overflow-hidden ${
                     activeSection === id
                       ? 'bg-gradient-to-r from-[var(--accent)] to-[var(--accent-strong)] text-white shadow-lg shadow-[var(--accent)]/30 border-transparent scale-[1.02] lg:scale-100'
@@ -579,6 +597,9 @@ export default function SettingsWorkspace() {
                       ))}
                     </div>
                   )}
+
+                  {/* --- YOUR ACTIVITY SECTION --- */}
+                  {activeSection === 'Your Activity' && <YourActivityPanel />}
 
                   {/* --- VISIBILITY SECTION --- */}
                   {activeSection === 'Visibility' && (

@@ -3,6 +3,7 @@ import { schema as graphqlSchema } from '../graphql/schema.js';
 import { resolvers as graphqlResolvers } from '../graphql/resolvers.js';
 import adminRoutes from '../modules/admin/admin.routes.js';
 import analyzeRoutes from '../modules/analysis/analysis.routes.js';
+import activityRoutes from '../modules/activity/activity.routes.js';
 import authRoutes from '../modules/auth/auth.routes.js';
 import badgeRoutes from '../modules/badge/badge.routes.js';
 import healthRoutes from '../modules/health/health.routes.js';
@@ -25,6 +26,7 @@ export function registerRoutes(app) {
   app.register(jobRoutes, { prefix: '/api/jobs' });
   app.register(profileRoutes, { prefix: '/api' });
   app.register(socialRoutes, { prefix: '/api/social' });
+  app.register(activityRoutes, { prefix: '/api/users/activity' });
   app.register(rejectionRoutes, { prefix: '/api' });
   app.register(shadowResumeRoutes, { prefix: '/api/shadow-resume' });
   app.register(squadRoutes, { prefix: '/api/squads' });
