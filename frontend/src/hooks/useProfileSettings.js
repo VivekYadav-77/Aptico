@@ -35,11 +35,11 @@ function normalizeTopProjects(projects) {
 
   return projects
     .map((project) => ({
-      title: String(project?.title || '').trim().slice(0, 100),
-      description: String(project?.description || '').trim().slice(0, 280),
-      techStack: parseList(project?.techStack).map((item) => item.slice(0, 40)).slice(0, 8),
-      githubUrl: String(project?.githubUrl || '').trim().slice(0, 300),
-      liveUrl: String(project?.liveUrl || '').trim().slice(0, 300)
+      title: String(project?.title || '').trim().slice(0, 80),
+      description: String(project?.description || '').trim().slice(0, 180),
+      techStack: parseList(project?.techStack).map((item) => item.slice(0, 24)).slice(0, 6),
+      githubUrl: String(project?.githubUrl || '').trim().slice(0, 240),
+      liveUrl: String(project?.liveUrl || '').trim().slice(0, 240)
     }))
     .filter((project) => project.title && project.description)
     .slice(0, 3);

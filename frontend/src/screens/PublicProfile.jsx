@@ -117,8 +117,8 @@ function TopProjectCard({ project }) {
         </div>
         {links.length ? <span className="text-[10px] font-black uppercase tracking-widest text-[#14b8a6]">Project</span> : null}
       </div>
-      <h3 className="text-base font-black leading-tight text-[var(--text)] transition-colors group-hover:text-[#14b8a6]">{project.title}</h3>
-      <p className="mt-2 line-clamp-4 text-sm font-medium leading-relaxed text-[var(--muted-strong)]">{project.description}</p>
+      <h3 className="line-clamp-2 break-words text-base font-black leading-tight text-[var(--text)] transition-colors group-hover:text-[#14b8a6]">{project.title}</h3>
+      <p className="mt-2 line-clamp-3 break-words text-sm font-medium leading-relaxed text-[var(--muted-strong)]">{project.description}</p>
       {project.techStack?.length ? (
         <div className="mt-4 flex flex-wrap gap-2">
           {project.techStack.map((tech) => (
@@ -134,10 +134,10 @@ function TopProjectCard({ project }) {
               href={normalizeUrl(link.url)}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-xs font-bold text-[var(--text)] transition-all hover:border-[#14b8a6]/50 hover:text-[#14b8a6]"
+              className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-xs font-bold text-[var(--text)] transition-all hover:border-[#14b8a6]/50 hover:text-[#14b8a6]"
             >
               <span className="material-symbols-outlined text-[14px]">open_in_new</span>
-              {link.label}
+              <span className="truncate">{link.label}</span>
             </a>
           ))}
         </div>

@@ -135,13 +135,13 @@ function normalizeTopProjects(topProjects, featured = []) {
   const normalizedTopProjects = Array.isArray(topProjects)
     ? topProjects
         .map((item) => ({
-          title: String(item?.title || '').trim(),
-          description: String(item?.description || '').trim(),
+          title: String(item?.title || '').trim().slice(0, 80),
+          description: String(item?.description || '').trim().slice(0, 180),
           techStack: Array.isArray(item?.techStack)
-            ? item.techStack.map((skill) => String(skill || '').trim()).filter(Boolean).slice(0, 8)
+            ? item.techStack.map((skill) => String(skill || '').trim().slice(0, 24)).filter(Boolean).slice(0, 6)
             : [],
-          githubUrl: String(item?.githubUrl || '').trim(),
-          liveUrl: String(item?.liveUrl || '').trim()
+          githubUrl: String(item?.githubUrl || '').trim().slice(0, 240),
+          liveUrl: String(item?.liveUrl || '').trim().slice(0, 240)
         }))
         .filter((item) => item.title && item.description)
         .slice(0, 3)
@@ -158,11 +158,11 @@ function normalizeTopProjects(topProjects, featured = []) {
           return !type || type === 'project';
         })
         .map((item) => ({
-          title: String(item?.title || '').trim(),
-          description: String(item?.description || '').trim(),
+          title: String(item?.title || '').trim().slice(0, 80),
+          description: String(item?.description || '').trim().slice(0, 180),
           techStack: [],
           githubUrl: '',
-          liveUrl: String(item?.link || '').trim()
+          liveUrl: String(item?.link || '').trim().slice(0, 240)
         }))
         .filter((item) => item.title && item.description)
         .slice(0, 3)

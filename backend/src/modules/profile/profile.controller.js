@@ -60,11 +60,11 @@ const profileSettingsSchema = z.object({
   })).max(20).optional().default([]),
 
   topProjects: z.array(z.object({
-    title: z.string().trim().min(1).max(100),
-    description: z.string().trim().min(1).max(280),
-    techStack: z.array(z.string().trim().max(40)).max(8).optional().default([]),
-    githubUrl: z.string().trim().max(300).optional().default(''),
-    liveUrl: z.string().trim().max(300).optional().default('')
+    title: z.string().trim().min(1).max(80),
+    description: z.string().trim().min(1).max(180),
+    techStack: z.array(z.string().trim().max(24)).max(6).optional().default([]),
+    githubUrl: z.string().trim().max(240).optional().default(''),
+    liveUrl: z.string().trim().max(240).optional().default('')
   })).max(3).optional().default([]),
 
   experiences: z.array(z.object({
@@ -176,13 +176,13 @@ function normalizeTopProjects(topProjects, featured = []) {
   const normalizedTopProjects = Array.isArray(topProjects)
     ? topProjects
         .map((item) => ({
-          title: String(item?.title || '').trim(),
-          description: String(item?.description || '').trim(),
+          title: String(item?.title || '').trim().slice(0, 80),
+          description: String(item?.description || '').trim().slice(0, 180),
           techStack: Array.isArray(item?.techStack)
-            ? item.techStack.map((skill) => String(skill || '').trim()).filter(Boolean).slice(0, 8)
+            ? item.techStack.map((skill) => String(skill || '').trim().slice(0, 24)).filter(Boolean).slice(0, 6)
             : [],
-          githubUrl: String(item?.githubUrl || '').trim(),
-          liveUrl: String(item?.liveUrl || '').trim()
+          githubUrl: String(item?.githubUrl || '').trim().slice(0, 240),
+          liveUrl: String(item?.liveUrl || '').trim().slice(0, 240)
         }))
         .filter((item) => item.title && item.description)
         .slice(0, 3)
@@ -196,11 +196,11 @@ function normalizeTopProjects(topProjects, featured = []) {
     .filter((item) => !item.type || item.type === 'project')
     .slice(0, 3)
     .map((item) => ({
-      title: item.title,
-      description: item.description,
+      title: item.title.slice(0, 80),
+      description: item.description.slice(0, 180),
       techStack: [],
       githubUrl: '',
-      liveUrl: item.link
+      liveUrl: item.link.slice(0, 240)
     }));
 }
 

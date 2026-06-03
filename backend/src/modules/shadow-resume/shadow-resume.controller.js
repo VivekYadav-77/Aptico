@@ -18,11 +18,11 @@ function normalizeProjects(settingsJson) {
   const topProjects = Array.isArray(settingsJson?.topProjects) ? settingsJson.topProjects : [];
   const normalizedTopProjects = topProjects
     .map((item) => ({
-      title: String(item?.title || '').trim(),
-      description: String(item?.description || '').trim(),
-      techStack: Array.isArray(item?.techStack) ? item.techStack.map((skill) => String(skill || '').trim()).filter(Boolean) : [],
-      githubUrl: String(item?.githubUrl || '').trim(),
-      liveUrl: String(item?.liveUrl || '').trim(),
+      title: String(item?.title || '').trim().slice(0, 80),
+      description: String(item?.description || '').trim().slice(0, 180),
+      techStack: Array.isArray(item?.techStack) ? item.techStack.map((skill) => String(skill || '').trim().slice(0, 24)).filter(Boolean).slice(0, 6) : [],
+      githubUrl: String(item?.githubUrl || '').trim().slice(0, 240),
+      liveUrl: String(item?.liveUrl || '').trim().slice(0, 240),
       type: 'project'
     }))
     .filter((item) => item.title || item.description || item.githubUrl || item.liveUrl)

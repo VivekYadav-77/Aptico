@@ -208,8 +208,8 @@ function TopProjectCard({ project }) {
           <span className="material-symbols-outlined text-[20px]">code_blocks</span>
         </span>
         <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-black leading-tight text-[var(--text)]">{project.title}</h3>
-          <p className="mt-2 text-sm font-medium leading-relaxed text-[var(--muted-strong)]">{project.description}</p>
+          <h3 className="line-clamp-2 break-words text-sm font-black leading-tight text-[var(--text)]">{project.title}</h3>
+          <p className="mt-2 line-clamp-3 break-words text-sm font-medium leading-relaxed text-[var(--muted-strong)]">{project.description}</p>
         </div>
       </div>
 
@@ -227,10 +227,10 @@ function TopProjectCard({ project }) {
               href={normalizeUrl(link.url)}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-xs font-bold text-[var(--text)] transition-all hover:border-[#14b8a6]/50 hover:text-[#14b8a6]"
+              className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-xs font-bold text-[var(--text)] transition-all hover:border-[#14b8a6]/50 hover:text-[#14b8a6]"
             >
               <span className="material-symbols-outlined text-[14px]">open_in_new</span>
-              {link.label}
+              <span className="truncate">{link.label}</span>
             </a>
           ))}
         </div>

@@ -23,6 +23,34 @@ function formatLabel(value) {
     .join(' ');
 }
 
+function stripUrl(value) {
+  return String(value || '').replace(/^https?:\/\//, '').slice(0, 240);
+}
+
+function normalizeTopProjects(projects) {
+  if (!Array.isArray(projects)) return [];
+
+  return projects
+    .map((project) => ({
+      title: String(project?.title || '').trim().slice(0, 80),
+      description: String(project?.description || '').trim().slice(0, 180),
+      techStack: Array.isArray(project?.techStack)
+        ? project.techStack.map((tech) => String(tech || '').trim().slice(0, 24)).filter(Boolean).slice(0, 6)
+        : [],
+      githubUrl: stripUrl(project?.githubUrl),
+      liveUrl: stripUrl(project?.liveUrl)
+    }))
+    .filter((project) => project.title && project.description)
+    .slice(0, 3);
+}
+
+function projectLinks(project) {
+  return [
+    project.githubUrl ? `GitHub: ${project.githubUrl}` : null,
+    project.liveUrl ? `Live: ${project.liveUrl}` : null
+  ].filter(Boolean).join(' | ');
+}
+
 export default function ResumeTemplate({ profile }) {
   const es = profile.enriched_settings || profile; // Support both flat profile and enriched_settings
 
@@ -41,7 +69,7 @@ export default function ResumeTemplate({ profile }) {
   const educationEntries = es.educationEntries || [];
   const licenses = es.licenses || [];
   const honorsAwards = es.honorsAwards || [];
-  const topProjects = es.topProjects || profile.topProjects || [];
+  const topProjects = normalizeTopProjects(es.topProjects || profile.topProjects || []);
   
   // Legacy support for single entries if arrays are empty
   if (experiences.length === 0 && profile.currentCompany) {
@@ -88,6 +116,7 @@ export default function ResumeTemplate({ profile }) {
         }
         .resume-print-view h1, .resume-print-view h2, .resume-print-view h3 { color: black; margin: 0; }
         .resume-print-view p { margin: 0 0 4px 0; font-size: 11pt; color: #333; }
+        .resume-project, .resume-project * { overflow-wrap: anywhere; word-break: break-word; }
         .resume-print-view a { color: black; text-decoration: none; }
         .resume-print-view ul { margin: 4px 0 12px 16px; padding: 0; list-style-type: disc; }
         .resume-print-view li { margin-bottom: 4px; font-size: 11pt; color: #333; }
@@ -158,15 +187,15 @@ export default function ResumeTemplate({ profile }) {
         <section>
           <SectionTitle>Projects</SectionTitle>
           {topProjects.map((project, idx) => (
-            <div key={`${project.title}-${idx}`} className="mb-3">
+            <div key={`${project.title}-${idx}`} className="resume-project mb-3">
               <h3 className="font-bold text-[11pt] m-0">{project.title}</h3>
               {project.techStack?.length ? (
                 <p className="italic text-[10pt] m-0">{project.techStack.join(', ')}</p>
               ) : null}
               <p className="text-[11pt] mt-1 m-0">{project.description}</p>
-              {(project.githubUrl || project.liveUrl) ? (
+              {projectLinks(project) ? (
                 <p className="text-[10pt] mt-1 m-0">
-                  {[project.githubUrl ? `GitHub: ${project.githubUrl.replace('https://','')}` : null, project.liveUrl ? `Live: ${project.liveUrl.replace('https://','')}` : null].filter(Boolean).join(' | ')}
+                  {projectLinks(project)}
                 </p>
               ) : null}
             </div>
