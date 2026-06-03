@@ -29,8 +29,8 @@ function topSkillGaps(analysis) {
     .filter(Boolean);
 }
 
-function selectPostShape() {
-  return {
+function selectPostShape(viewerId = null) {
+  const shape = {
     id: posts.id,
     user_id: posts.userId,
     post_type: posts.postType,
@@ -56,6 +56,14 @@ function selectPostShape() {
       gap_analysis_json: analyses.gapAnalysisJson
     }
   };
+
+  if (viewerId) {
+    shape.has_liked = sql`exists(select 1 from post_likes where post_id = posts.id and user_id = ${viewerId})`.mapWith(Boolean);
+  } else {
+    shape.has_liked = sql`false`.mapWith(Boolean);
+  }
+
+  return shape;
 }
 
 function parseScheduledAt(value) {
@@ -80,9 +88,9 @@ async function getActorName(db, userId) {
   return rows[0]?.name || 'Someone';
 }
 
-async function getEnrichedPost(db, postId) {
+async function getEnrichedPost(db, postId, viewerId = null) {
   const rows = await db
-    .select(selectPostShape())
+    .select(selectPostShape(viewerId))
     .from(posts)
     .innerJoin(users, eq(posts.userId, users.id))
     .leftJoin(userProfiles, eq(posts.userId, userProfiles.userId))
@@ -172,7 +180,7 @@ export async function createPost(db, userId, data) {
     })
     .returning({ id: posts.id });
 
-  const post = await getEnrichedPost(db, inserted[0].id);
+  const post = await getEnrichedPost(db, inserted[0].id, userId);
 
   if (post && analysisRow) {
     post.analysis = {
@@ -200,7 +208,7 @@ export async function getFeedPosts(db, userId, { limit = 20, offset = 0, filterT
   }
 
   const rows = await db
-    .select(selectPostShape())
+    .select(selectPostShape(userId))
     .from(posts)
     .innerJoin(users, eq(posts.userId, users.id))
     .leftJoin(userProfiles, eq(posts.userId, userProfiles.userId))
@@ -218,7 +226,7 @@ export async function getFeedPosts(db, userId, { limit = 20, offset = 0, filterT
   }));
 }
 
-export async function getPublicFeedPosts(db, { limit = 20, offset = 0, filterType = null, userId = null } = {}) {
+export async function getPublicFeedPosts(db, viewerId, { limit = 20, offset = 0, filterType = null, userId = null } = {}) {
   const filters = [eq(posts.isVisible, true), PUBLICATION_FILTER];
 
   if (filterType) {
@@ -230,7 +238,7 @@ export async function getPublicFeedPosts(db, { limit = 20, offset = 0, filterTyp
   }
 
   const rows = await db
-    .select(selectPostShape())
+    .select(selectPostShape(viewerId))
     .from(posts)
     .innerJoin(users, eq(posts.userId, users.id))
     .leftJoin(userProfiles, eq(posts.userId, userProfiles.userId))
@@ -256,7 +264,7 @@ export async function getMyPosts(db, userId, { limit = 20, offset = 0, filterTyp
   }
 
   const rows = await db
-    .select(selectPostShape())
+    .select(selectPostShape(userId))
     .from(posts)
     .innerJoin(users, eq(posts.userId, users.id))
     .leftJoin(userProfiles, eq(posts.userId, userProfiles.userId))
@@ -343,7 +351,7 @@ export async function updatePost(db, userId, postId, data) {
     })
     .where(eq(posts.id, postId));
 
-  const post = await getEnrichedPost(db, postId);
+  const post = await getEnrichedPost(db, postId, userId);
   if (post && analysisRow) {
     post.analysis = {
       company_name: analysisRow.companyName,
@@ -518,22 +526,30 @@ export async function addComment(db, userId, postId, content, parentId = null) {
   return rows[0];
 }
 
-export async function getPostComments(db, postId, { limit = 20, offset = 0 } = {}) {
+export async function getPostComments(db, viewerId, postId, { limit = 20, offset = 0 } = {}) {
+  const shape = {
+    id: postComments.id,
+    post_id: postComments.postId,
+    user_id: postComments.userId,
+    parent_id: postComments.parentId,
+    content: postComments.content,
+    likes_count: postComments.likesCount,
+    created_at: postComments.createdAt,
+    user: {
+      name: users.name,
+      avatar_url: users.avatarUrl,
+      username: userProfiles.username
+    }
+  };
+
+  if (viewerId) {
+    shape.has_liked = sql`exists(select 1 from comment_likes where comment_id = post_comments.id and user_id = ${viewerId})`.mapWith(Boolean);
+  } else {
+    shape.has_liked = sql`false`.mapWith(Boolean);
+  }
+
   return db
-    .select({
-      id: postComments.id,
-      post_id: postComments.postId,
-      user_id: postComments.userId,
-      parent_id: postComments.parentId,
-      content: postComments.content,
-      likes_count: postComments.likesCount,
-      created_at: postComments.createdAt,
-      user: {
-        name: users.name,
-        avatar_url: users.avatarUrl,
-        username: userProfiles.username
-      }
-    })
+    .select(shape)
     .from(postComments)
     .innerJoin(users, eq(postComments.userId, users.id))
     .leftJoin(userProfiles, eq(postComments.userId, userProfiles.userId))

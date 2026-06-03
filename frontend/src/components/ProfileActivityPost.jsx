@@ -104,7 +104,12 @@ export default function ProfileActivityPost({ post, currentUserId, onPostChanged
             onClick={handleLike}
             className={`flex items-center gap-1.5 py-1 px-2 text-xs font-bold transition-all rounded-l border border-r-0 ${hasLiked ? 'text-pink-500 bg-pink-500/10 border-pink-500/30' : 'text-[var(--muted-strong)] border-transparent hover:bg-[var(--panel)]'}`}
           >
-            <span className="material-symbols-outlined text-[18px]">favorite</span>
+            <span 
+              className="material-symbols-outlined text-[18px]"
+              style={{ fontVariationSettings: hasLiked ? '"FILL" 1' : '"FILL" 0' }}
+            >
+              favorite
+            </span>
           </button>
           <button
             type="button"

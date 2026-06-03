@@ -537,10 +537,11 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.get('/feed/public', async (request, reply) => {
+  app.get('/feed/public', { preHandler: optionalAuthenticateRequest }, async (request, reply) => {
     try {
       const query = feedQuerySchema.parse(request.query || {});
-      const cacheKey = `public:feed:${query.filterType || 'all'}:${query.userId || 'all'}:${query.offset}`;
+      const viewerId = request.auth?.userId || null;
+      const cacheKey = `public:feed:${query.filterType || 'all'}:${query.userId || 'all'}:${query.offset}:${viewerId || 'anon'}`;
       const redis = request.server.services?.redis;
       const cached = parseCachedJson(await redis?.get(cacheKey));
 
@@ -548,9 +549,9 @@ export default async function socialRoutes(app) {
         return reply.send(cached);
       }
 
-      const posts = await getPublicFeedPosts(request.server.db, query);
+      const posts = await getPublicFeedPosts(request.server.db, viewerId, query);
       const payload = { posts, hasMore: posts.length === query.limit };
-      await redis?.set(cacheKey, JSON.stringify(payload), 180);
+      await redis?.set(cacheKey, JSON.stringify(payload), viewerId ? 10 : 180);
       return reply.send(payload);
     } catch (error) {
       return sendError(reply, error, 'Could not load public feed.');
@@ -604,10 +605,11 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.get('/posts/:postId/comments', async (request, reply) => {
+  app.get('/posts/:postId/comments', { preHandler: optionalAuthenticateRequest }, async (request, reply) => {
     try {
       const query = paginationSchema.parse(request.query || {});
-      const comments = await getPostComments(request.server.db, request.params.postId, query);
+      const viewerId = request.auth?.userId || null;
+      const comments = await getPostComments(request.server.db, viewerId, request.params.postId, query);
       return reply.send({ comments });
     } catch (error) {
       return sendError(reply, error, 'Could not load comments.');

@@ -58,8 +58,16 @@ function CommentItem({ comment, onLike, onReply, onDelete, isReply = false, curr
         </div>
       </div>
       <button type="button" onClick={() => onLike(comment.id)} style={{ background: 'none', border: 'none', padding: '4px 0 0 0', cursor: 'pointer', flexShrink: 0 }}>
-        <span className="material-symbols-outlined" style={{ fontSize: 14, color: comment.has_liked ? '#ef4444' : 'var(--muted)', transition: 'color 0.15s' }}>
-          {comment.has_liked ? 'favorite' : 'favorite_border'}
+        <span
+          className="material-symbols-outlined"
+          style={{
+            fontSize: 14,
+            color: comment.has_liked ? '#ec4899' : 'var(--muted)',
+            transition: 'color 0.15s',
+            fontVariationSettings: comment.has_liked ? '"FILL" 1' : '"FILL" 0'
+          }}
+        >
+          favorite
         </span>
       </button>
     </div>
