@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from '@/lib/router-compat.jsx';
 import { useSelector } from 'react-redux';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
@@ -80,6 +80,15 @@ export default function CommunityWins() {
   const [deleting, setDeleting] = useState(false);
   const [likersWinId, setLikersWinId] = useState(null);
 
+  const debounceTimeouts = useRef({});
+  const pendingLikeStates = useRef({});
+
+  useEffect(() => {
+    return () => {
+      Object.values(debounceTimeouts.current).forEach(clearTimeout);
+    };
+  }, []);
+
   useEffect(() => {
     if (toast) {
       const timer = setTimeout(() => setToast(''), 3000);
@@ -129,8 +138,44 @@ export default function CommunityWins() {
       return;
     }
 
-    const result = await likeWin(winId);
-    setWins((current) => current.map((win) => win.id === winId ? { ...win, likes_count: result.newLikesCount, has_liked: result.liked } : win));
+    const win = wins.find((w) => w.id === winId);
+    if (!win) return;
+
+    const nextState = !win.has_liked;
+    pendingLikeStates.current[winId] = nextState;
+
+    setWins((current) =>
+      current.map((w) =>
+        w.id === winId
+          ? { ...w, has_liked: nextState, likes_count: nextState ? (w.likes_count || 0) + 1 : Math.max((w.likes_count || 0) - 1, 0) }
+          : w
+      )
+    );
+
+    if (debounceTimeouts.current[winId]) {
+      clearTimeout(debounceTimeouts.current[winId]);
+    }
+
+    debounceTimeouts.current[winId] = setTimeout(async () => {
+      try {
+        const result = await likeWin(winId);
+        setWins((current) =>
+          current.map((w) => (w.id === winId ? { ...w, likes_count: result.newLikesCount, has_liked: result.liked } : w))
+        );
+        pendingLikeStates.current[winId] = result.liked;
+      } catch (err) {
+        const rollbackState = !nextState;
+        setWins((current) =>
+          current.map((w) =>
+            w.id === winId
+              ? { ...w, has_liked: rollbackState, likes_count: rollbackState ? (w.likes_count || 0) + 1 : Math.max((w.likes_count || 0) - 1, 0) }
+              : w
+          )
+        );
+        pendingLikeStates.current[winId] = rollbackState;
+        setToast('Could not update like status.');
+      }
+    }, 400);
   }
 
   function openCreateModal() {
