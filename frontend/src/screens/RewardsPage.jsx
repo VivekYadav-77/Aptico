@@ -50,6 +50,108 @@ function reqLabel(req) {
   return labels[req.type] || 'Special requirement';
 }
 
+function formatRequirementCopy(req, isUnlocked = false) {
+  const prefix = isUnlocked ? {
+    xp: 'Reached',
+    streak: 'Built',
+    total_applications: 'Logged',
+    total_rejections: 'Pushed through',
+    followers: 'Gained',
+    connections: 'Built',
+    posts: 'Shared',
+    sparks_given: 'Gave',
+    post_likes: 'Earned',
+    daily_apps: 'Logged',
+    skill_count: 'Added',
+  } : {
+    xp: 'Reach',
+    streak: 'Build',
+    total_applications: 'Log',
+    total_rejections: 'Push through',
+    followers: 'Gain',
+    connections: 'Build',
+    posts: 'Share',
+    sparks_given: 'Give',
+    post_likes: 'Earn',
+    daily_apps: 'Log',
+    skill_count: 'Add',
+  };
+
+  const labels = {
+    xp: `${prefix.xp} ${req.value.toLocaleString()} XP.`,
+    streak: `${prefix.streak} a ${req.value} day streak.`,
+    total_applications: `${prefix.total_applications} ${req.value.toLocaleString()} applications.`,
+    total_rejections: `${prefix.total_rejections} ${req.value.toLocaleString()} rejections.`,
+    followers: `${prefix.followers} ${req.value.toLocaleString()} follower${req.value === 1 ? '' : 's'}.`,
+    connections: `${prefix.connections} ${req.value.toLocaleString()} connection${req.value === 1 ? '' : 's'}.`,
+    night_owl: `${isUnlocked ? 'Logged' : 'Log'} activity between 12 AM and 4 AM.`,
+    early_bird: `${isUnlocked ? 'Logged' : 'Log'} activity between 4 AM and 6 AM.`,
+    join_before: `${isUnlocked ? 'Joined' : 'Join'} before ${new Date(req.value).getFullYear()}.`,
+    squad_goal: `${isUnlocked ? 'Helped your squad hit' : 'Help your squad hit'} a weekly goal.`,
+    speed_demon: `${isUnlocked ? 'Logged' : 'Log'} an application within 1 hour of discovery.`,
+    weekend_warrior: `${isUnlocked ? 'Logged' : 'Log'} application activity on a weekend.`,
+    skill: `${isUnlocked ? 'Added' : 'Add'} ${req.value} as a profile skill.`,
+    posts: `${prefix.posts} ${req.value.toLocaleString()} community post${req.value === 1 ? '' : 's'}.`,
+    sparks_given: `${prefix.sparks_given} ${req.value.toLocaleString()} sparks to your squad.`,
+    post_likes: `${prefix.post_likes} ${req.value.toLocaleString()} likes on a post.`,
+    daily_apps: `${prefix.daily_apps} ${req.value.toLocaleString()} applications in one day.`,
+    skill_count: `${prefix.skill_count} ${req.value.toLocaleString()} skills to your profile.`,
+    streak_no_rejections: `${isUnlocked ? 'Held' : 'Hold'} a ${req.value} day streak without rejections.`,
+    hired_after_rejections: `${isUnlocked ? 'Got hired' : 'Get hired'} after ${req.value.toLocaleString()} rejections.`,
+    ghost_jobs_found: `${isUnlocked ? 'Identified' : 'Identify'} ${req.value.toLocaleString()} ghost jobs.`,
+    hours_active: `${isUnlocked ? 'Stayed' : 'Stay'} active for ${req.value} hours.`,
+    squad_contribution: `${isUnlocked ? 'Contributed' : 'Contribute'} 50% of a squad goal.`,
+    hired_silent: `${isUnlocked ? 'Got hired' : 'Get hired'} without public posts.`,
+    squad_connections: `${isUnlocked ? 'Connected' : 'Connect'} 2 squads.`,
+    join_order: `${isUnlocked ? 'Joined' : 'Join'} as an early Aptico user.`,
+    xp_rank: `${isUnlocked ? 'Reached' : 'Reach'} the top 1% XP rank.`,
+    bug_report: `${isUnlocked ? 'Reported' : 'Report'} a product bug.`,
+    repo_contribution: `${isUnlocked ? 'Contributed' : 'Contribute'} code to Aptico.`,
+    test_phase: `${isUnlocked ? 'Participated' : 'Participate'} as a ${req.value} tester.`,
+  };
+
+  return labels[req.type] || (isUnlocked ? 'Completed a special Aptico achievement.' : 'Complete a special Aptico achievement.');
+}
+
+function getStickerMeaning(sticker) {
+  const meanings = {
+    xp: sticker.requirement.value <= 50
+      ? 'The first visible step in your Aptico progress journey.'
+      : 'Sustained progress across your job-search journey and long-term consistency in Aptico.',
+    streak: 'Consistent effort over time, even when the search takes patience.',
+    total_applications: 'Focused job-search activity and steady outreach to opportunities.',
+    total_rejections: 'Resilience through difficult outcomes and continued forward movement.',
+    followers: 'Your profile has started attracting attention from the community.',
+    connections: 'Network growth and stronger access to people, squads, and opportunities.',
+    night_owl: 'Extra effort during late hours when you kept momentum alive.',
+    early_bird: 'Early discipline and a proactive start to your job-search day.',
+    join_before: 'Early belief in Aptico and participation in its founding era.',
+    squad_goal: 'Team contribution and shared momentum with your squad.',
+    speed_demon: 'Fast action when a relevant opportunity appeared.',
+    weekend_warrior: 'Commitment that continued beyond the normal weekday rhythm.',
+    skill: `Visible proof that ${sticker.requirement.value} is part of your profile capability.`,
+    posts: 'Community presence and willingness to share your journey publicly.',
+    sparks_given: 'Support given to others and positive energy inside your squad.',
+    post_likes: 'Community impact through posts that resonated with other users.',
+    daily_apps: 'A high-intensity application push in a single day.',
+    skill_count: 'A broader skill profile that gives your career story more range.',
+    streak_no_rejections: 'A stable run of progress without recent rejection setbacks.',
+    hired_after_rejections: 'Persistence that carried through rejection and reached an offer.',
+    ghost_jobs_found: 'Sharper judgment in spotting low-quality or misleading job posts.',
+    hours_active: 'Deep focus time invested into your career progress.',
+    squad_contribution: 'Heavy lifting for a shared squad outcome.',
+    hired_silent: 'Quiet execution that turned into a real hiring result.',
+    squad_connections: 'Bridge-building between different groups in the Aptico network.',
+    join_order: 'Early participation before the wider community arrived.',
+    xp_rank: 'Exceptional progress compared with the wider Aptico community.',
+    bug_report: 'Product care and practical help improving Aptico for everyone.',
+    repo_contribution: 'Direct technical contribution to the product itself.',
+    test_phase: 'Early product feedback and participation before full release.',
+  };
+
+  return meanings[sticker.requirement.type] || `${STICKER_CATEGORIES.find((c) => c.id === sticker.category)?.name || 'Aptico'} progress represented as a collectible reward.`;
+}
+
 function reqProgress(req, stats) {
   const map = {
     xp: [stats.xp, req.value], streak: [stats.streak, req.value], total_applications: [stats.totalApplications, req.value],
@@ -304,7 +406,7 @@ export default function RewardsPage() {
       {/* ── Detail Modal ── */}
       {detailSticker && (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4 backdrop-blur-md" onClick={() => setDetailSticker(null)}>
-          <div className="w-full max-w-sm rounded-3xl border border-[var(--border)] bg-[var(--panel)] p-8 shadow-2xl relative" onClick={(e) => e.stopPropagation()}>
+          <div className="relative max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-[var(--border)] bg-[var(--panel)] p-8 shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <button onClick={() => setDetailSticker(null)} className="absolute top-4 right-4 text-[var(--muted-strong)] hover:text-[var(--text)] transition-colors bg-[var(--panel-soft)] rounded-full p-1.5">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
@@ -313,9 +415,14 @@ export default function RewardsPage() {
               const s = detailSticker;
               const rc = RARITY_CONFIG[s.rarity];
               const isUnlocked = unlockedIds.includes(s.id);
+              const isEquipped = equippedIds.includes(s.id);
               const isSecret = s.category === 'secret' && !isUnlocked;
               const [current, target] = stats ? reqProgress(s.requirement, stats) : [0, 1];
               const pct = Math.min(100, Math.round((current / target) * 100));
+              const categoryName = STICKER_CATEGORIES.find((c) => c.id === s.category)?.name;
+              const achievementLabel = isUnlocked ? 'Earned for' : 'How to unlock';
+              const achievementCopy = isSecret ? 'Secret achievement. Keep exploring Aptico to discover this reward.' : formatRequirementCopy(s.requirement, isUnlocked);
+              const meaningCopy = isSecret ? 'This reward stays hidden until you unlock it, so the exact value it represents is part of the discovery.' : getStickerMeaning(s);
 
               return (
                 <>
@@ -325,27 +432,45 @@ export default function RewardsPage() {
                     </div>
                   </div>
                   <h2 className="text-2xl font-black text-[var(--text)] text-center">{isSecret ? '???' : s.name}</h2>
-                  <span className={`block text-center mt-2 text-xs font-bold uppercase tracking-wider ${rc.textColor}`}>{rc.label} · {STICKER_CATEGORIES.find((c) => c.id === s.category)?.name}</span>
+                  <span className={`block text-center mt-2 text-xs font-bold uppercase tracking-wider ${rc.textColor}`}>{rc.label} &middot; {categoryName}</span>
                   <p className="mt-4 text-sm text-[var(--muted-strong)] text-center leading-relaxed">{isSecret ? 'This is a secret sticker. Keep using Aptico and you might discover it!' : s.description}</p>
 
-                  {!isUnlocked && !isSecret && (
-                    <div className="mt-6 p-4 rounded-xl bg-[var(--panel-soft)]/50 border border-[var(--border)]">
-                      <div className="flex justify-between text-xs font-bold text-[var(--muted-strong)] mb-2">
-                        <span>{reqLabel(s.requirement)}</span>
-                        <span>{current}/{target} ({pct}%)</span>
-                      </div>
-                      <div className="h-2 rounded-full bg-[var(--border)] overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: s.color }} />
-                      </div>
+                  <div className="mt-6 space-y-4 rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)]/45 p-5">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--muted)]">{achievementLabel}</p>
+                      <p className="mt-1 text-sm font-semibold leading-relaxed text-[var(--text)]">{achievementCopy}</p>
                     </div>
-                  )}
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--muted)]">Represents</p>
+                      <p className="mt-1 text-sm font-semibold leading-relaxed text-[var(--text)]">{meaningCopy}</p>
+                    </div>
+
+                    {!isUnlocked && !isSecret && (
+                      <div>
+                        <div className="mb-2 flex items-center justify-between gap-3 text-xs font-bold text-[var(--muted-strong)]">
+                          <span className="uppercase tracking-[0.14em]">Progress</span>
+                          <span>{current.toLocaleString()}/{target.toLocaleString()} ({pct}%)</span>
+                        </div>
+                        <div className="h-2 rounded-full bg-[var(--border)] overflow-hidden">
+                          <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: s.color }} />
+                        </div>
+                        <p className="mt-2 text-xs font-medium text-[var(--muted-strong)]">{reqLabel(s.requirement)}</p>
+                      </div>
+                    )}
+                  </div>
 
                   {isUnlocked && (
-                    <div className="mt-6 text-center">
+                    <div className="mt-6 flex flex-wrap justify-center gap-2">
                       <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-4 py-1.5 text-xs font-bold text-emerald-600 dark:text-emerald-400">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
                         Unlocked
                       </span>
+                      {isEquipped && (
+                        <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--accent)]/30 bg-[var(--accent)]/10 px-4 py-1.5 text-xs font-bold text-[var(--accent-strong)]">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 3l2.4 4.9 5.4.8-3.9 3.8.9 5.4L12 15.3 7.2 17.9l.9-5.4-3.9-3.8 5.4-.8L12 3z" /></svg>
+                          Showcased
+                        </span>
+                      )}
                     </div>
                   )}
                 </>
