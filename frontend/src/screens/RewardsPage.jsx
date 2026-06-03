@@ -192,7 +192,21 @@ export default function RewardsPage() {
                 if (!s) return null;
                 const rc = RARITY_CONFIG[s.rarity];
                 return (
-                  <div key={id} className={`flex flex-col items-center gap-2 rounded-2xl border ${rc.border} ${rc.bg} ${rc.glow} p-4 min-w-[90px] transition-all hover:scale-105 ${s.rarity === 'legendary' ? 'sticker-holo' : ''}`}>
+                  <div key={id} className={`relative flex flex-col items-center gap-2 rounded-2xl border ${rc.border} ${rc.bg} ${rc.glow} p-4 min-w-[90px] transition-all hover:scale-105 ${s.rarity === 'legendary' ? 'sticker-holo' : ''}`}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleToggleEquip(id);
+                      }}
+                      aria-label={`Remove ${s.name} from showcase`}
+                      title={`Remove ${s.name}`}
+                      className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--panel)] text-[var(--muted-strong)] shadow-md transition-all hover:border-red-400/60 hover:bg-red-500 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-400/40"
+                    >
+                      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
                     <div className="flex items-center justify-center h-12 w-12"><StickerIcon sticker={s} size={48} /></div>
                     <p className="text-[11px] font-bold text-[var(--text)] text-center leading-tight">{s.name}</p>
                   </div>
