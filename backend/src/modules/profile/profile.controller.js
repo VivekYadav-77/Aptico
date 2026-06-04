@@ -62,6 +62,7 @@ const profileSettingsSchema = z.object({
   topProjects: z.array(z.object({
     title: z.string().trim().min(1).max(80),
     description: z.string().trim().min(1).max(280),
+    resumeDescription: z.string().trim().max(160).optional().default(''),
     techStack: z.array(z.string().trim().max(20)).max(4).optional().default([]),
     githubUrl: z.string().trim().max(240).optional().default(''),
     liveUrl: z.string().trim().max(240).optional().default('')
@@ -178,6 +179,7 @@ function normalizeTopProjects(topProjects, featured = []) {
         .map((item) => ({
           title: String(item?.title || '').trim().slice(0, 80),
           description: String(item?.description || '').replace(/\s+/g, ' ').trim().slice(0, 280),
+          resumeDescription: String(item?.resumeDescription || '').replace(/\s+/g, ' ').trim().slice(0, 160),
           techStack: Array.isArray(item?.techStack)
             ? item.techStack.map((skill) => String(skill || '').trim().slice(0, 20)).filter(Boolean).slice(0, 4)
             : [],
@@ -198,6 +200,7 @@ function normalizeTopProjects(topProjects, featured = []) {
     .map((item) => ({
       title: item.title.slice(0, 80),
       description: item.description.replace(/\s+/g, ' ').slice(0, 280),
+      resumeDescription: '',
       techStack: [],
       githubUrl: '',
       liveUrl: item.link.slice(0, 240)

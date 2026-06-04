@@ -609,6 +609,7 @@ export default function SettingsWorkspace() {
 
                       {(draft.topProjects || []).map((project, idx) => {
                         const descriptionLength = String(project.description || '').length;
+                        const resumeDescriptionLength = String(project.resumeDescription || '').length;
                         const techCount = Array.isArray(project.techStack)
                           ? project.techStack.length
                           : String(project.techStack || '').split(',').map((item) => item.trim()).filter(Boolean).length;
@@ -622,6 +623,10 @@ export default function SettingsWorkspace() {
                             <div>
                               <TextAreaField label="Project Description" value={project.description} onChange={(e) => { const next = [...draft.topProjects]; next[idx] = { ...next[idx], description: e.target.value.replace(/\s+/g, ' ').slice(0, 280) }; updateField('topProjects', next); }} placeholder="Describe the problem, build, and result. Profile cards show a preview; the full text opens in details." minHeight="min-h-[92px]" />
                               <p className={`mt-1 text-right text-[10px] font-bold uppercase tracking-[0.14em] ${descriptionLength >= 250 ? 'text-[var(--warning-text)]' : 'text-[var(--muted)]'}`}>{descriptionLength}/280</p>
+                            </div>
+                            <div>
+                              <TextAreaField label="Resume Description" value={project.resumeDescription || ''} onChange={(e) => { const next = [...draft.topProjects]; next[idx] = { ...next[idx], resumeDescription: e.target.value.replace(/\s+/g, ' ').slice(0, 160) }; updateField('topProjects', next); }} placeholder="One compact result-focused line for resume export." minHeight="min-h-[72px]" />
+                              <p className={`mt-1 text-right text-[10px] font-bold uppercase tracking-[0.14em] ${resumeDescriptionLength >= 145 ? 'text-[var(--warning-text)]' : 'text-[var(--muted)]'}`}>{resumeDescriptionLength}/160</p>
                             </div>
                             <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
                               <InputField label="GitHub URL" value={project.githubUrl} onChange={(e) => { const next = [...draft.topProjects]; next[idx] = { ...next[idx], githubUrl: e.target.value.slice(0, 240) }; updateField('topProjects', next); }} placeholder="https://github.com/..." />

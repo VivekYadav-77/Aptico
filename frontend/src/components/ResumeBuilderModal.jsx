@@ -12,15 +12,20 @@ function normalizeResumeProjects(projects) {
   if (!Array.isArray(projects)) return [];
 
   return projects
-    .map((project) => ({
-      title: String(project?.title || '').trim().slice(0, 80),
-      description: String(project?.description || '').replace(/\s+/g, ' ').trim().slice(0, 120),
-      techStack: Array.isArray(project?.techStack)
-        ? project.techStack.map((tech) => String(tech || '').trim().slice(0, 20)).filter(Boolean).slice(0, 4)
-        : [],
-      githubUrl: String(project?.githubUrl || '').trim().slice(0, 240),
-      liveUrl: String(project?.liveUrl || '').trim().slice(0, 240)
-    }))
+    .map((project) => {
+      const profileDescription = String(project?.description || '').replace(/\s+/g, ' ').trim();
+      const resumeDescription = String(project?.resumeDescription || '').replace(/\s+/g, ' ').trim();
+
+      return {
+        title: String(project?.title || '').trim().slice(0, 80),
+        description: (resumeDescription || profileDescription).slice(0, resumeDescription ? 160 : 120),
+        techStack: Array.isArray(project?.techStack)
+          ? project.techStack.map((tech) => String(tech || '').trim().slice(0, 20)).filter(Boolean).slice(0, 4)
+          : [],
+        githubUrl: String(project?.githubUrl || '').trim().slice(0, 240),
+        liveUrl: String(project?.liveUrl || '').trim().slice(0, 240)
+      };
+    })
     .filter((project) => project.title && project.description)
     .slice(0, 3);
 }
