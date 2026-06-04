@@ -486,16 +486,16 @@ export default function ModernJobSearchPage() {
             </div>
           </div>
           
-          <div className="flex shrink-0 gap-4">
+          <div className="grid w-full shrink-0 grid-cols-1 gap-3 sm:grid-cols-3 lg:w-auto lg:gap-4">
             {[
               ['Live sources', String(sourceCount || 0), 'cloud_sync'],
               ['Visible roles', String(filteredJobs.length || 0), 'work'],
               ['Avg. fit', averageMatch ? `${averageMatch}%` : '--', 'speed']
             ].map(([label, value, icon]) => (
-              <div key={label} className="min-w-[6rem] rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-3 transition-all hover:border-[var(--accent)]/30">
+              <div key={label} className="min-w-0 rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-3 transition-all hover:border-[var(--accent)]/30">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="material-symbols-outlined text-[14px] text-[var(--muted)]">{icon}</span>
-                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--muted)] whitespace-nowrap">{label}</p>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--muted)]">{label}</p>
                 </div>
                 <p className="text-2xl font-black tracking-tight text-[var(--text)]">{value}</p>
               </div>
@@ -506,7 +506,7 @@ export default function ModernJobSearchPage() {
 
       <div className="space-y-6">
         <form className="app-panel py-6 px-6 sm:px-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-3">
               <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--panel-strong)] border border-[var(--border)]">
                 <span className="material-symbols-outlined text-[16px] text-[var(--accent-strong)]">tune</span>
@@ -514,7 +514,7 @@ export default function ModernJobSearchPage() {
               <h3 className="text-lg font-black tracking-tight text-[var(--text)]">Search Criteria</h3>
             </div>
             {analysisSearchText ? (
-              <label className="flex items-center gap-3 cursor-pointer select-none group">
+              <label className="flex items-center gap-3 cursor-pointer select-none group sm:justify-end">
                 <span className="text-sm font-bold text-[var(--text)] group-hover:text-[var(--accent-strong)] transition-colors">Use analysis context</span>
                 <button
                   type="button"
@@ -617,13 +617,13 @@ export default function ModernJobSearchPage() {
 
           <section className="app-panel space-y-5">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="inline-flex gap-2 p-1.5 rounded-xl bg-[var(--panel-strong)]/50 border border-[var(--border)]">
+              <div className="flex w-full gap-2 overflow-x-auto rounded-xl border border-[var(--border)] bg-[var(--panel-strong)]/50 p-1.5 pb-2 hide-scrollbar md:w-auto md:flex-wrap md:overflow-visible md:pb-1.5">
                 {FOCUS_TAGS.map((option) => (
                   <button
                     key={option.value}
                     type="button"
                     onClick={() => setActiveFocus(option.value)}
-                    className={`rounded-lg px-4 py-2 text-sm font-bold tracking-wide transition-all duration-300 ${
+                    className={`shrink-0 rounded-lg px-4 py-2 text-sm font-bold tracking-wide transition-all duration-300 ${
                       activeFocus === option.value
                         ? 'bg-[var(--accent)] text-[#003824] shadow-[0_0_15px_rgba(78,222,163,0.2)]'
                         : 'text-[var(--muted-strong)] hover:text-[var(--text)] hover:bg-[var(--panel)]'
@@ -725,9 +725,9 @@ export default function ModernJobSearchPage() {
                             </div>
                           ) : null}
 
-                          <div className="flex items-center justify-between gap-4">
+                          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                             <div className="space-y-1.5 flex-1 min-w-0">
-                              <div className="flex items-center gap-4">
+                              <div className="flex min-w-0 items-center gap-4">
                                 <div className={`min-w-[52px] shrink-0 rounded-xl border px-2.5 py-2 text-center flex flex-col justify-center items-center transition-colors ${
                                   job.matchScore >= 85 ? 'border-emerald-500/25 bg-emerald-500/10' : job.matchScore >= 70 ? 'border-cyan-500/25 bg-cyan-500/10' : 'border-amber-500/25 bg-amber-500/10'
                                 }`}>
@@ -744,7 +744,7 @@ export default function ModernJobSearchPage() {
                                 </div>
                               </div>
                             </div>
-                            <div className="flex shrink-0 items-center justify-end gap-3">
+                            <div className="flex shrink-0 items-center justify-between gap-3 sm:justify-end">
                                <div className="hidden md:flex flex-wrap items-center justify-end gap-2 max-w-[400px]">
                                  <span className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] bg-[var(--panel-soft)] py-1 px-2.5 text-[10px] font-bold text-[var(--muted-strong)]">
                                    <span className="material-symbols-outlined text-[12px]">payments</span>
@@ -769,7 +769,7 @@ export default function ModernJobSearchPage() {
                     })}
 
                     {totalPages > 1 && (
-                      <div className="flex items-center justify-between mt-6 rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] px-5 py-3">
+                      <div className="mt-6 flex flex-col items-stretch gap-3 rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] px-5 py-3 sm:flex-row sm:items-center sm:justify-between">
                         <button
                           type="button"
                           className="inline-flex items-center gap-1.5 app-button-secondary text-sm disabled:opacity-40 disabled:cursor-not-allowed"
@@ -779,7 +779,7 @@ export default function ModernJobSearchPage() {
                           <span className="material-symbols-outlined text-[16px]">chevron_left</span>
                           Previous
                         </button>
-                        <span className="text-sm font-bold text-[var(--muted-strong)]">
+                        <span className="text-center text-sm font-bold text-[var(--muted-strong)]">
                           Page <span className="text-[var(--text)]">{currentPage}</span> of <span className="text-[var(--text)]">{totalPages}</span>
                         </span>
                         <button

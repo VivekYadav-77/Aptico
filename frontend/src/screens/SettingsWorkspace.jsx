@@ -237,7 +237,7 @@ export default function SettingsWorkspace() {
       title="Settings Workspace"
       description="Your control center for identity, career trajectory, and visibility. Changes here directly impact your Profile Portfolio."
       actions={
-        <div className="flex gap-3">
+        <div className="flex min-w-0 flex-wrap gap-3">
           <button 
             type="button" 
             className="app-button bg-gradient-to-r from-[var(--accent)] via-[var(--accent-strong)] to-[var(--accent)] bg-[length:200%_auto] hover:bg-[position:right_center] text-white border-0 shadow-lg shadow-[var(--accent)]/30 hover:shadow-xl hover:shadow-[var(--accent)]/50 hover:-translate-y-0.5 transition-all duration-500 flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold" 
@@ -258,12 +258,12 @@ export default function SettingsWorkspace() {
     >
       {/* Alert Banner for Status Messages */}
       {statusMessage && (
-        <div className={`mb-6 p-4 rounded-xl border flex items-center justify-between text-sm font-semibold animate-fade-in-up ${
+        <div className={`mb-6 flex flex-col gap-3 rounded-xl border p-4 text-sm font-semibold animate-fade-in-up sm:flex-row sm:items-center sm:justify-between ${
           statusMessage.type === 'success' 
             ? 'bg-[var(--success-soft)] border-[var(--success-border)] text-[var(--success-strong)]'
             : 'bg-[var(--warning-soft)] border-[var(--warning-border)] text-[var(--warning-text)]'
         }`}>
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-0 items-center gap-3">
             {statusMessage.type === 'success' ? <Icons.Check className="w-5 h-5" /> : <Icons.AlertCircle className="w-5 h-5" />}
             {statusMessage.text}
           </div>
@@ -271,7 +271,7 @@ export default function SettingsWorkspace() {
         </div>
       )}
 
-      <section className="mx-auto w-full max-w-6xl grid gap-6 lg:gap-8 lg:grid-cols-[280px_1fr]">
+      <section className="mx-auto grid w-full max-w-6xl gap-6 lg:gap-8 lg:grid-cols-[minmax(0,280px)_minmax(0,1fr)]">
         {/* Navigation Sidebar */}
         <aside className="space-y-4">
           <div className="app-panel border border-[var(--border)] shadow-sm lg:sticky top-24 p-4">
@@ -306,7 +306,7 @@ export default function SettingsWorkspace() {
               ))}
             </nav>
             
-            <div className="mt-4 lg:mt-8 pt-4 lg:pt-6 border-t border-[var(--border)] px-2">
+            <div className="mt-4 border-t border-[var(--border)] px-2 pt-4 lg:mt-8 lg:pt-6">
               <button 
                 type="button" 
                 className="w-full flex items-center justify-center gap-2 text-sm font-bold text-[var(--warning-text)] hover:text-[var(--warning-strong)] hover:bg-[var(--warning-soft)] py-2 rounded-lg transition-colors" 

@@ -27,7 +27,7 @@ function AppLogo({ compact = false }) {
     <Link to="/" className="flex items-center gap-3 select-none">
       <ApticoLogo className="h-9 w-9 text-[var(--accent)] drop-shadow-[0_0_12px_var(--accent-soft)] transition-transform hover:scale-105" />
       {!compact && (
-        <div>
+        <div className="hidden sm:block">
           <p className="text-base font-black tracking-[-0.04em] text-[var(--text)]">{APP_NAME}</p>
           <p className="text-[9px] uppercase tracking-[0.28em] text-[var(--muted)]">{APP_TAGLINE}</p>
         </div>
@@ -96,7 +96,7 @@ function SearchDropdown({ query, onClose, navigate }) {
 
   return (
     <div
-      className="search-dropdown absolute left-0 top-[calc(100%+8px)] z-[200] w-full min-w-[320px] max-w-sm overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel)] shadow-[0_24px_48px_rgba(0,0,0,0.18)]"
+      className="search-dropdown absolute left-0 top-[calc(100%+8px)] z-[200] w-[min(24rem,calc(100vw-2rem))] max-w-sm overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel)] shadow-[0_24px_48px_rgba(0,0,0,0.18)]"
       style={{ backdropFilter: 'blur(20px)' }}
     >
       {!trimmed ? (
@@ -262,9 +262,9 @@ export default function AppShell({ title, description, actions, children, banner
       {/* ── NAVBAR ──────────────────────────────────────────── */}
       <header className="fixed left-0 right-0 top-0 z-50 bg-[var(--shell)]/70 backdrop-blur-3xl border-b border-white/[0.06] shadow-[0_4px_24px_-8px_rgba(0,0,0,0.5)]">
         {banner}
-        <div className="flex items-center justify-between gap-4 px-4 sm:px-6" style={{ height: `${NAVBAR_HEIGHT}px` }}>
+        <div className="flex min-w-0 items-center justify-between gap-2 px-3 sm:gap-4 sm:px-6" style={{ height: `${NAVBAR_HEIGHT}px` }}>
           {/* Left: Mobile hamburger + App Logo */}
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex min-w-0 items-center gap-2 shrink-0 sm:gap-3">
             <button
               type="button"
               className="app-icon-button shrink-0 lg:hidden"
@@ -354,14 +354,14 @@ export default function AppShell({ title, description, actions, children, banner
           )}
 
           {/* Right: Search, Theme, Notifications, Profile Dropdown */}
-          <div className="flex items-center gap-3 ml-auto">
+          <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-3">
             {/* Desktop Search (Only when logged in) */}
             {auth.isAuthenticated && (
               <div className="relative hidden md:block" ref={searchRef}>
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-[16px] text-[var(--muted-strong)] z-10 pointer-events-none transition-colors duration-300 peer-focus:text-[var(--text)]">search</span>
                 <input
                   ref={searchInputRef}
-                  className="peer w-48 rounded-xl border border-white/[0.1] bg-black/20 hover:bg-black/40 py-1.5 pl-9 pr-12 text-[13px] text-[var(--text)] outline-none transition-all duration-300 focus:w-64 focus:border-white/[0.2] focus:bg-black/60 focus:ring-2 focus:ring-white/[0.05] lg:w-56 lg:focus:w-72"
+                  className="peer w-44 rounded-xl border border-white/[0.1] bg-black/20 hover:bg-black/40 py-1.5 pl-9 pr-12 text-[13px] text-[var(--text)] outline-none transition-all duration-300 focus:w-56 focus:border-white/[0.2] focus:bg-black/60 focus:ring-2 focus:ring-white/[0.05] lg:w-52 lg:focus:w-64 xl:w-56 xl:focus:w-72"
                   placeholder="Search..."
                   value={searchQuery}
                   onChange={(e) => { setSearchQuery(e.target.value); setSearchOpen(true); }}
@@ -623,7 +623,7 @@ export default function AppShell({ title, description, actions, children, banner
             <h1 className="text-2xl font-black tracking-[-0.04em] text-[var(--text)] sm:text-3xl md:text-4xl lg:text-5xl">{title}</h1>
             {description ? <p className="max-w-2xl text-sm leading-7 text-[var(--muted-strong)] sm:text-base">{description}</p> : null}
           </div>
-          {actions ? <div className="flex flex-wrap gap-3">{actions}</div> : null}
+          {actions ? <div className="flex w-full min-w-0 flex-wrap gap-3 sm:w-auto sm:justify-end">{actions}</div> : null}
         </section>
 
         <div className="mx-auto max-w-7xl">
