@@ -1,7 +1,6 @@
-import { and, desc, eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { profileSettings, userEducations, userExperiences, userProfiles, users } from '../../db/schema.js';
 import { env } from '../../config/env.js';
+import { getPublicProfile } from '../profile/profile.service.js';
 import { callGeminiWithRotation, getGeminiKeys } from '../../shared/utils/gemini-client.js';
 
 const chatBodySchema = z.object({
@@ -14,182 +13,276 @@ function serviceError(message, statusCode) {
   return error;
 }
 
-function normalizeProjects(settingsJson) {
-  const topProjects = Array.isArray(settingsJson?.topProjects) ? settingsJson.topProjects : [];
-  const normalizedTopProjects = topProjects
-    .map((item) => ({
-      title: String(item?.title || '').trim().slice(0, 80),
-      description: String(item?.description || '').replace(/\s+/g, ' ').trim().slice(0, 280),
-      resumeDescription: String(item?.resumeDescription || '').replace(/\s+/g, ' ').trim().slice(0, 160),
-      techStack: Array.isArray(item?.techStack) ? item.techStack.map((skill) => String(skill || '').trim().slice(0, 20)).filter(Boolean).slice(0, 4) : [],
-      githubUrl: String(item?.githubUrl || '').trim().slice(0, 240),
-      liveUrl: String(item?.liveUrl || '').trim().slice(0, 240),
-      type: 'project'
-    }))
-    .filter((item) => item.title || item.description || item.githubUrl || item.liveUrl)
-    .slice(0, 3);
-
-  if (normalizedTopProjects.length) {
-    return { projects: normalizedTopProjects, source: 'profile_settings.topProjects' };
+function isMeaningfulValue(value) {
+  if (value === null || value === undefined) {
+    return false;
   }
 
-  const featured = Array.isArray(settingsJson?.featured) ? settingsJson.featured : [];
+  if (typeof value === 'string') {
+    return value.trim().length > 0;
+  }
 
-  const projects = featured
-    .filter((item) => {
-      const type = String(item?.type || '').trim().toLowerCase();
-      return !type || type === 'project';
-    })
-    .map((item) => ({
-      title: String(item?.title || '').trim(),
-      description: String(item?.description || '').trim(),
-      link: String(item?.link || '').trim(),
-      type: String(item?.type || 'project').trim()
-    }))
-    .filter((item) => item.title || item.description || item.link);
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
 
-  return { projects, source: projects.length ? 'profile_settings.featured' : 'none' };
+  if (typeof value === 'object') {
+    return Object.keys(value).length > 0;
+  }
+
+  return true;
 }
 
-async function getShadowResumePayload(db, username) {
-  const profileRows = await db
-    .select({
-      userId: userProfiles.userId,
-      username: userProfiles.username,
-      headline: userProfiles.headline,
-      location: userProfiles.location,
-      skills: userProfiles.skills,
-      isPublic: userProfiles.isPublic,
-      avatarUrl: users.avatarUrl,
-      name: users.name
-    })
-    .from(userProfiles)
-    .innerJoin(users, eq(userProfiles.userId, users.id))
-    .where(and(eq(userProfiles.username, username), eq(userProfiles.isPublic, true)))
-    .limit(1);
+function compactValue(value) {
+  if (Array.isArray(value)) {
+    const items = value
+      .map((item) => compactValue(item))
+      .filter(isMeaningfulValue);
 
-  const profile = profileRows[0];
-
-  if (!profile) {
-    throw serviceError('Profile not found', 404);
+    return items.length ? items : undefined;
   }
 
-  const [experienceRows, educationRows, settingsRows] = await Promise.all([
-    db
-      .select({
-        id: userExperiences.id,
-        company: userExperiences.company,
-        role: userExperiences.role,
-        startDate: userExperiences.startDate,
-        endDate: userExperiences.endDate,
-        isCurrent: userExperiences.isCurrent,
-        description: userExperiences.description
-      })
-      .from(userExperiences)
-      .where(eq(userExperiences.userId, profile.userId))
-      .orderBy(desc(userExperiences.startDate), desc(userExperiences.createdAt)),
-    db
-      .select({
-        id: userEducations.id,
-        institution: userEducations.institution,
-        degree: userEducations.degree,
-        fieldOfStudy: userEducations.fieldOfStudy,
-        graduationYear: userEducations.graduationYear
-      })
-      .from(userEducations)
-      .where(eq(userEducations.userId, profile.userId))
-      .orderBy(desc(userEducations.graduationYear), desc(userEducations.createdAt)),
-    db
-      .select({ settingsJson: profileSettings.settingsJson })
-      .from(profileSettings)
-      .where(eq(profileSettings.userId, profile.userId))
-      .limit(1)
-  ]);
+  if (value && typeof value === 'object') {
+    const compacted = Object.entries(value).reduce((accumulator, [key, entryValue]) => {
+      const nextValue = compactValue(entryValue);
 
-  const settingsJson = settingsRows[0]?.settingsJson || {};
-  const { projects, source: projectSource } = normalizeProjects(settingsJson);
+      if (isMeaningfulValue(nextValue)) {
+        accumulator[key] = nextValue;
+      }
+
+      return accumulator;
+    }, {});
+
+    return Object.keys(compacted).length ? compacted : undefined;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed || undefined;
+  }
+
+  return isMeaningfulValue(value) ? value : undefined;
+}
+
+function toArray(value) {
+  return Array.isArray(value) ? value.filter(isMeaningfulValue) : [];
+}
+
+function normalizeFeaturedItems(items) {
+  return toArray(items).map((item) => ({
+    title: item?.title || '',
+    description: item?.description || '',
+    link: item?.link || '',
+    type: item?.type || ''
+  }));
+}
+
+function normalizeTopProjects(items) {
+  return toArray(items).map((item) => ({
+    title: item?.title || '',
+    description: item?.description || '',
+    resumeDescription: item?.resumeDescription || '',
+    techStack: toArray(item?.techStack),
+    githubUrl: item?.githubUrl || '',
+    liveUrl: item?.liveUrl || ''
+  }));
+}
+
+function normalizeExperiences(items) {
+  return toArray(items).map((item) => ({
+    title: item?.title || item?.role || '',
+    company: item?.company || '',
+    startDate: item?.startDate || '',
+    endDate: item?.endDate || '',
+    isCurrent: Boolean(item?.isCurrent),
+    description: item?.description || ''
+  }));
+}
+
+function normalizeEducation(items) {
+  return toArray(items).map((item) => ({
+    school: item?.school || item?.institution || '',
+    degree: item?.degree || '',
+    field: item?.field || item?.fieldOfStudy || '',
+    startYear: item?.startYear || '',
+    endYear: item?.endYear || item?.graduationYear || '',
+    activities: item?.activities || ''
+  }));
+}
+
+function normalizeLicenses(items) {
+  return toArray(items).map((item) => ({
+    name: item?.name || '',
+    issuingOrg: item?.issuingOrg || '',
+    issueDate: item?.issueDate || '',
+    expiryDate: item?.expiryDate || '',
+    credentialUrl: item?.credentialUrl || ''
+  }));
+}
+
+function normalizeHonorsAwards(items) {
+  return toArray(items).map((item) => ({
+    title: item?.title || '',
+    issuer: item?.issuer || '',
+    date: item?.date || '',
+    description: item?.description || ''
+  }));
+}
+
+function compactLatestAnalysis(latestAnalysis) {
+  if (!latestAnalysis) {
+    return null;
+  }
 
   return {
+    targetRole: latestAnalysis.target_role || latestAnalysis.targetRole || '',
+    confidenceScore: latestAnalysis.confidence_score ?? latestAnalysis.confidenceScore ?? null,
+    topSkillGaps: toArray(latestAnalysis.top_skill_gaps || latestAnalysis.topSkillGaps).slice(0, 3)
+  };
+}
+
+function compactResiliencePortfolio(resiliencePortfolio) {
+  if (!resiliencePortfolio) {
+    return null;
+  }
+
+  return {
+    stats: resiliencePortfolio.stats || null,
+    recentApplications: toArray(resiliencePortfolio.applicationHistory).slice(0, 5),
+    rejectionJourney: toArray(resiliencePortfolio.rejectionJourney).slice(0, 5)
+  };
+}
+
+export function compactPublicProfileForRecruiter(profile) {
+  const enrichedSettings = profile?.enriched_settings || {};
+  const payload = {
     profile: {
-      username: profile.username,
-      name: profile.name || profile.username,
-      headline: profile.headline || '',
-      location: profile.location || '',
-      avatarUrl: profile.avatarUrl || '',
-      skills: Array.isArray(profile.skills) ? profile.skills : [],
-      bio: String(settingsJson?.bio || '').trim(),
-      currentTitle: String(settingsJson?.currentTitle || '').trim(),
-      currentCompany: String(settingsJson?.currentCompany || '').trim(),
-      industry: String(settingsJson?.industry || '').trim(),
-      topSkills: Array.isArray(settingsJson?.topSkills) ? settingsJson.topSkills : [],
-      tools: Array.isArray(settingsJson?.tools) ? settingsJson.tools : [],
-      languages: Array.isArray(settingsJson?.languages) ? settingsJson.languages : [],
-      achievements: Array.isArray(settingsJson?.achievements) ? settingsJson.achievements : []
+      username: profile?.username || '',
+      name: profile?.name || profile?.username || '',
+      headline: profile?.headline || '',
+      location: profile?.location || '',
+      avatarUrl: profile?.avatar_url || profile?.avatarUrl || '',
+      skills: toArray(profile?.skills),
+      followerCount: profile?.follower_count ?? null,
+      connectionCount: profile?.connection_count ?? null,
+      about: {
+        bio: enrichedSettings.bio || '',
+        currentTitle: enrichedSettings.currentTitle || '',
+        currentCompany: enrichedSettings.currentCompany || '',
+        yearsExperience: enrichedSettings.yearsExperience || '',
+        currentStatus: enrichedSettings.currentStatus || '',
+        employmentType: enrichedSettings.employmentType || '',
+        industry: enrichedSettings.industry || '',
+        availability: enrichedSettings.availability || '',
+        openToWork: enrichedSettings.openToWork
+      },
+      links: {
+        linkedin: enrichedSettings.linkedin || '',
+        github: enrichedSettings.github || '',
+        portfolio: enrichedSettings.portfolio || '',
+        website: enrichedSettings.website || ''
+      },
+      skillsDetail: {
+        topSkills: toArray(enrichedSettings.topSkills),
+        tools: toArray(enrichedSettings.tools),
+        languages: toArray(enrichedSettings.languages)
+      }
     },
-    experiences: experienceRows,
-    educations: educationRows,
-    projects,
-    metadata: {
-      projectSource
+    experience: normalizeExperiences(enrichedSettings.experiences),
+    education: normalizeEducation(enrichedSettings.educationEntries),
+    projects: normalizeTopProjects(enrichedSettings.topProjects),
+    featured: normalizeFeaturedItems(enrichedSettings.featured),
+    licenses: normalizeLicenses(enrichedSettings.licenses),
+    honorsAwards: normalizeHonorsAwards(enrichedSettings.honorsAwards),
+    resiliencePortfolio: compactResiliencePortfolio(profile?.resilience_portfolio),
+    latestAnalysis: compactLatestAnalysis(profile?.latest_analysis)
+  };
+
+  return compactValue(payload) || {};
+}
+
+export function buildRecruiterShadowResumePrompt(payload, message) {
+  const candidateName = payload?.profile?.name || payload?.profile?.username || 'this candidate';
+
+  return [
+    `You are Recruiter Shadow Resume, a public-facing AI representative for ${candidateName}.`,
+    'A recruiter is asking a screening question about this candidate.',
+    '',
+    'Grounding and privacy rules:',
+    '- Answer using ONLY the public candidate data supplied below.',
+    '- Treat the supplied data as already visibility-filtered public profile data.',
+    '- Never reveal, infer, or mention hidden/private platform data, internal notes, raw resumes, raw job descriptions, private contact details, or fields that are not present.',
+    '- Do not invent experience, education, projects, companies, dates, achievements, links, certifications, metrics, or skills.',
+    '- If the answer is not present in the supplied data, say: "That information is not available in the public profile data."',
+    '',
+    'Recruiter-friendly response style:',
+    '- Be concise, polished, factual, supportive, and easy to scan.',
+    '- Prefer short paragraphs or bullets when that helps a recruiter evaluate fit quickly.',
+    '- Highlight evidence-backed strengths and relevant context from the profile.',
+    '- Distinguish confirmed facts from unavailable details.',
+    '- Keep the candidate professional and credible; do not exaggerate.',
+    '',
+    'Public candidate data:',
+    JSON.stringify(payload, null, 2),
+    '',
+    `Recruiter question: ${message}`
+  ].join('\n');
+}
+
+export function createShadowResumeChatController({
+  getPublicProfileFn = getPublicProfile,
+  callGeminiFn = callGeminiWithRotation,
+  getGeminiKeysFn = getGeminiKeys,
+  envConfig = env
+} = {}) {
+  return async function shadowResumeChatController(request, reply) {
+    try {
+      const db = request.server.db;
+
+      if (!db) {
+        throw serviceError('Database is not configured yet.', 503);
+      }
+
+      const username = String(request.params?.username || '').trim();
+      const body = chatBodySchema.parse(request.body || {});
+      const publicProfile = await getPublicProfileFn(db, username, null);
+      const payload = compactPublicProfileForRecruiter(publicProfile);
+      const prompt = buildRecruiterShadowResumePrompt(payload, body.message);
+
+      const dedicatedKey = envConfig.geminiShadowResumeKey;
+      const chatModel = envConfig.geminiShadowResumeModel || envConfig.geminiModel2 || envConfig.geminiModel1;
+      const chatKeys = dedicatedKey ? [dedicatedKey] : getGeminiKeysFn(envConfig.geminiKeys);
+
+      const responseText = await callGeminiFn({
+        prompt,
+        model: chatModel,
+        keys: chatKeys,
+        logger: request.log,
+        config: {
+          temperature: 0.2,
+          topP: 0.9
+        }
+      });
+
+      return reply.send({
+        success: true,
+        response: String(responseText || '').trim(),
+        profile: {
+          username: payload.profile?.username,
+          name: payload.profile?.name,
+          headline: payload.profile?.headline,
+          avatarUrl: payload.profile?.avatarUrl
+        }
+      });
+    } catch (error) {
+      const statusCode = error.name === 'ZodError' ? 400 : error.statusCode || 500;
+
+      return reply.code(statusCode).send({
+        success: false,
+        error: error.message || 'Could not generate shadow resume response.'
+      });
     }
   };
 }
 
-export async function shadowResumeChatController(request, reply) {
-  try {
-    const db = request.server.db;
-
-    if (!db) {
-      throw serviceError('Database is not configured yet.', 503);
-    }
-
-    const username = String(request.params?.username || '').trim();
-    const body = chatBodySchema.parse(request.body || {});
-    const payload = await getShadowResumePayload(db, username);
-
-    const systemPrompt = [
-      `You are the representative AI for ${payload.profile.username}.`,
-      'A recruiter is asking you a question about them.',
-      'Answer based ONLY on the following data.',
-      'If the answer is not present in the data, say that the information is not available in the profile data.',
-      'Do not invent experience, education, projects, companies, dates, achievements, or skills.',
-      'Be concise, highly professional, and advocate for their skills.',
-      '',
-      JSON.stringify(payload, null, 2)
-    ].join('\n');
-
-    // Use dedicated shadow resume key if available, otherwise fall back to shared pool
-    const dedicatedKey = env.geminiShadowResumeKey;
-    const chatModel = env.geminiShadowResumeModel || env.geminiModel2 || env.geminiModel1;
-    const chatKeys = dedicatedKey ? [dedicatedKey] : getGeminiKeys(env.geminiKeys);
-
-    const responseText = await callGeminiWithRotation({
-      prompt: `${systemPrompt}\n\nRecruiter question: ${body.message}`,
-      model: chatModel,
-      keys: chatKeys,
-      logger: request.log,
-      config: {
-        temperature: 0.2,
-        topP: 0.9
-      }
-    });
-
-    return reply.send({
-      success: true,
-      response: String(responseText || '').trim(),
-      profile: {
-        username: payload.profile.username,
-        name: payload.profile.name,
-        headline: payload.profile.headline,
-        avatarUrl: payload.profile.avatarUrl
-      }
-    });
-  } catch (error) {
-    const statusCode = error.name === 'ZodError' ? 400 : error.statusCode || 500;
-
-    return reply.code(statusCode).send({
-      success: false,
-      error: error.message || 'Could not generate shadow resume response.'
-    });
-  }
-}
+export const shadowResumeChatController = createShadowResumeChatController();
