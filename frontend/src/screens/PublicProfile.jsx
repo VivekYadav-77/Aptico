@@ -24,6 +24,7 @@ import ResumeTemplate from '../components/ResumeTemplate.jsx';
 import StickerShowcase from '../components/StickerShowcase.jsx';
 import StickerInventoryModal from '../components/StickerInventoryModal.jsx';
 import ResumeBuilderModal from '../components/ResumeBuilderModal.jsx';
+import TopProjectDetailsModal from '../components/TopProjectDetailsModal.jsx';
 
 function initials(name) {
   return String(name || 'A').trim().charAt(0).toUpperCase() || 'A';
@@ -103,42 +104,57 @@ function SectionCard({ id, title, icon, accentColor = 'var(--accent)', children,
 }
 
 /* ── Mini Post Card ── */
-function TopProjectCard({ project }) {
+function TopProjectCard({ project, onReadMore }) {
   const links = [
     project.githubUrl ? { label: 'GitHub', url: project.githubUrl } : null,
     project.liveUrl ? { label: 'Live Demo', url: project.liveUrl } : null
   ].filter(Boolean);
+  const canReadMore = String(project.description || '').length > 110;
 
   return (
-    <article className="group flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)]/40 p-5 transition-all duration-300 hover:border-[#14b8a6]/50 hover:bg-[#14b8a6]/5 hover:shadow-xl">
-      <div className="mb-4 flex items-start justify-between gap-4">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#14b8a6]/20 bg-[#14b8a6]/10 text-[#14b8a6] shadow-inner transition-transform group-hover:scale-110">
-          <span className="material-symbols-outlined text-[22px]">code_blocks</span>
+    <article className="group rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)]/40 p-4 transition-all duration-300 hover:border-[#14b8a6]/50 hover:bg-[#14b8a6]/5 hover:shadow-xl sm:p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#14b8a6]/20 bg-[#14b8a6]/10 text-[#14b8a6] shadow-inner transition-transform group-hover:scale-110">
+            <span className="material-symbols-outlined text-[22px]">code_blocks</span>
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="line-clamp-2 break-words text-base font-black leading-tight text-[var(--text)] transition-colors group-hover:text-[#14b8a6]">{project.title}</h3>
+            <p className="mt-1.5 line-clamp-2 break-words text-sm font-medium leading-6 text-[var(--muted-strong)]">{project.description}</p>
+            {canReadMore ? (
+              <button
+                type="button"
+                onClick={() => onReadMore(project)}
+                className="mt-1 text-xs font-black uppercase tracking-[0.14em] text-[#14b8a6] transition-colors hover:text-[#0f766e]"
+              >
+                Read more
+              </button>
+            ) : null}
+          </div>
         </div>
-        {links.length ? <span className="text-[10px] font-black uppercase tracking-widest text-[#14b8a6]">Project</span> : null}
+
+        {links.length ? (
+          <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
+            {links.map((link) => (
+              <a
+                key={`${link.label}-${link.url}`}
+                href={normalizeUrl(link.url)}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-xs font-bold text-[var(--text)] transition-all hover:border-[#14b8a6]/50 hover:text-[#14b8a6]"
+              >
+                <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                <span className="truncate">{link.label}</span>
+              </a>
+            ))}
+          </div>
+        ) : null}
       </div>
-      <h3 className="line-clamp-2 break-words text-base font-black leading-tight text-[var(--text)] transition-colors group-hover:text-[#14b8a6]">{project.title}</h3>
-      <p className="mt-2 line-clamp-3 break-words text-sm font-medium leading-relaxed text-[var(--muted-strong)]">{project.description}</p>
+
       {project.techStack?.length ? (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {project.techStack.map((tech) => (
+        <div className="mt-3 flex flex-wrap gap-2 pl-0 sm:pl-14">
+          {project.techStack.slice(0, 4).map((tech) => (
             <span key={tech} className="rounded-lg border border-[#14b8a6]/20 bg-[#14b8a6]/10 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider text-[#14b8a6]">{tech}</span>
-          ))}
-        </div>
-      ) : null}
-      {links.length ? (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {links.map((link) => (
-            <a
-              key={`${link.label}-${link.url}`}
-              href={normalizeUrl(link.url)}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-xs font-bold text-[var(--text)] transition-all hover:border-[#14b8a6]/50 hover:text-[#14b8a6]"
-            >
-              <span className="material-symbols-outlined text-[14px]">open_in_new</span>
-              <span className="truncate">{link.label}</span>
-            </a>
           ))}
         </div>
       ) : null}
@@ -291,6 +307,7 @@ export default function PublicProfile() {
   const [badgePopupOpen, setBadgePopupOpen] = useState(false);
   const [stickerGalleryOpen, setStickerGalleryOpen] = useState(false);
   const [resumeModalOpen, setResumeModalOpen] = useState(false);
+  const [selectedTopProject, setSelectedTopProject] = useState(null);
   const [bannerPrefTemp, setBannerPrefTemp] = useState('badge');
   const [listModalState, setListModalState] = useState({ isOpen: false, type: null, title: '', fetchFn: null });
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -883,9 +900,9 @@ export default function PublicProfile() {
                     <SectionCard id="top-projects" title="Top Projects" accentColor="#14b8a6" locked lockedMessage="Connect to see top projects" />
                   ) : isSectionVisible('topProjects') && topProjects.length > 0 ? (
                     <SectionCard id="top-projects" title="Top Projects" accentColor="#14b8a6">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div className="space-y-3">
                         {topProjects.map((project, idx) => (
-                          <TopProjectCard key={`${project.title || 'project'}-${idx}`} project={project} />
+                          <TopProjectCard key={`${project.title || 'project'}-${idx}`} project={project} onReadMore={setSelectedTopProject} />
                         ))}
                       </div>
                     </SectionCard>
@@ -1441,6 +1458,7 @@ export default function PublicProfile() {
         educationEntries={profile?.educationEntries || []}
         readonly={!viewingOwnProfile}
       />
+      <TopProjectDetailsModal project={selectedTopProject} onClose={() => setSelectedTopProject(null)} />
     </main>
   );
 }

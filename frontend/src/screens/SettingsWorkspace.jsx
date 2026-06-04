@@ -586,7 +586,7 @@ export default function SettingsWorkspace() {
                     <div className="space-y-6">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
-                          <p className="text-sm font-medium text-[var(--muted-strong)]">Showcase up to three projects that best prove your skills.</p>
+                          <p className="text-sm font-medium text-[var(--muted-strong)]">Use one outcome-focused sentence and up to 4 core technologies per project.</p>
                           <p className="mt-1 text-xs font-bold uppercase tracking-[0.16em] text-[var(--muted)]">{(draft.topProjects || []).length}/3 projects added</p>
                         </div>
                         <button
@@ -609,16 +609,19 @@ export default function SettingsWorkspace() {
 
                       {(draft.topProjects || []).map((project, idx) => {
                         const descriptionLength = String(project.description || '').length;
+                        const techCount = Array.isArray(project.techStack)
+                          ? project.techStack.length
+                          : String(project.techStack || '').split(',').map((item) => item.trim()).filter(Boolean).length;
                         return (
                           <div key={idx} className="p-6 rounded-3xl border border-[var(--border)] bg-gradient-to-br from-[var(--panel)] to-[var(--panel-soft)] shadow-sm hover:shadow-xl hover:shadow-[var(--accent)]/10 hover:-translate-y-1 hover:border-[var(--accent)]/40 transition-all duration-500 space-y-4 relative group overflow-hidden">
                             <button type="button" onClick={() => updateField('topProjects', draft.topProjects.filter((_, i) => i !== idx))} className="absolute top-3 right-3 text-xs font-bold text-[var(--warning-text)] opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[var(--warning-soft)] px-2 py-1 rounded-lg">Remove</button>
                             <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
                               <InputField label="Project Title" value={project.title} onChange={(e) => { const next = [...draft.topProjects]; next[idx] = { ...next[idx], title: e.target.value.slice(0, 80) }; updateField('topProjects', next); }} placeholder="e.g. Aptico Job Dashboard" />
-                              <InputField label="Tech Stack" value={Array.isArray(project.techStack) ? project.techStack.join(', ') : (project.techStack || '')} onChange={(e) => { const next = [...draft.topProjects]; next[idx] = { ...next[idx], techStack: e.target.value.slice(0, 180) }; updateField('topProjects', next); }} placeholder="React, Node.js, PostgreSQL" />
+                              <InputField label={`Tech Stack (${Math.min(techCount, 4)}/4)`} value={Array.isArray(project.techStack) ? project.techStack.join(', ') : (project.techStack || '')} onChange={(e) => { const next = [...draft.topProjects]; next[idx] = { ...next[idx], techStack: e.target.value.slice(0, 120) }; updateField('topProjects', next); }} placeholder="React, Node.js, MongoDB, Express" />
                             </div>
                             <div>
-                              <TextAreaField label="Short Description" value={project.description} onChange={(e) => { const next = [...draft.topProjects]; next[idx] = { ...next[idx], description: e.target.value.slice(0, 180) }; updateField('topProjects', next); }} placeholder="One resume-ready line about the problem, build, and outcome." minHeight="min-h-[80px]" />
-                              <p className={`mt-1 text-right text-[10px] font-bold uppercase tracking-[0.14em] ${descriptionLength >= 160 ? 'text-[var(--warning-text)]' : 'text-[var(--muted)]'}`}>{descriptionLength}/180</p>
+                              <TextAreaField label="Project Description" value={project.description} onChange={(e) => { const next = [...draft.topProjects]; next[idx] = { ...next[idx], description: e.target.value.replace(/\s+/g, ' ').slice(0, 280) }; updateField('topProjects', next); }} placeholder="Describe the problem, build, and result. Profile cards show a preview; the full text opens in details." minHeight="min-h-[92px]" />
+                              <p className={`mt-1 text-right text-[10px] font-bold uppercase tracking-[0.14em] ${descriptionLength >= 250 ? 'text-[var(--warning-text)]' : 'text-[var(--muted)]'}`}>{descriptionLength}/280</p>
                             </div>
                             <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
                               <InputField label="GitHub URL" value={project.githubUrl} onChange={(e) => { const next = [...draft.topProjects]; next[idx] = { ...next[idx], githubUrl: e.target.value.slice(0, 240) }; updateField('topProjects', next); }} placeholder="https://github.com/..." />

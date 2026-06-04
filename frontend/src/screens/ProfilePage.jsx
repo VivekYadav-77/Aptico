@@ -11,6 +11,7 @@ import { useProfileSettings } from '../hooks/useProfileSettings.js';
 import { selectAuth } from '../store/authSlice.js';
 import { selectCurrentAnalysis } from '../store/historySlice.js';
 import StickerShowcase from '../components/StickerShowcase.jsx';
+import TopProjectDetailsModal from '../components/TopProjectDetailsModal.jsx';
 
 function initials(name) {
   return String(name || 'A').trim().charAt(0).toUpperCase() || 'A';
@@ -195,44 +196,56 @@ function Pill({ children, tone = 'default' }) {
   return <span className={`rounded-full border px-3.5 py-1.5 text-[10px] font-bold uppercase tracking-[0.15em] ${tones[tone]}`}>{children}</span>;
 }
 
-function TopProjectCard({ project }) {
+function TopProjectCard({ project, onReadMore }) {
   const links = [
     project.githubUrl ? { label: 'GitHub', url: project.githubUrl } : null,
     project.liveUrl ? { label: 'Live Demo', url: project.liveUrl } : null
   ].filter(Boolean);
+  const canReadMore = String(project.description || '').length > 110;
 
   return (
-    <article className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-5 transition-all hover:border-[#14b8a6]/50 hover:shadow-md">
-      <div className="flex items-start gap-3">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#14b8a6]/20 bg-[#14b8a6]/10 text-[#14b8a6]">
+    <article className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4 transition-all hover:border-[#14b8a6]/50 hover:shadow-md sm:p-5">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#14b8a6]/20 bg-[#14b8a6]/10 text-[#14b8a6]">
           <span className="material-symbols-outlined text-[20px]">code_blocks</span>
-        </span>
-        <div className="min-w-0 flex-1">
-          <h3 className="line-clamp-2 break-words text-sm font-black leading-tight text-[var(--text)]">{project.title}</h3>
-          <p className="mt-2 line-clamp-3 break-words text-sm font-medium leading-relaxed text-[var(--muted-strong)]">{project.description}</p>
+          </span>
+          <div className="min-w-0 flex-1">
+            <h3 className="line-clamp-2 break-words text-sm font-black leading-tight text-[var(--text)] sm:text-base">{project.title}</h3>
+            <p className="mt-1.5 line-clamp-2 break-words text-sm font-medium leading-6 text-[var(--muted-strong)]">{project.description}</p>
+            {canReadMore ? (
+              <button
+                type="button"
+                onClick={() => onReadMore(project)}
+                className="mt-1 text-xs font-black uppercase tracking-[0.14em] text-[#14b8a6] transition-colors hover:text-[#0f766e]"
+              >
+                Read more
+              </button>
+            ) : null}
+          </div>
         </div>
+
+        {links.length ? (
+          <div className="flex shrink-0 flex-wrap gap-2 sm:justify-end">
+            {links.map((link) => (
+              <a
+                key={`${link.label}-${link.url}`}
+                href={normalizeUrl(link.url)}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-xs font-bold text-[var(--text)] transition-all hover:border-[#14b8a6]/50 hover:text-[#14b8a6]"
+              >
+                <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+                <span className="truncate">{link.label}</span>
+              </a>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {project.techStack?.length ? (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {project.techStack.map((tech) => <Pill key={tech} tone="success">{tech}</Pill>)}
-        </div>
-      ) : null}
-
-      {links.length ? (
-        <div className="mt-4 flex flex-wrap gap-2">
-          {links.map((link) => (
-            <a
-              key={`${link.label}-${link.url}`}
-              href={normalizeUrl(link.url)}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-[var(--border)] bg-[var(--panel)] px-3 py-1.5 text-xs font-bold text-[var(--text)] transition-all hover:border-[#14b8a6]/50 hover:text-[#14b8a6]"
-            >
-              <span className="material-symbols-outlined text-[14px]">open_in_new</span>
-              <span className="truncate">{link.label}</span>
-            </a>
-          ))}
+        <div className="mt-3 flex flex-wrap gap-2 pl-0 sm:pl-[52px]">
+          {project.techStack.slice(0, 4).map((tech) => <Pill key={tech} tone="success">{tech}</Pill>)}
         </div>
       ) : null}
     </article>
@@ -256,6 +269,7 @@ export default function ProfilePage() {
   const [bannerPrefTemp, setBannerPrefTemp] = useState('badge');
   const [listModalState, setListModalState] = useState({ isOpen: false, type: null, title: '', fetchFn: null });
   const [resumeModalOpen, setResumeModalOpen] = useState(false);
+  const [selectedTopProject, setSelectedTopProject] = useState(null);
 
   const fullName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'Aptico User';
   const userInitials = `${profile.firstName?.[0] || 'A'}${profile.lastName?.[0] || 'U'}`.toUpperCase();
@@ -723,9 +737,9 @@ export default function ProfilePage() {
                 isEmpty={!topProjects.length}
                 emptyMessage="Add up to three projects to strengthen your profile and resume."
               >
-                <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-3">
                   {topProjects.map((project, index) => (
-                    <TopProjectCard key={`${project.title || 'project'}-${index}`} project={project} />
+                    <TopProjectCard key={`${project.title || 'project'}-${index}`} project={project} onReadMore={setSelectedTopProject} />
                   ))}
                 </div>
               </SectionCard>
@@ -1130,6 +1144,8 @@ export default function ProfilePage() {
         profile={profile}
         educationEntries={educationEntries}
       />
+
+      <TopProjectDetailsModal project={selectedTopProject} onClose={() => setSelectedTopProject(null)} />
 
       {bannerSettingsOpen ? (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4 backdrop-blur-md animate-fade-in">

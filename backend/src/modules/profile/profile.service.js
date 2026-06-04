@@ -136,9 +136,9 @@ function normalizeTopProjects(topProjects, featured = []) {
     ? topProjects
         .map((item) => ({
           title: String(item?.title || '').trim().slice(0, 80),
-          description: String(item?.description || '').trim().slice(0, 180),
+          description: String(item?.description || '').replace(/\s+/g, ' ').trim().slice(0, 280),
           techStack: Array.isArray(item?.techStack)
-            ? item.techStack.map((skill) => String(skill || '').trim().slice(0, 24)).filter(Boolean).slice(0, 6)
+            ? item.techStack.map((skill) => String(skill || '').trim().slice(0, 20)).filter(Boolean).slice(0, 4)
             : [],
           githubUrl: String(item?.githubUrl || '').trim().slice(0, 240),
           liveUrl: String(item?.liveUrl || '').trim().slice(0, 240)
@@ -159,7 +159,7 @@ function normalizeTopProjects(topProjects, featured = []) {
         })
         .map((item) => ({
           title: String(item?.title || '').trim().slice(0, 80),
-          description: String(item?.description || '').trim().slice(0, 180),
+          description: String(item?.description || '').replace(/\s+/g, ' ').trim().slice(0, 280),
           techStack: [],
           githubUrl: '',
           liveUrl: String(item?.link || '').trim().slice(0, 240)

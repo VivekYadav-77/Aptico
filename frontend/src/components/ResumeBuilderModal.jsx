@@ -14,9 +14,9 @@ function normalizeResumeProjects(projects) {
   return projects
     .map((project) => ({
       title: String(project?.title || '').trim().slice(0, 80),
-      description: String(project?.description || '').trim().slice(0, 180),
+      description: String(project?.description || '').replace(/\s+/g, ' ').trim().slice(0, 120),
       techStack: Array.isArray(project?.techStack)
-        ? project.techStack.map((tech) => String(tech || '').trim().slice(0, 24)).filter(Boolean).slice(0, 6)
+        ? project.techStack.map((tech) => String(tech || '').trim().slice(0, 20)).filter(Boolean).slice(0, 4)
         : [],
       githubUrl: String(project?.githubUrl || '').trim().slice(0, 240),
       liveUrl: String(project?.liveUrl || '').trim().slice(0, 240)
@@ -37,6 +37,10 @@ function projectMeta(project) {
     project.techStack?.length ? project.techStack.join(', ') : null,
     ...projectLinks(project)
   ].filter(Boolean).join(' | ');
+}
+
+function projectHeading(project) {
+  return [project.title, projectMeta(project)].filter(Boolean).join(' | ');
 }
 
 function useResumeData(profile, educationEntries) {
@@ -136,8 +140,7 @@ function ExecutiveTemplate({ data }) {
         <><h2 style={s.sectionTitle}>Projects</h2>
           {data.projects.map((project, i) => (
             <div key={i} style={{ marginBottom: 12 }}>
-              <h3 style={{ ...s.expTitle, ...projectWrapStyle }}>{project.title}</h3>
-              {projectMeta(project) && <p style={{ ...s.expCompany, ...projectWrapStyle }}>{projectMeta(project)}</p>}
+              <h3 style={{ ...s.expTitle, ...projectWrapStyle }}>{projectHeading(project)}</h3>
               <p style={{ ...s.text, ...projectWrapStyle }}>{project.description}</p>
             </div>
           ))}
@@ -297,8 +300,7 @@ function ModernTemplate({ data }) {
                 <><h2 style={secStyle()}>Projects</h2>
                   {data.projects.map((project, i) => (
                     <div key={i} style={{ marginBottom: 14 }}>
-                      <h3 style={{ ...s.entryTitle, ...projectWrapStyle }}>{project.title}</h3>
-                      {projectMeta(project) && <p style={{ ...s.entryCompany, ...projectWrapStyle }}>{projectMeta(project)}</p>}
+                      <h3 style={{ ...s.entryTitle, ...projectWrapStyle }}>{projectHeading(project)}</h3>
                       <p style={{ ...s.text, ...projectWrapStyle }}>{project.description}</p>
                     </div>
                   ))}
@@ -407,8 +409,7 @@ function MinimalTemplate({ data }) {
         <><hr style={s.hr} /><h2 style={s.sectionTitle}>Projects</h2>
           {data.projects.map((project, i) => (
             <div key={i} style={{ marginBottom: 10 }}>
-              <h3 style={{ ...s.entryTitle, ...projectWrapStyle }}>{project.title}</h3>
-              {projectMeta(project) && <p style={{ ...s.entryCompany, ...projectWrapStyle }}>{projectMeta(project)}</p>}
+              <h3 style={{ ...s.entryTitle, ...projectWrapStyle }}>{projectHeading(project)}</h3>
               <p style={{ ...s.text, ...projectWrapStyle }}>{project.description}</p>
             </div>
           ))}
@@ -532,8 +533,7 @@ function CreativeTemplate({ data }) {
           <><h2 style={(() => { if (isFirst) { isFirst = false; return s.firstSectionTitle; } return s.sectionTitle; })()}><span style={s.sectionDot} /> Projects</h2>
             {data.projects.map((project, i) => (
               <div key={i} style={s.entryCard}>
-                <h3 style={{ ...s.entryTitle, ...projectWrapStyle }}>{project.title}</h3>
-                {projectMeta(project) && <p style={{ ...s.entryCompany, ...projectWrapStyle }}>{projectMeta(project)}</p>}
+                <h3 style={{ ...s.entryTitle, ...projectWrapStyle }}>{projectHeading(project)}</h3>
                 <p style={{ ...s.text, ...projectWrapStyle }}>{project.description}</p>
               </div>
             ))}
@@ -677,8 +677,7 @@ function TechnicalTemplate({ data }) {
           </div>
           {data.projects.map((project, i) => (
             <div key={i} style={s.codeBlock}>
-              <h3 style={{ ...s.entryTitle, ...projectWrapStyle }}>{project.title}</h3>
-              {projectMeta(project) && <p style={{ ...s.tag, ...projectWrapStyle }}>{projectMeta(project)}</p>}
+              <h3 style={{ ...s.entryTitle, ...projectWrapStyle }}>{projectHeading(project)}</h3>
               <p style={{ ...s.text, ...projectWrapStyle, marginTop: 6 }}>{project.description}</p>
             </div>
           ))}

@@ -33,9 +33,9 @@ function normalizeTopProjects(projects) {
   return projects
     .map((project) => ({
       title: String(project?.title || '').trim().slice(0, 80),
-      description: String(project?.description || '').trim().slice(0, 180),
+      description: String(project?.description || '').replace(/\s+/g, ' ').trim().slice(0, 120),
       techStack: Array.isArray(project?.techStack)
-        ? project.techStack.map((tech) => String(tech || '').trim().slice(0, 24)).filter(Boolean).slice(0, 6)
+        ? project.techStack.map((tech) => String(tech || '').trim().slice(0, 20)).filter(Boolean).slice(0, 4)
         : [],
       githubUrl: stripUrl(project?.githubUrl),
       liveUrl: stripUrl(project?.liveUrl)
@@ -49,6 +49,12 @@ function projectLinks(project) {
     project.githubUrl ? `GitHub: ${project.githubUrl}` : null,
     project.liveUrl ? `Live: ${project.liveUrl}` : null
   ].filter(Boolean).join(' | ');
+}
+
+function projectHeading(project) {
+  return [project.title, project.techStack?.length ? project.techStack.join(', ') : null, projectLinks(project)]
+    .filter(Boolean)
+    .join(' | ');
 }
 
 export default function ResumeTemplate({ profile }) {
@@ -188,16 +194,8 @@ export default function ResumeTemplate({ profile }) {
           <SectionTitle>Projects</SectionTitle>
           {topProjects.map((project, idx) => (
             <div key={`${project.title}-${idx}`} className="resume-project mb-3">
-              <h3 className="font-bold text-[11pt] m-0">{project.title}</h3>
-              {project.techStack?.length ? (
-                <p className="italic text-[10pt] m-0">{project.techStack.join(', ')}</p>
-              ) : null}
+              <h3 className="font-bold text-[11pt] m-0">{projectHeading(project)}</h3>
               <p className="text-[11pt] mt-1 m-0">{project.description}</p>
-              {projectLinks(project) ? (
-                <p className="text-[10pt] mt-1 m-0">
-                  {projectLinks(project)}
-                </p>
-              ) : null}
             </div>
           ))}
         </section>
