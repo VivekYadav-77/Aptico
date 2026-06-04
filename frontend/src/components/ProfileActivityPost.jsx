@@ -39,19 +39,19 @@ function AnalysisSharePreview({ analysis }) {
           {gaps.map((gap) => <span key={gap} className="app-chip">{gap}</span>)}
         </div>
       ) : null}
-      {analysis.share_full_report ? (
-        <>
-          {reportSnapshot ? (
-            <button type="button" className="app-button-secondary mt-4 px-3 py-2" onClick={() => setReportOpen(true)}>
-              <span className="material-symbols-outlined text-[18px]">visibility</span>
-              View full report
-            </button>
-          ) : <p className="mt-3 text-xs leading-5 text-[var(--muted-strong)]">Full report details are not available for this older shared analysis.</p>}
-          <SharedAnalysisReportModal open={reportOpen} onClose={() => setReportOpen(false)} report={reportSnapshot} />
-        </>
-      ) : (
+      {analysis.share_full_report && !reportSnapshot ? <p className="mt-3 text-xs leading-5 text-[var(--muted-strong)]">Full report details are not available for this older shared analysis.</p> : null}
+      {!analysis.share_full_report ? (
         <p className="mt-3 text-xs leading-5 text-[var(--muted-strong)]">The owner shared a summary only. The detailed gap report is private.</p>
-      )}
+      ) : null}
+      {analysis.share_full_report && reportSnapshot ? (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <button type="button" className="app-button-secondary h-10 px-3 py-2" onClick={() => setReportOpen(true)}>
+            <span className="material-symbols-outlined text-[18px]">visibility</span>
+            View full report
+          </button>
+        </div>
+      ) : null}
+      <SharedAnalysisReportModal open={reportOpen} onClose={() => setReportOpen(false)} report={reportSnapshot} />
     </div>
   );
 }
