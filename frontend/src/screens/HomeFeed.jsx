@@ -14,6 +14,8 @@ import {
   getMyProfile,
   getPostById,
   getPendingConnections,
+  getProfileConnections,
+  getProfileFollowers,
   getPostLikers,
   likePost,
   respondToConnection,
@@ -290,6 +292,7 @@ export default function HomeFeed() {
   const [initialComposerType, setInitialComposerType] = useState('');
   const [editingPost, setEditingPost] = useState(null);
   const [likersPostId, setLikersPostId] = useState(null);
+  const [profileListModal, setProfileListModal] = useState(null);
   const [connectUser, setConnectUser] = useState(null);
   const [connectNote, setConnectNote] = useState('');
   const [toast, setToast] = useState('');
@@ -379,11 +382,28 @@ export default function HomeFeed() {
     setInitialComposerType('');
   }
 
+  const profileUsername = profile?.username;
+
+  function openProfileList(type) {
+    if (!profileUsername) {
+      setToast('Set up your profile before viewing your public network.');
+      return;
+    }
+
+    setProfileListModal({
+      title: type === 'followers' ? 'Followers' : 'Connections',
+      fetchData: () => type === 'followers' ? getProfileFollowers(profileUsername) : getProfileConnections(profileUsername),
+      emptyMessage: type === 'followers' ? 'No followers yet.' : 'No connections yet.'
+    });
+  }
+
   const leftCard = (
-    <aside className="space-y-4 lg:w-[20%]">
+    <aside className="w-full space-y-4">
       <section className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5">
         <Avatar user={{ ...auth.user, avatar_url: auth.user?.avatarUrl }} size="h-16 w-16" />
-        <h2 className="mt-4 text-xl font-black text-[var(--text)]">{auth.user?.name || profile?.username || 'Aptico member'}</h2>
+        <Link to="/profile" className="mt-4 block text-xl font-black text-[var(--text)] transition hover:text-[var(--accent-strong)]">
+          {auth.user?.name || profile?.username || 'Aptico member'}
+        </Link>
         <p className="mt-1 text-sm text-[var(--muted-strong)]">{profile?.headline || 'Build your career signal'}</p>
         {!profile?.headline ? (
           <p className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] p-3 text-xs font-semibold leading-5 text-[var(--muted-strong)]">
@@ -391,14 +411,22 @@ export default function HomeFeed() {
           </p>
         ) : null}
         <div className="mt-4 grid grid-cols-2 gap-2">
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] p-3">
+          <button
+            type="button"
+            onClick={() => openProfileList('followers')}
+            className="rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] p-3 text-left transition hover:border-[var(--accent)] hover:bg-[var(--panel)]"
+          >
             <p className="text-lg font-black text-[var(--text)]">{profile?.followerCount || profile?.follower_count || 0}</p>
             <p className="text-xs font-bold text-[var(--muted-strong)]">Followers</p>
-          </div>
-          <div className="rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] p-3">
+          </button>
+          <button
+            type="button"
+            onClick={() => openProfileList('connections')}
+            className="rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] p-3 text-left transition hover:border-[var(--accent)] hover:bg-[var(--panel)]"
+          >
             <p className="text-lg font-black text-[var(--text)]">{connections.length}</p>
             <p className="text-xs font-bold text-[var(--muted-strong)]">Connections</p>
-          </div>
+          </button>
         </div>
         <div className="mt-5 grid gap-2">
           <Link to="/profile" className="app-button-secondary px-3 py-2">
@@ -419,7 +447,7 @@ export default function HomeFeed() {
   );
 
   const rightCard = (
-    <aside className="space-y-4 lg:w-[25%]">
+    <aside className="w-full space-y-4">
       {pending.length ? (
         <section id="pending-requests" className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5">
           <h2 className="font-black text-[var(--text)]">Connection Requests</h2>
@@ -480,9 +508,9 @@ export default function HomeFeed() {
   return (
     <AppShell title="Career Feed" description="Share career updates, ask useful questions, surface job leads, and turn analysis insights into community momentum.">
       {toast ? <div className="mb-5 rounded-lg border border-[var(--border)] bg-[var(--accent-soft)] p-3 text-sm font-bold text-[var(--accent-strong)]">{toast}</div> : null}
-      <div className="flex flex-col gap-5 lg:flex-row">
-        <div className="order-2 lg:order-1 lg:block">{leftCard}</div>
-        <section className="order-1 min-w-0 flex-1 space-y-4 lg:order-2 lg:w-[55%]">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
+        <div className="order-2 w-full lg:order-1 lg:w-64 lg:shrink-0">{leftCard}</div>
+        <section className="order-1 min-w-0 flex-1 space-y-4 lg:order-2">
           <section className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4">
             <button type="button" onClick={() => openComposer()} className="flex w-full items-center gap-3 text-left">
               <Avatar user={{ ...auth.user, avatar_url: auth.user?.avatarUrl }} />
@@ -534,7 +562,7 @@ export default function HomeFeed() {
           )}
           {hasMore ? <div className="text-center"><button type="button" className="app-button-secondary" onClick={loadMore}>Load more</button></div> : null}
         </section>
-        <div className="order-3 lg:block">{rightCard}</div>
+        <div className="order-3 w-full lg:w-72 lg:shrink-0">{rightCard}</div>
       </div>
       <PostComposer
         open={composerOpen}
@@ -574,6 +602,14 @@ export default function HomeFeed() {
         title="Liked by"
         fetchData={() => getPostLikers(likersPostId)}
         emptyMessage="No one has liked this post yet."
+      />
+      <UserListModal
+        isOpen={Boolean(profileListModal)}
+        onClose={() => setProfileListModal(null)}
+        title={profileListModal?.title || ''}
+        fetchData={profileListModal?.fetchData || (() => Promise.resolve([]))}
+        emptyMessage={profileListModal?.emptyMessage}
+        actionLabel="Visit"
       />
     </AppShell>
   );

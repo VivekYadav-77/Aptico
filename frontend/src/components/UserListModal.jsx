@@ -5,7 +5,7 @@ function initials(name) {
   return String(name || 'A').trim().charAt(0).toUpperCase() || 'A';
 }
 
-export default function UserListModal({ isOpen, onClose, title, fetchData, emptyMessage = 'No users found.' }) {
+export default function UserListModal({ isOpen, onClose, title, fetchData, emptyMessage = 'No users found.', actionLabel = 'View' }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -110,7 +110,7 @@ export default function UserListModal({ isOpen, onClose, title, fetchData, empty
                     className="shrink-0 rounded-full bg-[var(--panel)] border border-[var(--border)] px-4 py-1.5 text-xs font-bold text-[var(--text)] transition-all hover:bg-[var(--panel-soft)] hover:border-[var(--muted-strong)] shadow-sm"
                     onClick={onClose}
                   >
-                    View
+                    {actionLabel}
                   </Link>
                 </div>
               ))}
