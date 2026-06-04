@@ -791,13 +791,188 @@ const TEMPLATES = [
   { id: 'technical', label: 'Technical', desc: 'Developer-inspired layout with monospace accents and code-block styling. Built for tech roles.', icon: 'terminal', color: '#10b981', Component: TechnicalTemplate },
 ];
 
+const COMPACT_RESUME_SCALE = 0.94;
+const A4_HEIGHT_RATIO = 297 / 210;
+const OVERFLOW_WARNING = 'This resume may export to 2 pages. Shorten summary, projects, or experience bullets for a one-page version.';
+
+function safeFileName(name) {
+  return `${String(name || 'Your_Name').replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_') || 'Your_Name'}_Resume`;
+}
+
+function compactText(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim();
+}
+
+function saveBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function buildResumeDocx(data) {
+  const {
+    AlignmentType,
+    BorderStyle,
+    Document,
+    HeadingLevel,
+    Packer,
+    Paragraph,
+    TextRun,
+  } = await import('docx');
+
+  const children = [];
+  const sectionBorder = {
+    bottom: { color: 'D1D5DB', size: 6, style: BorderStyle.SINGLE },
+  };
+
+  function paragraph(text, options = {}) {
+    const clean = compactText(text);
+    if (!clean) return;
+    children.push(new Paragraph({
+      spacing: { after: options.after ?? 90 },
+      alignment: options.alignment,
+      bullet: options.bullet ? { level: 0 } : undefined,
+      children: [
+        new TextRun({
+          text: clean,
+          bold: options.bold,
+          italics: options.italics,
+          size: options.size ?? 20,
+          color: options.color ?? '111827',
+        }),
+      ],
+    }));
+  }
+
+  function heading(text) {
+    const clean = compactText(text);
+    if (!clean) return;
+    children.push(new Paragraph({
+      heading: HeadingLevel.HEADING_2,
+      border: sectionBorder,
+      spacing: { before: 180, after: 100 },
+      children: [new TextRun({ text: clean.toUpperCase(), bold: true, size: 22, color: '111827' })],
+    }));
+  }
+
+  function entryTitle(left, right) {
+    const leftText = compactText(left);
+    const rightText = compactText(right);
+    if (!leftText && !rightText) return;
+    children.push(new Paragraph({
+      spacing: { before: 80, after: 30 },
+      children: [
+        new TextRun({ text: leftText, bold: true, size: 21, color: '111827' }),
+        ...(rightText ? [new TextRun({ text: ` | ${rightText}`, size: 19, color: '4B5563' })] : []),
+      ],
+    }));
+  }
+
+  children.push(new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { after: 50 },
+    children: [new TextRun({ text: compactText(data.fullName), bold: true, size: 34, color: '111827' })],
+  }));
+
+  paragraph(data.headline, { alignment: AlignmentType.CENTER, color: '374151', size: 21, after: 50 });
+  paragraph([...data.contact, ...data.links].map(compactText).filter(Boolean).join(' | '), {
+    alignment: AlignmentType.CENTER,
+    color: '4B5563',
+    size: 18,
+    after: 160,
+  });
+
+  if (data.bio) {
+    heading('Professional Summary');
+    paragraph(data.bio);
+  }
+
+  if (data.experiences.length) {
+    heading('Professional Experience');
+    data.experiences.forEach((exp) => {
+      entryTitle([exp.title || 'Role', exp.company].filter(Boolean).join(', '), dateRange(exp.startDate, exp.endDate, exp.isCurrent));
+      bulletLines(exp.description).forEach((line) => paragraph(line, { bullet: true, after: 40 }));
+    });
+  }
+
+  if (data.skills.length) {
+    heading('Skills');
+    paragraph(data.skills.map(compactText).filter(Boolean).join(', '));
+  }
+
+  if (data.projects.length) {
+    heading('Projects');
+    data.projects.forEach((project) => {
+      entryTitle(projectHeading(project));
+      paragraph(project.description);
+    });
+  }
+
+  if (data.education.length) {
+    heading('Education');
+    data.education.forEach((ed) => {
+      entryTitle(ed.school || 'Institution', [ed.startYear, ed.endYear].filter(Boolean).join(' - '));
+      paragraph([ed.degree, ed.field].filter(Boolean).join(' in ') || 'Degree', { color: '4B5563' });
+    });
+  }
+
+  if (data.licenses.length) {
+    heading('Certifications');
+    data.licenses.forEach((license) => {
+      entryTitle(license.name, license.issueDate);
+      paragraph(license.issuingOrg, { color: '4B5563' });
+    });
+  }
+
+  if (data.awards.length) {
+    heading('Honors & Awards');
+    data.awards.forEach((award) => {
+      entryTitle(award.title, award.date);
+      paragraph(award.issuer, { color: '4B5563' });
+      paragraph(award.description);
+    });
+  }
+
+  const doc = new Document({
+    creator: 'Aptico Resume Builder',
+    description: 'Editable resume generated from Aptico profile data.',
+    title: `${data.fullName} Resume`,
+    styles: {
+      default: {
+        document: {
+          run: { font: 'Arial', size: 20 },
+          paragraph: { spacing: { line: 240 } },
+        },
+      },
+    },
+    sections: [{
+      properties: {
+        page: {
+          margin: { top: 540, right: 540, bottom: 540, left: 540 },
+        },
+      },
+      children,
+    }],
+  });
+
+  return Packer.toBlob(doc);
+}
+
 /* ─────────────────────────────────────────────
    MAIN MODAL
    ───────────────────────────────────────────── */
 export default function ResumeBuilderModal({ open, onClose, profile, educationEntries, readonly = false }) {
   const [selectedId, setSelectedId] = useState(profile?.resumeTemplate || 'executive');
   const [downloading, setDownloading] = useState(false);
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
+  const [resumeOverflows, setResumeOverflows] = useState(false);
   const previewRef = useRef(null);
+  const downloadMenuRef = useRef(null);
 
   useEffect(() => {
     if (open && profile?.resumeTemplate) {
@@ -805,18 +980,53 @@ export default function ResumeBuilderModal({ open, onClose, profile, educationEn
     }
   }, [open, profile?.resumeTemplate]);
 
+  useEffect(() => {
+    if (!downloadMenuOpen) return undefined;
+
+    function handlePointerDown(event) {
+      if (!downloadMenuRef.current?.contains(event.target)) {
+        setDownloadMenuOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [downloadMenuOpen]);
+
   const data = useResumeData(profile, educationEntries);
   const selected = TEMPLATES.find(t => t.id === selectedId) || TEMPLATES[0];
 
-  const handleDownload = useCallback(async () => {
+  useEffect(() => {
+    if (!open) return undefined;
+
+    let frameId = 0;
+    function measureResumeHeight() {
+      frameId = window.requestAnimationFrame(() => {
+        if (!previewRef.current) return;
+        const rect = previewRef.current.getBoundingClientRect();
+        const onePageHeight = rect.width * A4_HEIGHT_RATIO;
+        const nextOverflows = rect.height > onePageHeight + 8;
+        setResumeOverflows((current) => current === nextOverflows ? current : nextOverflows);
+      });
+    }
+
+    measureResumeHeight();
+    window.addEventListener('resize', measureResumeHeight);
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      window.removeEventListener('resize', measureResumeHeight);
+    };
+  }, [open, selectedId, profile, educationEntries]);
+
+  const downloadPdf = useCallback(async () => {
     if (!previewRef.current || downloading) return;
-    setDownloading(true);
+    setDownloading('pdf');
     try {
       const html2pdf = (await import('html2pdf.js')).default;
       const el = previewRef.current;
       const opt = {
         margin: 0,
-        filename: `${data.fullName.replace(/\s+/g, '_')}_Resume.pdf`,
+        filename: `${safeFileName(data.fullName)}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: false },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
@@ -829,6 +1039,28 @@ export default function ResumeBuilderModal({ open, onClose, profile, educationEn
       setDownloading(false);
     }
   }, [data.fullName, downloading]);
+
+  const downloadDocx = useCallback(async () => {
+    if (downloading) return;
+    setDownloading('docx');
+    try {
+      const blob = await buildResumeDocx(data);
+      saveBlob(blob, `${safeFileName(data.fullName)}.docx`);
+    } catch (err) {
+      console.error('DOCX generation failed:', err);
+    } finally {
+      setDownloading(false);
+    }
+  }, [data, downloading]);
+
+  const handleDownload = useCallback(async (format) => {
+    setDownloadMenuOpen(false);
+    if (format === 'docx') {
+      await downloadDocx();
+      return;
+    }
+    await downloadPdf();
+  }, [downloadDocx, downloadPdf]);
 
   if (!open) return null;
 
@@ -846,14 +1078,38 @@ export default function ResumeBuilderModal({ open, onClose, profile, educationEn
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            onClick={handleDownload}
-            disabled={downloading}
-            className="app-button flex items-center gap-2 shadow-lg shadow-[var(--accent)]/20 disabled:opacity-60"
-          >
-            <span className="material-symbols-outlined text-[18px]">{downloading ? 'progress_activity' : 'download'}</span>
-            {downloading ? 'Generating...' : 'Download PDF'}
-          </button>
+          {resumeOverflows && (
+            <div className="hidden max-w-[300px] items-center gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-[11px] font-semibold leading-snug text-amber-200 lg:flex">
+              <span className="material-symbols-outlined text-[16px]">warning</span>
+              <span>{OVERFLOW_WARNING}</span>
+            </div>
+          )}
+          <div ref={downloadMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => setDownloadMenuOpen((value) => !value)}
+              disabled={Boolean(downloading)}
+              aria-haspopup="menu"
+              aria-expanded={downloadMenuOpen}
+              className="app-button flex items-center gap-2 shadow-lg shadow-[var(--accent)]/20 disabled:opacity-60"
+            >
+              <span className="material-symbols-outlined text-[18px]">{downloading ? 'progress_activity' : 'download'}</span>
+              {downloading ? 'Generating...' : 'Download'}
+              {!downloading && <span className="material-symbols-outlined text-[18px]">expand_more</span>}
+            </button>
+            {downloadMenuOpen && (
+              <div role="menu" className="absolute right-0 top-[calc(100%+0.5rem)] z-20 w-44 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--panel)] shadow-2xl">
+                <button type="button" role="menuitem" onClick={() => handleDownload('pdf')} className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-bold text-[var(--text)] transition hover:bg-[var(--panel-soft)]">
+                  <span className="material-symbols-outlined text-[18px] text-[var(--accent-strong)]">picture_as_pdf</span>
+                  Download PDF
+                </button>
+                <button type="button" role="menuitem" onClick={() => handleDownload('docx')} className="flex w-full items-center gap-2 px-4 py-3 text-left text-sm font-bold text-[var(--text)] transition hover:bg-[var(--panel-soft)]">
+                  <span className="material-symbols-outlined text-[18px] text-[var(--accent-strong)]">description</span>
+                  Download DOCX
+                </button>
+              </div>
+            )}
+          </div>
           <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-[var(--panel-strong)] transition text-[var(--muted-strong)] hover:text-[var(--text)]">
             <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
@@ -900,9 +1156,22 @@ export default function ResumeBuilderModal({ open, onClose, profile, educationEn
         )}
 
         {/* Preview area */}
-        <div className="flex-1 overflow-auto bg-[var(--panel-strong)]/50 p-8 flex justify-center">
-          <div className="w-[210mm] min-h-[297mm] bg-white shadow-2xl rounded-lg" style={{ transform: 'scale(0.72)', transformOrigin: 'top center' }}>
-            <div ref={previewRef}>
+        <div className="flex-1 overflow-auto bg-[var(--panel-strong)]/50 p-8 flex flex-col items-center">
+          {resumeOverflows && (
+            <div className="mb-4 flex max-w-[210mm] items-start gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-xs font-semibold leading-relaxed text-amber-200 lg:hidden">
+              <span className="material-symbols-outlined text-[17px]">warning</span>
+              <span>{OVERFLOW_WARNING}</span>
+            </div>
+          )}
+          <div className="h-[297mm] w-[210mm] overflow-hidden bg-white shadow-2xl rounded-lg" style={{ transform: 'scale(0.72)', transformOrigin: 'top center' }}>
+            <div
+              ref={previewRef}
+              style={{
+                transform: `scale(${COMPACT_RESUME_SCALE})`,
+                transformOrigin: 'top left',
+                width: `${100 / COMPACT_RESUME_SCALE}%`
+              }}
+            >
               <selected.Component data={data} />
             </div>
           </div>
