@@ -18,7 +18,7 @@ export const API_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS || 1
 // ── Navigation ───────────────────────────────────────────────
 export const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', icon: 'dashboard', description: 'Your career overview and activity' },
-  { to: '/home', label: 'Feed', icon: 'dynamic_feed', description: 'Posts, comments, and community discussion' },
+  { to: '/home', label: 'Feed', icon: 'dynamic_feed', description: 'Career updates, questions, job shares, and analysis insights' },
   { to: '/analysis', label: 'Analysis', icon: 'analytics', description: 'Resume and job match analysis' },
   { to: '/jobs', label: 'Job Search', icon: 'work', description: 'Discover and filter roles' },
   { to: '/squads', label: 'Squad', icon: 'groups', description: 'Anonymous squad progress and weekly goal' },

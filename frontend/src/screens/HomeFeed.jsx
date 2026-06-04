@@ -1,13 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from '@/lib/router-compat.jsx';
 import { useSelector } from 'react-redux';
 import AppShell from '../components/AppShell.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import PostComments from '../components/PostComments.jsx';
 import PostComposer from '../components/PostComposer.jsx';
+import SharedAnalysisReportModal from '../components/SharedAnalysisReportModal.jsx';
 import UserListModal from '../components/UserListModal.jsx';
 import {
-  addPostComment,
   deleteSocialPost,
   getConnections,
   getFeedPosts,
@@ -15,7 +15,8 @@ import {
   getMyProfile,
   getPostById,
   getPendingConnections,
-  getPostComments,
+  getProfileConnections,
+  getProfileFollowers,
   getPostLikers,
   likePost,
   respondToConnection,
@@ -23,14 +24,28 @@ import {
   sendConnectionRequest
 } from '../api/socialApi.js';
 import { selectAuth } from '../store/authSlice.js';
+import { selectAnalysisHistory } from '../store/historySlice.js';
 
 const filters = [
   ['All', null],
-  ['Career Updates', 'career_update'],
-  ['Job Tips', 'job_tip'],
-  ['Job Shares', 'job_share'],
+  ['Updates', 'career_update'],
+  ['Tips', 'job_tip'],
+  ['Jobs', 'job_share'],
   ['Analysis', 'analysis_share'],
   ['Questions', 'question']
+];
+
+const quickActions = [
+  ['career_update', 'emoji_events', 'Update'],
+  ['question', 'help', 'Question'],
+  ['job_share', 'work', 'Job'],
+  ['analysis_share', 'analytics', 'Analysis']
+];
+
+const communityPrompts = [
+  ['Ask sharper questions', 'Turn a blocker into a useful post for people ahead of you.'],
+  ['Share what worked', 'Small tactics around resumes, interviews, and job boards help the feed stay practical.'],
+  ['Keep roles moving', 'When you find a promising job, share the context that made it stand out.']
 ];
 
 const typeLabels = {
@@ -78,22 +93,103 @@ function Avatar({ user, size = 'h-11 w-11' }) {
   );
 }
 
+function LoadingPostSkeleton() {
+  return (
+    <article className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-1 gap-3">
+          <div className="h-11 w-11 rounded-full bg-[var(--panel-soft)]" />
+          <div className="min-w-0 flex-1">
+            <div className="h-4 w-36 rounded bg-[var(--panel-soft)]" />
+            <div className="mt-2 h-3 w-52 max-w-full rounded bg-[var(--panel-soft)]" />
+          </div>
+        </div>
+        <div className="h-7 w-20 rounded-full bg-[var(--panel-soft)]" />
+      </div>
+      <div className="mt-5 space-y-3">
+        <div className="h-3 w-full rounded bg-[var(--panel-soft)]" />
+        <div className="h-3 w-5/6 rounded bg-[var(--panel-soft)]" />
+        <div className="h-3 w-2/3 rounded bg-[var(--panel-soft)]" />
+      </div>
+      <div className="mt-5 flex gap-2 border-t border-[var(--border)] pt-4">
+        <div className="h-9 w-20 rounded-lg bg-[var(--panel-soft)]" />
+        <div className="h-9 w-20 rounded-lg bg-[var(--panel-soft)]" />
+      </div>
+    </article>
+  );
+}
+
+function EmptyFeedState({ viewMode, onCreate, onAsk }) {
+  const isMine = viewMode === 'mine';
+
+  return (
+    <section className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-6 text-center">
+      <span className="material-symbols-outlined text-[34px] text-[var(--accent-strong)]">{isMine ? 'inventory_2' : 'dynamic_feed'}</span>
+      <h2 className="mt-3 text-xl font-black text-[var(--text)]">{isMine ? 'Your post shelf is empty' : 'No career posts yet'}</h2>
+      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[var(--muted-strong)]">
+        {isMine
+          ? 'Share an update, question, job, or analysis insight so your useful career activity has a place to live.'
+          : 'Start the feed with something practical: a milestone, a job-search question, or a role worth sharing.'}
+      </p>
+      <div className="mt-5 flex flex-wrap justify-center gap-2">
+        <button type="button" className="app-button px-4 py-2" onClick={() => onCreate('career_update')}>
+          <span className="material-symbols-outlined text-[18px]">emoji_events</span>
+          Share update
+        </button>
+        <button type="button" className="app-button-secondary px-4 py-2" onClick={onAsk}>
+          <span className="material-symbols-outlined text-[18px]">help</span>
+          Ask question
+        </button>
+        <Link to="/people" className="app-button-secondary px-4 py-2">
+          <span className="material-symbols-outlined text-[18px]">diversity_3</span>
+          Find people
+        </Link>
+      </div>
+    </section>
+  );
+}
+
 function AnalysisCard({ analysis, isOwn }) {
+  const [reportOpen, setReportOpen] = useState(false);
   if (!analysis) return null;
   const score = Number(analysis.confidence_score || 0);
   const scoreClass = score >= 70 ? 'text-emerald-500' : score >= 50 ? 'text-amber-500' : 'text-red-500';
-  const gaps = analysis.top_skill_gaps || (analysis.gap_analysis_json?.keywordMismatches || []).slice(0, 3).map((item) => item.keyword).filter(Boolean);
+  const report = analysis.gap_analysis_json || {};
+  const gaps = analysis.top_skill_gaps || (report.keywordMismatches || []).slice(0, 3).map((item) => item.keyword).filter(Boolean);
+  const reportSnapshot = analysis.analysis_report_snapshot || null;
 
   return (
     <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] p-4">
-      <p className="font-black text-[var(--text)]">Gap Analysis - {analysis.company_name || 'Role Analysis'}</p>
-      <p className={`mt-2 text-sm font-black ${scoreClass}`}>{score}% readiness</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="font-black text-[var(--text)]">Gap Analysis - {analysis.company_name || 'Role Analysis'}</p>
+          <p className={`mt-2 text-sm font-black ${scoreClass}`}>{score}% readiness</p>
+        </div>
+        <span className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[var(--muted-strong)]">
+          {analysis.share_full_report ? 'Full report' : 'Summary'}
+        </span>
+      </div>
       {gaps.length ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {gaps.map((gap) => <span key={gap} className="app-chip">{gap}</span>)}
         </div>
       ) : null}
-      {isOwn ? <Link to="/analysis-history" className="app-button-secondary mt-4 px-3 py-2">View analysis</Link> : null}
+      {analysis.share_full_report && !reportSnapshot ? <p className="mt-3 text-xs leading-5 text-[var(--muted-strong)]">Full report details are not available for this older shared analysis.</p> : null}
+      {!analysis.share_full_report ? (
+        <p className="mt-3 text-xs leading-5 text-[var(--muted-strong)]">The owner shared a summary only. The detailed gap report is private.</p>
+      ) : null}
+      {(analysis.share_full_report && reportSnapshot) || isOwn ? (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {analysis.share_full_report && reportSnapshot ? (
+            <button type="button" className="app-button-secondary h-10 px-3 py-2" onClick={() => setReportOpen(true)}>
+              <span className="material-symbols-outlined text-[18px]">visibility</span>
+              View full report
+            </button>
+          ) : null}
+          {isOwn ? <Link to="/analysis-history" className="app-button-secondary h-10 px-3 py-2">View analysis</Link> : null}
+        </div>
+      ) : null}
+      <SharedAnalysisReportModal open={reportOpen} onClose={() => setReportOpen(false)} report={reportSnapshot} />
     </div>
   );
 }
@@ -206,6 +302,7 @@ function PostCard({ post, currentUserId, onPostChanged, onDeleted, onEdit, onSho
 
 export default function HomeFeed() {
   const auth = useSelector(selectAuth);
+  const analysisHistory = useSelector(selectAnalysisHistory);
   const [searchParams] = useSearchParams();
   const focusedPostId = searchParams.get('postId');
   const focusedCommentId = searchParams.get('commentId');
@@ -220,12 +317,36 @@ export default function HomeFeed() {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [initialComposerType, setInitialComposerType] = useState('');
   const [editingPost, setEditingPost] = useState(null);
   const [likersPostId, setLikersPostId] = useState(null);
+  const [profileListModal, setProfileListModal] = useState(null);
   const [connectUser, setConnectUser] = useState(null);
   const [connectNote, setConnectNote] = useState('');
   const [toast, setToast] = useState('');
   const [highlightedPostId, setHighlightedPostId] = useState(null);
+
+  const recentAnalyses = useMemo(() => {
+    return analysisHistory
+      .filter((analysis) => analysis.id)
+      .slice(0, 10)
+      .map((analysis) => ({
+        id: analysis.id,
+        localId: analysis.localId || null,
+        company_name: analysis.companyName || analysis.stage1?.companyName || 'Role Analysis',
+        companyName: analysis.companyName || analysis.stage1?.companyName || 'Role Analysis',
+        confidence_score: analysis.confidenceScore ?? analysis.stage1?.confidenceScore ?? 0,
+        confidenceScore: analysis.confidenceScore ?? analysis.stage1?.confidenceScore ?? 0,
+        jobTitle: analysis.jobTitle || analysis.stage1?.jobTitle || 'Target Role',
+        createdAt: analysis.createdAt,
+        summary: analysis.summary || analysis.stage1?.summary || '',
+        matchedSkills: analysis.matchedSkills || analysis.stage1?.skillsPresent || [],
+        precheck: analysis.precheck || null,
+        stage1: analysis.stage1 || null,
+        stage2: analysis.stage2 || null,
+        stage3: analysis.stage3 || null
+      }));
+  }, [analysisHistory]);
 
   useEffect(() => {
     getMyProfile().then(setProfile).catch(() => null);
@@ -301,25 +422,82 @@ export default function HomeFeed() {
     setToast('Connection request sent.');
   }
 
+  function openComposer(type = '') {
+    setInitialComposerType(type);
+    setComposerOpen(true);
+  }
+
+  function closeComposer() {
+    setComposerOpen(false);
+    setInitialComposerType('');
+  }
+
+  const profileUsername = profile?.username;
+
+  function openProfileList(type) {
+    if (!profileUsername) {
+      setToast('Set up your profile before viewing your public network.');
+      return;
+    }
+
+    setProfileListModal({
+      title: type === 'followers' ? 'Followers' : 'Connections',
+      fetchData: () => type === 'followers' ? getProfileFollowers(profileUsername) : getProfileConnections(profileUsername),
+      emptyMessage: type === 'followers' ? 'No followers yet.' : 'No connections yet.'
+    });
+  }
+
   const leftCard = (
-    <aside className="hidden space-y-4 lg:block lg:w-[20%]">
+    <aside className="w-full space-y-4">
       <section className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5">
         <Avatar user={{ ...auth.user, avatar_url: auth.user?.avatarUrl }} size="h-16 w-16" />
-        <h2 className="mt-4 text-xl font-black text-[var(--text)]">{auth.user?.name || profile?.username || 'Aptico member'}</h2>
+        <Link to="/profile" className="mt-4 block text-xl font-black text-[var(--text)] transition hover:text-[var(--accent-strong)]">
+          {auth.user?.name || profile?.username || 'Aptico member'}
+        </Link>
         <p className="mt-1 text-sm text-[var(--muted-strong)]">{profile?.headline || 'Build your career signal'}</p>
-        <p className="mt-4 text-sm font-bold text-[var(--muted-strong)]">{profile?.followerCount || profile?.follower_count || 0} followers</p>
-        <p className="text-sm font-bold text-[var(--muted-strong)]">{connections.length} connections</p>
+        {!profile?.headline ? (
+          <p className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] p-3 text-xs font-semibold leading-5 text-[var(--muted-strong)]">
+            Add a headline so people know what roles, skills, or projects you are building toward.
+          </p>
+        ) : null}
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => openProfileList('followers')}
+            className="rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] p-3 text-left transition hover:border-[var(--accent)] hover:bg-[var(--panel)]"
+          >
+            <p className="text-lg font-black text-[var(--text)]">{profile?.followerCount || profile?.follower_count || 0}</p>
+            <p className="text-xs font-bold text-[var(--muted-strong)]">Followers</p>
+          </button>
+          <button
+            type="button"
+            onClick={() => openProfileList('connections')}
+            className="rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] p-3 text-left transition hover:border-[var(--accent)] hover:bg-[var(--panel)]"
+          >
+            <p className="text-lg font-black text-[var(--text)]">{connections.length}</p>
+            <p className="text-xs font-bold text-[var(--muted-strong)]">Connections</p>
+          </button>
+        </div>
         <div className="mt-5 grid gap-2">
-          <Link to="/settings" className="app-button-secondary px-3 py-2">Edit Profile</Link>
-          <Link to="/analysis" className="app-button-secondary px-3 py-2">My Analysis</Link>
-          <Link to="/jobs" className="app-button-secondary px-3 py-2">Job Search</Link>
+          <Link to="/profile" className="app-button-secondary px-3 py-2">
+            <span className="material-symbols-outlined text-[18px]">person</span>
+            Profile
+          </Link>
+          <Link to="/analysis" className="app-button-secondary px-3 py-2">
+            <span className="material-symbols-outlined text-[18px]">analytics</span>
+            Analysis
+          </Link>
+          <Link to="/jobs" className="app-button-secondary px-3 py-2">
+            <span className="material-symbols-outlined text-[18px]">work</span>
+            Jobs
+          </Link>
         </div>
       </section>
     </aside>
   );
 
   const rightCard = (
-    <aside className="hidden space-y-4 lg:block lg:w-[25%]">
+    <aside className="w-full space-y-4">
       {pending.length ? (
         <section id="pending-requests" className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5">
           <h2 className="font-black text-[var(--text)]">Connection Requests</h2>
@@ -363,19 +541,40 @@ export default function HomeFeed() {
         </div>
         <Link to="/people" className="mt-4 inline-flex text-sm font-bold text-[var(--accent-strong)]">See more people</Link>
       </section>
+      <section className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5">
+        <h2 className="font-black text-[var(--text)]">Career Feed Prompts</h2>
+        <div className="mt-4 space-y-3">
+          {communityPrompts.map(([title, copy]) => (
+            <div key={title} className="rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] p-3">
+              <p className="text-sm font-bold text-[var(--text)]">{title}</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--muted-strong)]">{copy}</p>
+            </div>
+          ))}
+        </div>
+      </section>
     </aside>
   );
 
   return (
-    <AppShell title="Home" description="Share progress, ask useful questions, and keep your career network warm.">
+    <AppShell title="Career Feed" description="Share career updates, ask useful questions, surface job leads, and turn analysis insights into community momentum.">
       {toast ? <div className="mb-5 rounded-lg border border-[var(--border)] bg-[var(--accent-soft)] p-3 text-sm font-bold text-[var(--accent-strong)]">{toast}</div> : null}
-      <div className="flex gap-5">
-        {leftCard}
-        <section className="min-w-0 flex-1 space-y-4 lg:w-[55%]">
-          <button type="button" onClick={() => setComposerOpen(true)} className="flex w-full items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4 text-left">
-            <Avatar user={{ ...auth.user, avatar_url: auth.user?.avatarUrl }} />
-            <span className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-3 text-sm text-[var(--muted-strong)]">Share a career update...</span>
-          </button>
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start">
+        <div className="order-2 w-full lg:order-1 lg:w-64 lg:shrink-0">{leftCard}</div>
+        <section className="order-1 min-w-0 flex-1 space-y-4 lg:order-2">
+          <section className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4">
+            <button type="button" onClick={() => openComposer()} className="flex w-full items-center gap-3 text-left">
+              <Avatar user={{ ...auth.user, avatar_url: auth.user?.avatarUrl }} />
+              <span className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-3 text-sm text-[var(--muted-strong)]">What would help your career network today?</span>
+            </button>
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {quickActions.map(([type, icon, label]) => (
+                <button key={type} type="button" onClick={() => openComposer(type)} className="app-button-secondary justify-center px-3 py-2">
+                  <span className="material-symbols-outlined text-[18px]">{icon}</span>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </section>
           <div className="grid grid-cols-2 gap-2 rounded-lg border border-[var(--border)] bg-[var(--panel)] p-2">
             <button type="button" onClick={() => setViewMode('feed')} className={viewMode === 'feed' ? 'app-button py-2' : 'app-button-secondary py-2'}>
               <span className="material-symbols-outlined text-[18px]">dynamic_feed</span>
@@ -392,7 +591,7 @@ export default function HomeFeed() {
             ))}
           </div>
           {loading ? (
-            <div className="space-y-4">{[0, 1, 2].map((item) => <div key={item} className="h-44 rounded-lg border border-[var(--border)] bg-[var(--panel)]" />)}</div>
+            <div className="space-y-4">{[0, 1, 2].map((item) => <LoadingPostSkeleton key={item} />)}</div>
           ) : (
             <div className="space-y-4">
               {posts.map((post) => (
@@ -408,16 +607,18 @@ export default function HomeFeed() {
                   highlighted={String(post.id) === String(highlightedPostId)}
                 />
               ))}
-              {!posts.length ? <p className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-6 text-center text-sm text-[var(--muted-strong)]">{viewMode === 'mine' ? 'You have not shared anything yet. Your old and scheduled posts will appear here.' : 'No posts yet. Share the first useful update.'}</p> : null}
+              {!posts.length ? <EmptyFeedState viewMode={viewMode} onCreate={openComposer} onAsk={() => openComposer('question')} /> : null}
             </div>
           )}
           {hasMore ? <div className="text-center"><button type="button" className="app-button-secondary" onClick={loadMore}>Load more</button></div> : null}
         </section>
-        {rightCard}
+        <div className="order-3 w-full lg:w-72 lg:shrink-0">{rightCard}</div>
       </div>
       <PostComposer
         open={composerOpen}
-        onClose={() => setComposerOpen(false)}
+        initialPostType={initialComposerType}
+        recentAnalyses={recentAnalyses}
+        onClose={closeComposer}
         onCreated={(post) => {
           if (viewMode === 'mine' || !isScheduledFuture(post.scheduled_at)) {
             setPosts((current) => [post, ...current]);
@@ -452,6 +653,14 @@ export default function HomeFeed() {
         title="Liked by"
         fetchData={() => getPostLikers(likersPostId)}
         emptyMessage="No one has liked this post yet."
+      />
+      <UserListModal
+        isOpen={Boolean(profileListModal)}
+        onClose={() => setProfileListModal(null)}
+        title={profileListModal?.title || ''}
+        fetchData={profileListModal?.fetchData || (() => Promise.resolve([]))}
+        emptyMessage={profileListModal?.emptyMessage}
+        actionLabel="Visit"
       />
     </AppShell>
   );

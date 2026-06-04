@@ -17,6 +17,14 @@ const careerTypes = [
   ['new_project', 'New Project']
 ];
 
+const contentPlaceholders = {
+  career_update: 'Share the progress, milestone, or lesson you want your network to see...',
+  job_tip: 'Share a practical resume, interview, or job-search tip that helped you...',
+  job_share: 'Add why this role may be useful for the community...',
+  analysis_share: 'Share what the analysis revealed and what you are improving next...',
+  question: 'Ask the community anything about job search, resumes, interviews, or career decisions...'
+};
+
 function toDatetimeLocal(value) {
   if (!value) return '';
   const date = new Date(value);
@@ -47,14 +55,35 @@ function isPastScheduleValue(value) {
   return Number.isNaN(date.getTime()) || date.getTime() <= Date.now();
 }
 
-export default function PostComposer({ open, onClose, onCreated, onUpdated, recentAnalyses = [], initialJob = null, initialPost = null }) {
+function buildAnalysisReportSnapshot(analysis) {
+  if (!analysis) return null;
+
+  return {
+    id: analysis.id,
+    localId: analysis.localId || null,
+    createdAt: analysis.createdAt || null,
+    companyName: analysis.companyName || analysis.company_name || analysis.stage1?.companyName || null,
+    jobTitle: analysis.jobTitle || analysis.stage1?.jobTitle || null,
+    confidenceScore: analysis.confidenceScore ?? analysis.confidence_score ?? analysis.stage1?.confidenceScore ?? 0,
+    summary: analysis.summary || analysis.stage1?.summary || '',
+    matchedSkills: Array.isArray(analysis.matchedSkills) ? analysis.matchedSkills : analysis.stage1?.skillsPresent || [],
+    precheck: analysis.precheck || null,
+    stage1: analysis.stage1 || null,
+    stage2: analysis.stage2 || null,
+    stage3: analysis.stage3 || null
+  };
+}
+
+export default function PostComposer({ open, onClose, onCreated, onUpdated, recentAnalyses = [], initialJob = null, initialPost = null, initialPostType = '' }) {
   const isEditing = Boolean(initialPost?.id);
-  const [step, setStep] = useState(isEditing || initialJob ? 2 : 1);
-  const [postType, setPostType] = useState(initialPost?.post_type || (initialJob ? 'job_share' : ''));
+  const shouldSkipTypeStep = isEditing || initialJob || initialPostType;
+  const defaultPostType = initialPost?.post_type || (initialJob ? 'job_share' : initialPostType || '');
+  const [step, setStep] = useState(shouldSkipTypeStep ? 2 : 1);
+  const [postType, setPostType] = useState(defaultPostType);
   const [content, setContent] = useState(initialPost?.content || '');
   const [careerUpdateType, setCareerUpdateType] = useState(initialPost?.career_update_type || '');
   const [analysisId, setAnalysisId] = useState(initialPost?.analysis_id || '');
-  const [showScore, setShowScore] = useState(true);
+  const [shareFullReport, setShareFullReport] = useState(Boolean(initialPost?.job_data?.shareFullReport));
   const [jobData, setJobData] = useState({
     title: initialPost?.job_data?.title || initialJob?.title || '',
     company: initialPost?.job_data?.company || initialJob?.company || '',
@@ -71,11 +100,13 @@ export default function PostComposer({ open, onClose, onCreated, onUpdated, rece
 
   useEffect(() => {
     if (!open) return;
-    setStep(isEditing || initialJob ? 2 : 1);
-    setPostType(initialPost?.post_type || (initialJob ? 'job_share' : ''));
+    const nextPostType = initialPost?.post_type || (initialJob ? 'job_share' : initialPostType || '');
+    setStep(isEditing || initialJob || initialPostType ? 2 : 1);
+    setPostType(nextPostType);
     setContent(initialPost?.content || '');
     setCareerUpdateType(initialPost?.career_update_type || '');
     setAnalysisId(initialPost?.analysis_id || '');
+    setShareFullReport(Boolean(initialPost?.job_data?.shareFullReport));
     setJobData({
       title: initialPost?.job_data?.title || initialJob?.title || '',
       company: initialPost?.job_data?.company || initialJob?.company || '',
@@ -83,18 +114,20 @@ export default function PostComposer({ open, onClose, onCreated, onUpdated, rece
     });
     setScheduledAt(isScheduledFuture(initialPost?.scheduled_at) ? toDatetimeLocal(initialPost?.scheduled_at) : '');
     setError('');
-  }, [open, initialPost?.id, initialJob?.id]);
+  }, [open, initialPost?.id, initialJob?.id, initialPostType]);
 
   if (!open) {
     return null;
   }
 
   function resetAndClose() {
-    setStep(isEditing || initialJob ? 2 : 1);
-    setPostType(initialPost?.post_type || (initialJob ? 'job_share' : ''));
+    const nextPostType = initialPost?.post_type || (initialJob ? 'job_share' : initialPostType || '');
+    setStep(isEditing || initialJob || initialPostType ? 2 : 1);
+    setPostType(nextPostType);
     setContent(initialPost?.content || '');
     setCareerUpdateType(initialPost?.career_update_type || '');
     setAnalysisId(initialPost?.analysis_id || '');
+    setShareFullReport(Boolean(initialPost?.job_data?.shareFullReport));
     setScheduledAt(isScheduledFuture(initialPost?.scheduled_at) ? toDatetimeLocal(initialPost?.scheduled_at) : '');
     setError('');
     onClose?.();
@@ -131,8 +164,10 @@ export default function PostComposer({ open, onClose, onCreated, onUpdated, rece
         content,
         career_update_type: postType === 'career_update' ? careerUpdateType : undefined,
         analysis_id: postType === 'analysis_share' ? analysisId : undefined,
-        job_data: postType === 'job_share' ? jobData : undefined,
-        show_score: showScore,
+        job_data: postType === 'job_share' ? jobData : postType === 'analysis_share' ? {
+          shareFullReport,
+          analysisReportSnapshot: shareFullReport ? buildAnalysisReportSnapshot(selectedAnalysis) : null
+        } : undefined,
         scheduled_at: toScheduledIso(scheduledAt)
       };
       const saved = isEditing ? await updateSocialPost(initialPost.id, payload) : await createSocialPost(payload);
@@ -202,7 +237,7 @@ export default function PostComposer({ open, onClose, onCreated, onUpdated, rece
               <textarea
                 className="app-input mt-2 min-h-36"
                 maxLength={500}
-                placeholder={postType === 'question' ? 'Ask the community anything about job search, resumes, interviews, or career decisions...' : 'Share a career update...'}
+                placeholder={contentPlaceholders[postType] || 'Share a career update...'}
                 value={content}
                 onChange={(event) => setContent(event.target.value)}
                 required
@@ -215,18 +250,21 @@ export default function PostComposer({ open, onClose, onCreated, onUpdated, rece
                 <label className="block">
                   <span className="app-field-label">Which analysis do you want to share?</span>
                   <select className="app-input mt-2" value={analysisId} onChange={(event) => setAnalysisId(event.target.value)} disabled={!recentAnalyses.length}>
-                    <option value="">{recentAnalyses.length ? 'Choose an analysis' : 'No recent analyses available here'}</option>
-                    {recentAnalyses.slice(0, 5).map((analysis) => (
+                    <option value="">{recentAnalyses.length ? 'Choose a saved analysis report' : 'No shareable saved analyses available here'}</option>
+                    {recentAnalyses.slice(0, 10).map((analysis) => (
                       <option key={analysis.id} value={analysis.id}>
-                        {analysis.company_name || analysis.companyName || 'Role Analysis'} - {analysis.confidence_score || analysis.confidenceScore || 0}% match
+                        {analysis.company_name || analysis.companyName || 'Role Analysis'} - {analysis.jobTitle || 'Target Role'} - {analysis.confidence_score || analysis.confidenceScore || 0}% match
                       </option>
                     ))}
                   </select>
                 </label>
                 {selectedAnalysis ? <p className="mt-3 text-sm text-[var(--muted-strong)]">Ready to share: {selectedAnalysis.company_name || selectedAnalysis.companyName || 'Role Analysis'}</p> : null}
-                <label className="mt-3 flex items-center gap-2 text-sm text-[var(--muted-strong)]">
-                  <input type="checkbox" checked={showScore} onChange={(event) => setShowScore(event.target.checked)} />
-                  Show confidence score publicly
+                <label className="mt-3 flex items-start gap-2 text-sm text-[var(--muted-strong)]">
+                  <input className="mt-1" type="checkbox" checked={shareFullReport} onChange={(event) => setShareFullReport(event.target.checked)} />
+                  <span>
+                    <span className="block font-bold text-[var(--text)]">Share full gap report publicly</span>
+                    <span className="mt-1 block text-xs leading-5">If unchecked, people only see the score, role, and top skill gaps.</span>
+                  </span>
                 </label>
               </div>
             ) : null}
