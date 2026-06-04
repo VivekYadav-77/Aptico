@@ -794,6 +794,7 @@ const TEMPLATES = [
 const COMPACT_RESUME_SCALE = 0.94;
 const A4_HEIGHT_RATIO = 297 / 210;
 const OVERFLOW_WARNING = 'This resume may export to 2 pages. Shorten summary, projects, or experience bullets for a one-page version.';
+const FITS_ONE_PAGE_MESSAGE = 'Fits on 1 page';
 
 function safeFileName(name) {
   return `${String(name || 'Your_Name').replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_') || 'Your_Name'}_Resume`;
@@ -1078,12 +1079,6 @@ export default function ResumeBuilderModal({ open, onClose, profile, educationEn
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {resumeOverflows && (
-            <div className="hidden max-w-[300px] items-center gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-[11px] font-semibold leading-snug text-amber-200 lg:flex">
-              <span className="material-symbols-outlined text-[16px]">warning</span>
-              <span>{OVERFLOW_WARNING}</span>
-            </div>
-          )}
           <div ref={downloadMenuRef} className="relative">
             <button
               type="button"
@@ -1156,14 +1151,37 @@ export default function ResumeBuilderModal({ open, onClose, profile, educationEn
         )}
 
         {/* Preview area */}
-        <div className="flex-1 overflow-auto bg-[var(--panel-strong)]/50 p-8 flex flex-col items-center">
+        <div className="flex-1 overflow-auto bg-[var(--panel-strong)]/50 px-4 py-6 sm:px-8 flex flex-col items-center">
+          <div className="mb-4 flex w-full max-w-[210mm] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--muted)]">A4 Preview</p>
+              <p className="mt-1 text-xs font-semibold text-[var(--muted-strong)]">PDF keeps this visual layout. DOCX exports editable text.</p>
+            </div>
+            <div className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold ${
+              resumeOverflows
+                ? 'border-amber-400/40 bg-amber-500/10 text-amber-200'
+                : 'border-emerald-400/30 bg-emerald-500/10 text-emerald-200'
+            }`}>
+              <span className="material-symbols-outlined text-[17px]">{resumeOverflows ? 'warning' : 'check_circle'}</span>
+              <span>{resumeOverflows ? 'May export to 2 pages' : FITS_ONE_PAGE_MESSAGE}</span>
+            </div>
+          </div>
+
           {resumeOverflows && (
-            <div className="mb-4 flex max-w-[210mm] items-start gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-xs font-semibold leading-relaxed text-amber-200 lg:hidden">
-              <span className="material-symbols-outlined text-[17px]">warning</span>
+            <div className="mb-4 flex w-full max-w-[210mm] items-start gap-2 rounded-xl border border-amber-400/30 bg-amber-500/10 px-4 py-3 text-xs font-semibold leading-relaxed text-amber-100">
+              <span className="material-symbols-outlined text-[17px]">lightbulb</span>
               <span>{OVERFLOW_WARNING}</span>
             </div>
           )}
-          <div className="h-[297mm] w-[210mm] overflow-hidden bg-white shadow-2xl rounded-lg" style={{ transform: 'scale(0.72)', transformOrigin: 'top center' }}>
+
+          <div className="relative w-[210mm] min-h-[297mm] bg-white shadow-2xl ring-1 ring-black/10">
+            {resumeOverflows && (
+              <div className="pointer-events-none absolute inset-x-0 top-[297mm] z-10 flex items-center">
+                <span className="h-px flex-1 border-t border-dashed border-amber-400/80" />
+                <span className="mx-3 rounded-full bg-amber-100 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-amber-800 shadow-sm">Page 1 ends here</span>
+                <span className="h-px flex-1 border-t border-dashed border-amber-400/80" />
+              </div>
+            )}
             <div
               ref={previewRef}
               style={{
