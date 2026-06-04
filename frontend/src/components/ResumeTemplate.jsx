@@ -23,6 +23,45 @@ function formatLabel(value) {
     .join(' ');
 }
 
+function stripUrl(value) {
+  return String(value || '').replace(/^https?:\/\//, '').slice(0, 240);
+}
+
+function normalizeTopProjects(projects) {
+  if (!Array.isArray(projects)) return [];
+
+  return projects
+    .map((project) => {
+      const profileDescription = String(project?.description || '').replace(/\s+/g, ' ').trim();
+      const resumeDescription = String(project?.resumeDescription || '').replace(/\s+/g, ' ').trim();
+
+      return {
+        title: String(project?.title || '').trim().slice(0, 80),
+        description: (resumeDescription || profileDescription).slice(0, resumeDescription ? 160 : 120),
+        techStack: Array.isArray(project?.techStack)
+          ? project.techStack.map((tech) => String(tech || '').trim().slice(0, 20)).filter(Boolean).slice(0, 4)
+          : [],
+        githubUrl: stripUrl(project?.githubUrl),
+        liveUrl: stripUrl(project?.liveUrl)
+      };
+    })
+    .filter((project) => project.title && project.description)
+    .slice(0, 3);
+}
+
+function projectLinks(project) {
+  return [
+    project.githubUrl ? `GitHub: ${project.githubUrl}` : null,
+    project.liveUrl ? `Live: ${project.liveUrl}` : null
+  ].filter(Boolean).join(' | ');
+}
+
+function projectHeading(project) {
+  return [project.title, project.techStack?.length ? project.techStack.join(', ') : null, projectLinks(project)]
+    .filter(Boolean)
+    .join(' | ');
+}
+
 export default function ResumeTemplate({ profile }) {
   const es = profile.enriched_settings || profile; // Support both flat profile and enriched_settings
 
@@ -41,6 +80,7 @@ export default function ResumeTemplate({ profile }) {
   const educationEntries = es.educationEntries || [];
   const licenses = es.licenses || [];
   const honorsAwards = es.honorsAwards || [];
+  const topProjects = normalizeTopProjects(es.topProjects || profile.topProjects || []);
   
   // Legacy support for single entries if arrays are empty
   if (experiences.length === 0 && profile.currentCompany) {
@@ -87,6 +127,7 @@ export default function ResumeTemplate({ profile }) {
         }
         .resume-print-view h1, .resume-print-view h2, .resume-print-view h3 { color: black; margin: 0; }
         .resume-print-view p { margin: 0 0 4px 0; font-size: 11pt; color: #333; }
+        .resume-project, .resume-project * { overflow-wrap: anywhere; word-break: break-word; }
         .resume-print-view a { color: black; text-decoration: none; }
         .resume-print-view ul { margin: 4px 0 12px 16px; padding: 0; list-style-type: disc; }
         .resume-print-view li { margin-bottom: 4px; font-size: 11pt; color: #333; }
@@ -149,6 +190,19 @@ export default function ResumeTemplate({ profile }) {
           <p className="text-[11pt] leading-snug">
             {uniqueSkills.join(', ')}
           </p>
+        </section>
+      )}
+
+      {/* Projects */}
+      {topProjects.length > 0 && (
+        <section>
+          <SectionTitle>Projects</SectionTitle>
+          {topProjects.map((project, idx) => (
+            <div key={`${project.title}-${idx}`} className="resume-project mb-3">
+              <h3 className="font-bold text-[11pt] m-0">{projectHeading(project)}</h3>
+              <p className="text-[11pt] mt-1 m-0">{project.description}</p>
+            </div>
+          ))}
         </section>
       )}
 

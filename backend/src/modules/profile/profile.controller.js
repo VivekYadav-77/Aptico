@@ -59,6 +59,15 @@ const profileSettingsSchema = z.object({
     type: z.string().max(50).default('project')
   })).max(20).optional().default([]),
 
+  topProjects: z.array(z.object({
+    title: z.string().trim().min(1).max(80),
+    description: z.string().trim().min(1).max(280),
+    resumeDescription: z.string().trim().max(160).optional().default(''),
+    techStack: z.array(z.string().trim().max(20)).max(4).optional().default([]),
+    githubUrl: z.string().trim().max(240).optional().default(''),
+    liveUrl: z.string().trim().max(240).optional().default('')
+  })).max(3).optional().default([]),
+
   experiences: z.array(z.object({
     id: z.string().uuid().optional(),
     title: z.string().max(200).default(''),
@@ -162,6 +171,40 @@ function normalizeFeaturedProjects(featured) {
         }))
         .filter((item) => item.title || item.description || item.link)
     : [];
+}
+
+function normalizeTopProjects(topProjects, featured = []) {
+  const normalizedTopProjects = Array.isArray(topProjects)
+    ? topProjects
+        .map((item) => ({
+          title: String(item?.title || '').trim().slice(0, 80),
+          description: String(item?.description || '').replace(/\s+/g, ' ').trim().slice(0, 280),
+          resumeDescription: String(item?.resumeDescription || '').replace(/\s+/g, ' ').trim().slice(0, 160),
+          techStack: Array.isArray(item?.techStack)
+            ? item.techStack.map((skill) => String(skill || '').trim().slice(0, 20)).filter(Boolean).slice(0, 4)
+            : [],
+          githubUrl: String(item?.githubUrl || '').trim().slice(0, 240),
+          liveUrl: String(item?.liveUrl || '').trim().slice(0, 240)
+        }))
+        .filter((item) => item.title && item.description)
+        .slice(0, 3)
+    : [];
+
+  if (normalizedTopProjects.length) {
+    return normalizedTopProjects;
+  }
+
+  return normalizeFeaturedProjects(featured)
+    .filter((item) => !item.type || item.type === 'project')
+    .slice(0, 3)
+    .map((item) => ({
+      title: item.title.slice(0, 80),
+      description: item.description.replace(/\s+/g, ' ').slice(0, 280),
+      resumeDescription: '',
+      techStack: [],
+      githubUrl: '',
+      liveUrl: item.link.slice(0, 240)
+    }));
 }
 
 async function getStoredExperiences(db, userId) {
@@ -274,7 +317,7 @@ async function getPortfolioReadmePayload(db, userId) {
       profileSkills: Array.isArray(publicProfile?.skills) ? publicProfile.skills : []
     },
     experiences,
-    projects: normalizeFeaturedProjects(settingsJson.featured),
+    projects: normalizeTopProjects(settingsJson.topProjects, settingsJson.featured),
     links: {
       badgeUrl,
       shadowResumeUrl

@@ -6,6 +6,48 @@ function strip(u) { return (u || '').replace(/^https?:\/\//, ''); }
 
 function pick(a, b) { return a?.length ? a : b?.length ? b : []; }
 
+const projectWrapStyle = { overflowWrap: 'anywhere', wordBreak: 'break-word' };
+
+function normalizeResumeProjects(projects) {
+  if (!Array.isArray(projects)) return [];
+
+  return projects
+    .map((project) => {
+      const profileDescription = String(project?.description || '').replace(/\s+/g, ' ').trim();
+      const resumeDescription = String(project?.resumeDescription || '').replace(/\s+/g, ' ').trim();
+
+      return {
+        title: String(project?.title || '').trim().slice(0, 80),
+        description: (resumeDescription || profileDescription).slice(0, resumeDescription ? 160 : 120),
+        techStack: Array.isArray(project?.techStack)
+          ? project.techStack.map((tech) => String(tech || '').trim().slice(0, 20)).filter(Boolean).slice(0, 4)
+          : [],
+        githubUrl: String(project?.githubUrl || '').trim().slice(0, 240),
+        liveUrl: String(project?.liveUrl || '').trim().slice(0, 240)
+      };
+    })
+    .filter((project) => project.title && project.description)
+    .slice(0, 3);
+}
+
+function projectLinks(project) {
+  return [
+    project.githubUrl ? `GitHub: ${strip(project.githubUrl)}` : null,
+    project.liveUrl ? `Live: ${strip(project.liveUrl)}` : null
+  ].filter(Boolean);
+}
+
+function projectMeta(project) {
+  return [
+    project.techStack?.length ? project.techStack.join(', ') : null,
+    ...projectLinks(project)
+  ].filter(Boolean).join(' | ');
+}
+
+function projectHeading(project) {
+  return [project.title, projectMeta(project)].filter(Boolean).join(' | ');
+}
+
 function useResumeData(profile, educationEntries) {
   const es = profile.enriched_settings || {};
   const fullName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'Your Name';
@@ -30,7 +72,8 @@ function useResumeData(profile, educationEntries) {
   const awards = pick(es.honorsAwards, profile.honorsAwards);
   const bio = es.bio || profile.bio || '';
   const featured = pick(es.featured, profile.featured);
-  return { fullName, headline, contact, links, experiences, education, skills, licenses, awards, bio, featured };
+  const projects = normalizeResumeProjects(pick(es.topProjects, profile.topProjects));
+  return { fullName, headline, contact, links, experiences, education, skills, licenses, awards, bio, featured, projects };
 }
 
 /* ── shared date range ── */
@@ -95,6 +138,17 @@ function ExecutiveTemplate({ data }) {
       {data.skills.length > 0 && (
         <><h2 style={s.sectionTitle}>Skills & Expertise</h2>
           <div>{data.skills.map((sk, i) => <span key={i} style={s.skillPill}>{sk}</span>)}</div>
+        </>
+      )}
+
+      {data.projects.length > 0 && (
+        <><h2 style={s.sectionTitle}>Projects</h2>
+          {data.projects.map((project, i) => (
+            <div key={i} style={{ marginBottom: 12 }}>
+              <h3 style={{ ...s.expTitle, ...projectWrapStyle }}>{projectHeading(project)}</h3>
+              <p style={{ ...s.text, ...projectWrapStyle }}>{project.description}</p>
+            </div>
+          ))}
         </>
       )}
 
@@ -247,6 +301,17 @@ function ModernTemplate({ data }) {
                 </>
               )}
 
+              {data.projects.length > 0 && (
+                <><h2 style={secStyle()}>Projects</h2>
+                  {data.projects.map((project, i) => (
+                    <div key={i} style={{ marginBottom: 14 }}>
+                      <h3 style={{ ...s.entryTitle, ...projectWrapStyle }}>{projectHeading(project)}</h3>
+                      <p style={{ ...s.text, ...projectWrapStyle }}>{project.description}</p>
+                    </div>
+                  ))}
+                </>
+              )}
+
               {data.education.length > 0 && (
                 <><h2 style={secStyle()}>Education</h2>
                   {data.education.map((ed, i) => (
@@ -344,6 +409,17 @@ function MinimalTemplate({ data }) {
       )}
 
       {data.skills.length > 0 && (<><hr style={s.hr} /><h2 style={s.sectionTitle}>Skills</h2><p style={s.skillText}>{data.skills.join('  ·  ')}</p></>)}
+
+      {data.projects.length > 0 && (
+        <><hr style={s.hr} /><h2 style={s.sectionTitle}>Projects</h2>
+          {data.projects.map((project, i) => (
+            <div key={i} style={{ marginBottom: 10 }}>
+              <h3 style={{ ...s.entryTitle, ...projectWrapStyle }}>{projectHeading(project)}</h3>
+              <p style={{ ...s.text, ...projectWrapStyle }}>{project.description}</p>
+            </div>
+          ))}
+        </>
+      )}
 
       {data.education.length > 0 && (
         <><hr style={s.hr} /><h2 style={s.sectionTitle}>Education</h2>
@@ -455,6 +531,17 @@ function CreativeTemplate({ data }) {
         {data.skills.length > 0 && (
           <><h2 style={(() => { if (isFirst) { isFirst = false; return s.firstSectionTitle; } return s.sectionTitle; })()}><span style={s.sectionDot} /> Skills & Expertise</h2>
             <div>{data.skills.map((sk, i) => <span key={i} style={s.skillPill}>{sk}</span>)}</div>
+          </>
+        )}
+
+        {data.projects.length > 0 && (
+          <><h2 style={(() => { if (isFirst) { isFirst = false; return s.firstSectionTitle; } return s.sectionTitle; })()}><span style={s.sectionDot} /> Projects</h2>
+            {data.projects.map((project, i) => (
+              <div key={i} style={s.entryCard}>
+                <h3 style={{ ...s.entryTitle, ...projectWrapStyle }}>{projectHeading(project)}</h3>
+                <p style={{ ...s.text, ...projectWrapStyle }}>{project.description}</p>
+              </div>
+            ))}
           </>
         )}
 
@@ -584,6 +671,21 @@ function TechnicalTemplate({ data }) {
           <div style={s.skillGrid}>
             {data.skills.map((sk, i) => <span key={i} style={s.skillChip}>{sk}</span>)}
           </div>
+        </div>
+      )}
+
+      {data.projects.length > 0 && (
+        <div style={s.sectionWrap}>
+          <div style={headerStyle()}>
+            <span style={s.sectionComment}>{'// '}</span>
+            <span style={s.sectionLabel}>Projects</span>
+          </div>
+          {data.projects.map((project, i) => (
+            <div key={i} style={s.codeBlock}>
+              <h3 style={{ ...s.entryTitle, ...projectWrapStyle }}>{projectHeading(project)}</h3>
+              <p style={{ ...s.text, ...projectWrapStyle, marginTop: 6 }}>{project.description}</p>
+            </div>
+          ))}
         </div>
       )}
 

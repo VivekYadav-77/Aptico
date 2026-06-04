@@ -30,6 +30,22 @@ function parseList(value) {
     .filter(Boolean);
 }
 
+function normalizeTopProjects(projects) {
+  if (!Array.isArray(projects)) return [];
+
+  return projects
+    .map((project) => ({
+      title: String(project?.title || '').trim().slice(0, 80),
+      description: String(project?.description || '').replace(/\s+/g, ' ').trim().slice(0, 280),
+      resumeDescription: String(project?.resumeDescription || '').replace(/\s+/g, ' ').trim().slice(0, 160),
+      techStack: parseList(project?.techStack).map((item) => item.slice(0, 20)).slice(0, 4),
+      githubUrl: String(project?.githubUrl || '').trim().slice(0, 240),
+      liveUrl: String(project?.liveUrl || '').trim().slice(0, 240)
+    }))
+    .filter((project) => project.title && project.description)
+    .slice(0, 3);
+}
+
 function createDefaults(auth, analysis) {
   const user = auth?.user || {};
   const nameParts = splitName(user.name);
@@ -92,10 +108,12 @@ function createDefaults(auth, analysis) {
       licenses: 'everyone',
       skills: 'everyone',
       honorsAwards: 'everyone',
+      topProjects: 'everyone',
       resiliencePortfolio: 'everyone'
     },
     // Multi-entry sections
     featured: [],
+    topProjects: [],
     experiences: [],
     educationEntries: [],
     licenses: [],
@@ -142,6 +160,7 @@ function mergeWithDefaults(defaults, incoming) {
     resumeTemplate: nextValue.resumeTemplate || defaults.resumeTemplate,
     sectionVisibility: { ...defaults.sectionVisibility, ...(nextValue.sectionVisibility || {}) },
     featured: parseArrayField(nextValue.featured, defaults.featured),
+    topProjects: normalizeTopProjects(nextValue.topProjects || defaults.topProjects),
     experiences: parseArrayField(nextValue.experiences, defaults.experiences).map(normalizeExperienceEntry),
     educationEntries: parseArrayField(nextValue.educationEntries, defaults.educationEntries),
     licenses: parseArrayField(nextValue.licenses, defaults.licenses),

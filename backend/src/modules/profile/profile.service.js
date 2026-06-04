@@ -131,6 +131,46 @@ function formatDisplayDate(value) {
   });
 }
 
+function normalizeTopProjects(topProjects, featured = []) {
+  const normalizedTopProjects = Array.isArray(topProjects)
+    ? topProjects
+        .map((item) => ({
+          title: String(item?.title || '').trim().slice(0, 80),
+          description: String(item?.description || '').replace(/\s+/g, ' ').trim().slice(0, 280),
+          resumeDescription: String(item?.resumeDescription || '').replace(/\s+/g, ' ').trim().slice(0, 160),
+          techStack: Array.isArray(item?.techStack)
+            ? item.techStack.map((skill) => String(skill || '').trim().slice(0, 20)).filter(Boolean).slice(0, 4)
+            : [],
+          githubUrl: String(item?.githubUrl || '').trim().slice(0, 240),
+          liveUrl: String(item?.liveUrl || '').trim().slice(0, 240)
+        }))
+        .filter((item) => item.title && item.description)
+        .slice(0, 3)
+    : [];
+
+  if (normalizedTopProjects.length) {
+    return normalizedTopProjects;
+  }
+
+  return Array.isArray(featured)
+    ? featured
+        .filter((item) => {
+          const type = String(item?.type || 'project').trim().toLowerCase();
+          return !type || type === 'project';
+        })
+        .map((item) => ({
+          title: String(item?.title || '').trim().slice(0, 80),
+          description: String(item?.description || '').replace(/\s+/g, ' ').trim().slice(0, 280),
+          resumeDescription: '',
+          techStack: [],
+          githubUrl: '',
+          liveUrl: String(item?.link || '').trim().slice(0, 240)
+        }))
+        .filter((item) => item.title && item.description)
+        .slice(0, 3)
+    : [];
+}
+
 function calculateLongestStreak(dateKeys) {
   if (!dateKeys.length) {
     return 0;
@@ -677,6 +717,11 @@ export async function getPublicProfile(db, username, viewerId = null) {
   // Featured section
   if (canViewSection('featured')) {
     enrichedSettings.featured = Array.isArray(rawSettings.featured) ? rawSettings.featured : [];
+  }
+
+  // Dedicated top projects, with legacy featured-project fallback
+  if (canViewSection('topProjects')) {
+    enrichedSettings.topProjects = normalizeTopProjects(rawSettings.topProjects, rawSettings.featured);
   }
 
   // Digital footprint / public links
