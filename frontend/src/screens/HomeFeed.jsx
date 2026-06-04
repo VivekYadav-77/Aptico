@@ -5,6 +5,7 @@ import AppShell from '../components/AppShell.jsx';
 import ConfirmDialog from '../components/ConfirmDialog.jsx';
 import PostComments from '../components/PostComments.jsx';
 import PostComposer from '../components/PostComposer.jsx';
+import SharedAnalysisReportModal from '../components/SharedAnalysisReportModal.jsx';
 import UserListModal from '../components/UserListModal.jsx';
 import {
   deleteSocialPost,
@@ -149,20 +150,43 @@ function EmptyFeedState({ viewMode, onCreate, onAsk }) {
 }
 
 function AnalysisCard({ analysis, isOwn }) {
+  const [reportOpen, setReportOpen] = useState(false);
   if (!analysis) return null;
   const score = Number(analysis.confidence_score || 0);
   const scoreClass = score >= 70 ? 'text-emerald-500' : score >= 50 ? 'text-amber-500' : 'text-red-500';
-  const gaps = analysis.top_skill_gaps || (analysis.gap_analysis_json?.keywordMismatches || []).slice(0, 3).map((item) => item.keyword).filter(Boolean);
+  const report = analysis.gap_analysis_json || {};
+  const gaps = analysis.top_skill_gaps || (report.keywordMismatches || []).slice(0, 3).map((item) => item.keyword).filter(Boolean);
+  const reportSnapshot = analysis.analysis_report_snapshot || null;
 
   return (
     <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] p-4">
-      <p className="font-black text-[var(--text)]">Gap Analysis - {analysis.company_name || 'Role Analysis'}</p>
-      <p className={`mt-2 text-sm font-black ${scoreClass}`}>{score}% readiness</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="font-black text-[var(--text)]">Gap Analysis - {analysis.company_name || 'Role Analysis'}</p>
+          <p className={`mt-2 text-sm font-black ${scoreClass}`}>{score}% readiness</p>
+        </div>
+        <span className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[var(--muted-strong)]">
+          {analysis.share_full_report ? 'Full report' : 'Summary'}
+        </span>
+      </div>
       {gaps.length ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {gaps.map((gap) => <span key={gap} className="app-chip">{gap}</span>)}
         </div>
       ) : null}
+      {analysis.share_full_report ? (
+        <>
+          {reportSnapshot ? (
+            <button type="button" className="app-button-secondary mt-4 px-3 py-2" onClick={() => setReportOpen(true)}>
+              <span className="material-symbols-outlined text-[18px]">visibility</span>
+              View full report
+            </button>
+          ) : <p className="mt-3 text-xs leading-5 text-[var(--muted-strong)]">Full report details are not available for this older shared analysis.</p>}
+          <SharedAnalysisReportModal open={reportOpen} onClose={() => setReportOpen(false)} report={reportSnapshot} />
+        </>
+      ) : (
+        <p className="mt-3 text-xs leading-5 text-[var(--muted-strong)]">The owner shared a summary only. The detailed gap report is private.</p>
+      )}
       {isOwn ? <Link to="/analysis-history" className="app-button-secondary mt-4 px-3 py-2">View analysis</Link> : null}
     </div>
   );
@@ -306,12 +330,19 @@ export default function HomeFeed() {
       .slice(0, 10)
       .map((analysis) => ({
         id: analysis.id,
+        localId: analysis.localId || null,
         company_name: analysis.companyName || analysis.stage1?.companyName || 'Role Analysis',
         companyName: analysis.companyName || analysis.stage1?.companyName || 'Role Analysis',
         confidence_score: analysis.confidenceScore ?? analysis.stage1?.confidenceScore ?? 0,
         confidenceScore: analysis.confidenceScore ?? analysis.stage1?.confidenceScore ?? 0,
         jobTitle: analysis.jobTitle || analysis.stage1?.jobTitle || 'Target Role',
-        createdAt: analysis.createdAt
+        createdAt: analysis.createdAt,
+        summary: analysis.summary || analysis.stage1?.summary || '',
+        matchedSkills: analysis.matchedSkills || analysis.stage1?.skillsPresent || [],
+        precheck: analysis.precheck || null,
+        stage1: analysis.stage1 || null,
+        stage2: analysis.stage2 || null,
+        stage3: analysis.stage3 || null
       }));
   }, [analysisHistory]);
 

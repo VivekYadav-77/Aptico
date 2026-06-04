@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { deleteSocialPost, likePost, getPostLikers } from '../api/socialApi.js';
 import ConfirmDialog from './ConfirmDialog.jsx';
 import PostComments from './PostComments.jsx';
+import SharedAnalysisReportModal from './SharedAnalysisReportModal.jsx';
 import UserListModal from './UserListModal.jsx';
 
 function initials(name) {
@@ -10,6 +11,49 @@ function initials(name) {
 
 function postTypeLabel(value) {
   return String(value || 'post').replace('_', ' ');
+}
+
+function AnalysisSharePreview({ analysis }) {
+  const [reportOpen, setReportOpen] = useState(false);
+  if (!analysis) return null;
+
+  const report = analysis.gap_analysis_json || {};
+  const score = Number(analysis.confidence_score || 0);
+  const scoreClass = score >= 70 ? 'text-emerald-500' : score >= 50 ? 'text-amber-500' : 'text-red-500';
+  const gaps = analysis.top_skill_gaps || (report.keywordMismatches || []).slice(0, 3).map((item) => item.keyword).filter(Boolean);
+  const reportSnapshot = analysis.analysis_report_snapshot || null;
+
+  return (
+    <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--panel)] p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <p className="font-black text-[var(--text)]">Gap Analysis - {analysis.company_name || 'Role Analysis'}</p>
+          <p className={`mt-1 text-sm font-black ${scoreClass}`}>{score}% readiness</p>
+        </div>
+        <span className="rounded-full border border-[var(--border)] bg-[var(--panel-soft)] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-[var(--muted-strong)]">
+          {analysis.share_full_report ? 'Full report' : 'Summary'}
+        </span>
+      </div>
+      {gaps.length ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {gaps.map((gap) => <span key={gap} className="app-chip">{gap}</span>)}
+        </div>
+      ) : null}
+      {analysis.share_full_report ? (
+        <>
+          {reportSnapshot ? (
+            <button type="button" className="app-button-secondary mt-4 px-3 py-2" onClick={() => setReportOpen(true)}>
+              <span className="material-symbols-outlined text-[18px]">visibility</span>
+              View full report
+            </button>
+          ) : <p className="mt-3 text-xs leading-5 text-[var(--muted-strong)]">Full report details are not available for this older shared analysis.</p>}
+          <SharedAnalysisReportModal open={reportOpen} onClose={() => setReportOpen(false)} report={reportSnapshot} />
+        </>
+      ) : (
+        <p className="mt-3 text-xs leading-5 text-[var(--muted-strong)]">The owner shared a summary only. The detailed gap report is private.</p>
+      )}
+    </div>
+  );
 }
 
 export default function ProfileActivityPost({ post, currentUserId, onPostChanged, onDeleted, onEdit }) {
@@ -96,6 +140,7 @@ export default function ProfileActivityPost({ post, currentUserId, onPostChanged
       </div>
 
       <p className="mt-3 whitespace-pre-wrap text-sm leading-relaxed text-[var(--text)]">{post.content}</p>
+      {post.post_type === 'analysis_share' ? <AnalysisSharePreview analysis={post.analysis} /> : null}
 
       <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-[var(--border)]/60 pt-3">
         <div className="flex items-stretch">

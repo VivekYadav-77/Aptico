@@ -29,6 +29,34 @@ function topSkillGaps(analysis) {
     .filter(Boolean);
 }
 
+function normalizeAnalysisPostData(value) {
+  return {
+    shareFullReport: Boolean(value?.shareFullReport),
+    analysisReportSnapshot: value?.shareFullReport && value?.analysisReportSnapshot ? value.analysisReportSnapshot : null
+  };
+}
+
+function formatPostRow(row) {
+  const shareFullReport = row.post_type === 'analysis_share' && Boolean(row.job_data?.shareFullReport);
+  const hasAnalysis = row.analysis?.company_name || row.analysis?.confidence_score != null;
+  const gapAnalysisJson = row.analysis?.gap_analysis_json || null;
+  const snapshot = shareFullReport ? row.job_data?.analysisReportSnapshot || null : null;
+
+  return {
+    ...row,
+    analysis: hasAnalysis
+      ? {
+          company_name: row.analysis.company_name,
+          confidence_score: row.analysis.confidence_score,
+          share_full_report: shareFullReport,
+          top_skill_gaps: topSkillGaps({ gapAnalysisJson }),
+          gap_analysis_json: shareFullReport ? gapAnalysisJson : null,
+          analysis_report_snapshot: snapshot
+        }
+      : null
+  };
+}
+
 function selectPostShape(viewerId = null) {
   const shape = {
     id: posts.id,
@@ -104,10 +132,7 @@ async function getEnrichedPost(db, postId, viewerId = null) {
   }
 
   return {
-    ...row,
-    analysis: row.analysis?.company_name || row.analysis?.confidence_score != null
-      ? { ...row.analysis, top_skill_gaps: topSkillGaps({ gapAnalysisJson: row.analysis.gap_analysis_json }) }
-      : null
+    ...formatPostRow(row)
   };
 }
 
@@ -174,7 +199,7 @@ export async function createPost(db, userId, data) {
       postType,
       content,
       analysisId: postType === 'analysis_share' ? data.analysis_id : null,
-      jobData: postType === 'job_share' ? data.job_data : null,
+      jobData: postType === 'job_share' ? data.job_data : postType === 'analysis_share' ? normalizeAnalysisPostData(data.job_data) : null,
       careerUpdateType: postType === 'career_update' ? data.career_update_type : null,
       scheduledAt
     })
@@ -186,7 +211,9 @@ export async function createPost(db, userId, data) {
     post.analysis = {
       company_name: analysisRow.companyName,
       confidence_score: analysisRow.confidenceScore,
-      gap_analysis_json: analysisRow.gapAnalysisJson,
+      share_full_report: Boolean(data.job_data?.shareFullReport),
+      analysis_report_snapshot: data.job_data?.shareFullReport ? data.job_data?.analysisReportSnapshot || null : null,
+      gap_analysis_json: data.job_data?.shareFullReport ? analysisRow.gapAnalysisJson : null,
       top_skill_gaps: topSkillGaps(analysisRow)
     };
   }
@@ -218,12 +245,7 @@ export async function getFeedPosts(db, userId, { limit = 20, offset = 0, filterT
     .limit(normalizeLimit(limit))
     .offset(normalizeOffset(offset));
 
-  return rows.map((row) => ({
-    ...row,
-    analysis: row.analysis?.company_name || row.analysis?.confidence_score != null
-      ? { ...row.analysis, top_skill_gaps: topSkillGaps({ gapAnalysisJson: row.analysis.gap_analysis_json }) }
-      : null
-  }));
+  return rows.map(formatPostRow);
 }
 
 export async function getPublicFeedPosts(db, viewerId, { limit = 20, offset = 0, filterType = null, userId = null } = {}) {
@@ -248,12 +270,7 @@ export async function getPublicFeedPosts(db, viewerId, { limit = 20, offset = 0,
     .limit(normalizeLimit(limit))
     .offset(normalizeOffset(offset));
 
-  return rows.map((row) => ({
-    ...row,
-    analysis: row.analysis?.company_name || row.analysis?.confidence_score != null
-      ? { ...row.analysis, top_skill_gaps: topSkillGaps({ gapAnalysisJson: row.analysis.gap_analysis_json }) }
-      : null
-  }));
+  return rows.map(formatPostRow);
 }
 
 export async function getPostById(db, viewerId, postId) {
@@ -272,10 +289,7 @@ export async function getPostById(db, viewerId, postId) {
   }
 
   return {
-    ...row,
-    analysis: row.analysis?.company_name || row.analysis?.confidence_score != null
-      ? { ...row.analysis, top_skill_gaps: topSkillGaps({ gapAnalysisJson: row.analysis.gap_analysis_json }) }
-      : null
+    ...formatPostRow(row)
   };
 }
 
@@ -297,12 +311,7 @@ export async function getMyPosts(db, userId, { limit = 20, offset = 0, filterTyp
     .limit(normalizeLimit(limit))
     .offset(normalizeOffset(offset));
 
-  return rows.map((row) => ({
-    ...row,
-    analysis: row.analysis?.company_name || row.analysis?.confidence_score != null
-      ? { ...row.analysis, top_skill_gaps: topSkillGaps({ gapAnalysisJson: row.analysis.gap_analysis_json }) }
-      : null
-  }));
+  return rows.map(formatPostRow);
 }
 
 export async function updatePost(db, userId, postId, data) {
@@ -367,7 +376,7 @@ export async function updatePost(db, userId, postId, data) {
       postType,
       content,
       analysisId: postType === 'analysis_share' ? data.analysis_id : null,
-      jobData: postType === 'job_share' ? data.job_data : null,
+      jobData: postType === 'job_share' ? data.job_data : postType === 'analysis_share' ? normalizeAnalysisPostData(data.job_data) : null,
       careerUpdateType: postType === 'career_update' ? data.career_update_type : null,
       scheduledAt: parseScheduledAt(data.scheduled_at || data.scheduledAt),
       updatedAt: new Date()
@@ -379,7 +388,9 @@ export async function updatePost(db, userId, postId, data) {
     post.analysis = {
       company_name: analysisRow.companyName,
       confidence_score: analysisRow.confidenceScore,
-      gap_analysis_json: analysisRow.gapAnalysisJson,
+      share_full_report: Boolean(data.job_data?.shareFullReport),
+      analysis_report_snapshot: data.job_data?.shareFullReport ? data.job_data?.analysisReportSnapshot || null : null,
+      gap_analysis_json: data.job_data?.shareFullReport ? analysisRow.gapAnalysisJson : null,
       top_skill_gaps: topSkillGaps(analysisRow)
     };
   }
