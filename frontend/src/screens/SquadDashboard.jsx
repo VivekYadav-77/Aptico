@@ -168,6 +168,19 @@ export default function SquadDashboard() {
   const clutchMode = squadData?.insights?.clutchMode;
   const pingStatus = squadData?.insights?.pingStatus;
   const meta = squadData?.meta;
+  const totalPingsThisWeek = Number(pingStatus?.totalPingsThisWeek || 0);
+  const appsAfterLastPing = Number(pingStatus?.appsAfterLastPing || 0);
+  const hasPingFeedback = Boolean(pingStatus?.lastPingAt);
+  const pingCountLabel = `${totalPingsThisWeek} ping${totalPingsThisWeek === 1 ? '' : 's'} this week`;
+  const movementUnitLabel = `App${appsAfterLastPing === 1 ? '' : 's'}`;
+  const lastPingDescription = hasPingFeedback
+    ? 'This is the most recent anonymous nudge sent to teammates who were behind the weekly pace.'
+    : 'No anonymous nudges have been sent this week, so feedback will appear after the first ping.';
+  const movementDescription = !hasPingFeedback
+    ? 'Send a ping when teammates fall behind pace. Applications logged afterward will be counted here.'
+    : appsAfterLastPing
+      ? `${appsAfterLastPing} application${appsAfterLastPing === 1 ? '' : 's'} logged after the most recent anonymous nudge.`
+      : 'No applications have been logged since the most recent anonymous nudge.';
 
   function dismissExplainer() {
     setShowExplainer(false);
@@ -701,7 +714,7 @@ export default function SquadDashboard() {
                   <h2 className="mt-3 text-2xl font-black tracking-[-0.04em] text-[var(--text)]">Did the nudge create movement?</h2>
                 </div>
                 <div className="rounded-full border border-[var(--border)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-                  {pingStatus?.totalPingsThisWeek || 0} pings this week
+                  {pingCountLabel}
                 </div>
               </div>
 
@@ -712,17 +725,17 @@ export default function SquadDashboard() {
                     {pingStatus?.lastPingAt ? formatDateTime(pingStatus.lastPingAt) : 'No pings yet'}
                   </p>
                   <p className="mt-3 text-sm leading-relaxed text-[var(--muted-strong)]">
-                    Use this to judge whether nudges are helping or whether the squad needs direct output from the members already in motion.
+                    {lastPingDescription}
                   </p>
                 </div>
                 <div className="rounded-3xl border border-[var(--border)] bg-[var(--panel-soft)] p-6 transition-all hover:border-[var(--muted-strong)]">
                   <p className="app-kicker !mt-0 text-[var(--muted)]">Movement after ping</p>
                   <div className="mt-4 flex items-baseline gap-2">
-                     <p className="text-4xl font-black text-[var(--text)] drop-shadow-md">{pingStatus?.appsAfterLastPing || 0}</p>
-                     <span className="text-xs font-bold uppercase tracking-widest text-[var(--muted)]">Apps</span>
+                     <p className="text-4xl font-black text-[var(--text)] drop-shadow-md">{appsAfterLastPing}</p>
+                     <span className="text-xs font-bold uppercase tracking-widest text-[var(--muted)]">{movementUnitLabel}</span>
                   </div>
                   <p className="mt-3 text-sm leading-relaxed text-[var(--muted-strong)]">
-                    Applications logged after the most recent anonymous nudge. This closes the feedback loop that the old dashboard was missing.
+                    {movementDescription}
                   </p>
                 </div>
               </div>
