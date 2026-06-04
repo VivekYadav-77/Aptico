@@ -7,7 +7,6 @@ import PostComments from '../components/PostComments.jsx';
 import PostComposer from '../components/PostComposer.jsx';
 import UserListModal from '../components/UserListModal.jsx';
 import {
-  addPostComment,
   deleteSocialPost,
   getConnections,
   getFeedPosts,
@@ -15,7 +14,6 @@ import {
   getMyProfile,
   getPostById,
   getPendingConnections,
-  getPostComments,
   getPostLikers,
   likePost,
   respondToConnection,
@@ -26,11 +24,24 @@ import { selectAuth } from '../store/authSlice.js';
 
 const filters = [
   ['All', null],
-  ['Career Updates', 'career_update'],
-  ['Job Tips', 'job_tip'],
-  ['Job Shares', 'job_share'],
+  ['Updates', 'career_update'],
+  ['Tips', 'job_tip'],
+  ['Jobs', 'job_share'],
   ['Analysis', 'analysis_share'],
   ['Questions', 'question']
+];
+
+const quickActions = [
+  ['career_update', 'emoji_events', 'Update'],
+  ['question', 'help', 'Question'],
+  ['job_share', 'work', 'Job'],
+  ['analysis_share', 'analytics', 'Analysis']
+];
+
+const communityPrompts = [
+  ['Ask sharper questions', 'Turn a blocker into a useful post for people ahead of you.'],
+  ['Share what worked', 'Small tactics around resumes, interviews, and job boards help the feed stay practical.'],
+  ['Keep roles moving', 'When you find a promising job, share the context that made it stand out.']
 ];
 
 const typeLabels = {
@@ -75,6 +86,62 @@ function Avatar({ user, size = 'h-11 w-11' }) {
     <div className={`${size} flex items-center justify-center rounded-full bg-[var(--accent)] text-sm font-black text-[#003824]`}>
       {initials(user?.name || user?.username)}
     </div>
+  );
+}
+
+function LoadingPostSkeleton() {
+  return (
+    <article className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-1 gap-3">
+          <div className="h-11 w-11 rounded-full bg-[var(--panel-soft)]" />
+          <div className="min-w-0 flex-1">
+            <div className="h-4 w-36 rounded bg-[var(--panel-soft)]" />
+            <div className="mt-2 h-3 w-52 max-w-full rounded bg-[var(--panel-soft)]" />
+          </div>
+        </div>
+        <div className="h-7 w-20 rounded-full bg-[var(--panel-soft)]" />
+      </div>
+      <div className="mt-5 space-y-3">
+        <div className="h-3 w-full rounded bg-[var(--panel-soft)]" />
+        <div className="h-3 w-5/6 rounded bg-[var(--panel-soft)]" />
+        <div className="h-3 w-2/3 rounded bg-[var(--panel-soft)]" />
+      </div>
+      <div className="mt-5 flex gap-2 border-t border-[var(--border)] pt-4">
+        <div className="h-9 w-20 rounded-lg bg-[var(--panel-soft)]" />
+        <div className="h-9 w-20 rounded-lg bg-[var(--panel-soft)]" />
+      </div>
+    </article>
+  );
+}
+
+function EmptyFeedState({ viewMode, onCreate, onAsk }) {
+  const isMine = viewMode === 'mine';
+
+  return (
+    <section className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-6 text-center">
+      <span className="material-symbols-outlined text-[34px] text-[var(--accent-strong)]">{isMine ? 'inventory_2' : 'dynamic_feed'}</span>
+      <h2 className="mt-3 text-xl font-black text-[var(--text)]">{isMine ? 'Your post shelf is empty' : 'No career posts yet'}</h2>
+      <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[var(--muted-strong)]">
+        {isMine
+          ? 'Share an update, question, job, or analysis insight so your useful career activity has a place to live.'
+          : 'Start the feed with something practical: a milestone, a job-search question, or a role worth sharing.'}
+      </p>
+      <div className="mt-5 flex flex-wrap justify-center gap-2">
+        <button type="button" className="app-button px-4 py-2" onClick={() => onCreate('career_update')}>
+          <span className="material-symbols-outlined text-[18px]">emoji_events</span>
+          Share update
+        </button>
+        <button type="button" className="app-button-secondary px-4 py-2" onClick={onAsk}>
+          <span className="material-symbols-outlined text-[18px]">help</span>
+          Ask question
+        </button>
+        <Link to="/people" className="app-button-secondary px-4 py-2">
+          <span className="material-symbols-outlined text-[18px]">diversity_3</span>
+          Find people
+        </Link>
+      </div>
+    </section>
   );
 }
 
@@ -220,6 +287,7 @@ export default function HomeFeed() {
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [initialComposerType, setInitialComposerType] = useState('');
   const [editingPost, setEditingPost] = useState(null);
   const [likersPostId, setLikersPostId] = useState(null);
   const [connectUser, setConnectUser] = useState(null);
@@ -301,25 +369,57 @@ export default function HomeFeed() {
     setToast('Connection request sent.');
   }
 
+  function openComposer(type = '') {
+    setInitialComposerType(type);
+    setComposerOpen(true);
+  }
+
+  function closeComposer() {
+    setComposerOpen(false);
+    setInitialComposerType('');
+  }
+
   const leftCard = (
-    <aside className="hidden space-y-4 lg:block lg:w-[20%]">
+    <aside className="space-y-4 lg:w-[20%]">
       <section className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5">
         <Avatar user={{ ...auth.user, avatar_url: auth.user?.avatarUrl }} size="h-16 w-16" />
         <h2 className="mt-4 text-xl font-black text-[var(--text)]">{auth.user?.name || profile?.username || 'Aptico member'}</h2>
         <p className="mt-1 text-sm text-[var(--muted-strong)]">{profile?.headline || 'Build your career signal'}</p>
-        <p className="mt-4 text-sm font-bold text-[var(--muted-strong)]">{profile?.followerCount || profile?.follower_count || 0} followers</p>
-        <p className="text-sm font-bold text-[var(--muted-strong)]">{connections.length} connections</p>
+        {!profile?.headline ? (
+          <p className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] p-3 text-xs font-semibold leading-5 text-[var(--muted-strong)]">
+            Add a headline so people know what roles, skills, or projects you are building toward.
+          </p>
+        ) : null}
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] p-3">
+            <p className="text-lg font-black text-[var(--text)]">{profile?.followerCount || profile?.follower_count || 0}</p>
+            <p className="text-xs font-bold text-[var(--muted-strong)]">Followers</p>
+          </div>
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] p-3">
+            <p className="text-lg font-black text-[var(--text)]">{connections.length}</p>
+            <p className="text-xs font-bold text-[var(--muted-strong)]">Connections</p>
+          </div>
+        </div>
         <div className="mt-5 grid gap-2">
-          <Link to="/settings" className="app-button-secondary px-3 py-2">Edit Profile</Link>
-          <Link to="/analysis" className="app-button-secondary px-3 py-2">My Analysis</Link>
-          <Link to="/jobs" className="app-button-secondary px-3 py-2">Job Search</Link>
+          <Link to="/profile" className="app-button-secondary px-3 py-2">
+            <span className="material-symbols-outlined text-[18px]">person</span>
+            Profile
+          </Link>
+          <Link to="/analysis" className="app-button-secondary px-3 py-2">
+            <span className="material-symbols-outlined text-[18px]">analytics</span>
+            Analysis
+          </Link>
+          <Link to="/jobs" className="app-button-secondary px-3 py-2">
+            <span className="material-symbols-outlined text-[18px]">work</span>
+            Jobs
+          </Link>
         </div>
       </section>
     </aside>
   );
 
   const rightCard = (
-    <aside className="hidden space-y-4 lg:block lg:w-[25%]">
+    <aside className="space-y-4 lg:w-[25%]">
       {pending.length ? (
         <section id="pending-requests" className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5">
           <h2 className="font-black text-[var(--text)]">Connection Requests</h2>
@@ -363,19 +463,40 @@ export default function HomeFeed() {
         </div>
         <Link to="/people" className="mt-4 inline-flex text-sm font-bold text-[var(--accent-strong)]">See more people</Link>
       </section>
+      <section className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-5">
+        <h2 className="font-black text-[var(--text)]">Career Feed Prompts</h2>
+        <div className="mt-4 space-y-3">
+          {communityPrompts.map(([title, copy]) => (
+            <div key={title} className="rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] p-3">
+              <p className="text-sm font-bold text-[var(--text)]">{title}</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--muted-strong)]">{copy}</p>
+            </div>
+          ))}
+        </div>
+      </section>
     </aside>
   );
 
   return (
-    <AppShell title="Home" description="Share progress, ask useful questions, and keep your career network warm.">
+    <AppShell title="Career Feed" description="Share career updates, ask useful questions, surface job leads, and turn analysis insights into community momentum.">
       {toast ? <div className="mb-5 rounded-lg border border-[var(--border)] bg-[var(--accent-soft)] p-3 text-sm font-bold text-[var(--accent-strong)]">{toast}</div> : null}
-      <div className="flex gap-5">
-        {leftCard}
-        <section className="min-w-0 flex-1 space-y-4 lg:w-[55%]">
-          <button type="button" onClick={() => setComposerOpen(true)} className="flex w-full items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4 text-left">
-            <Avatar user={{ ...auth.user, avatar_url: auth.user?.avatarUrl }} />
-            <span className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-3 text-sm text-[var(--muted-strong)]">Share a career update...</span>
-          </button>
+      <div className="flex flex-col gap-5 lg:flex-row">
+        <div className="order-2 lg:order-1 lg:block">{leftCard}</div>
+        <section className="order-1 min-w-0 flex-1 space-y-4 lg:order-2 lg:w-[55%]">
+          <section className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-4">
+            <button type="button" onClick={() => openComposer()} className="flex w-full items-center gap-3 text-left">
+              <Avatar user={{ ...auth.user, avatar_url: auth.user?.avatarUrl }} />
+              <span className="flex-1 rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-3 text-sm text-[var(--muted-strong)]">What would help your career network today?</span>
+            </button>
+            <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {quickActions.map(([type, icon, label]) => (
+                <button key={type} type="button" onClick={() => openComposer(type)} className="app-button-secondary justify-center px-3 py-2">
+                  <span className="material-symbols-outlined text-[18px]">{icon}</span>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </section>
           <div className="grid grid-cols-2 gap-2 rounded-lg border border-[var(--border)] bg-[var(--panel)] p-2">
             <button type="button" onClick={() => setViewMode('feed')} className={viewMode === 'feed' ? 'app-button py-2' : 'app-button-secondary py-2'}>
               <span className="material-symbols-outlined text-[18px]">dynamic_feed</span>
@@ -392,7 +513,7 @@ export default function HomeFeed() {
             ))}
           </div>
           {loading ? (
-            <div className="space-y-4">{[0, 1, 2].map((item) => <div key={item} className="h-44 rounded-lg border border-[var(--border)] bg-[var(--panel)]" />)}</div>
+            <div className="space-y-4">{[0, 1, 2].map((item) => <LoadingPostSkeleton key={item} />)}</div>
           ) : (
             <div className="space-y-4">
               {posts.map((post) => (
@@ -408,16 +529,17 @@ export default function HomeFeed() {
                   highlighted={String(post.id) === String(highlightedPostId)}
                 />
               ))}
-              {!posts.length ? <p className="rounded-lg border border-[var(--border)] bg-[var(--panel)] p-6 text-center text-sm text-[var(--muted-strong)]">{viewMode === 'mine' ? 'You have not shared anything yet. Your old and scheduled posts will appear here.' : 'No posts yet. Share the first useful update.'}</p> : null}
+              {!posts.length ? <EmptyFeedState viewMode={viewMode} onCreate={openComposer} onAsk={() => openComposer('question')} /> : null}
             </div>
           )}
           {hasMore ? <div className="text-center"><button type="button" className="app-button-secondary" onClick={loadMore}>Load more</button></div> : null}
         </section>
-        {rightCard}
+        <div className="order-3 lg:block">{rightCard}</div>
       </div>
       <PostComposer
         open={composerOpen}
-        onClose={() => setComposerOpen(false)}
+        initialPostType={initialComposerType}
+        onClose={closeComposer}
         onCreated={(post) => {
           if (viewMode === 'mine' || !isScheduledFuture(post.scheduled_at)) {
             setPosts((current) => [post, ...current]);

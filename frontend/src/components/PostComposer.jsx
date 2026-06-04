@@ -17,6 +17,14 @@ const careerTypes = [
   ['new_project', 'New Project']
 ];
 
+const contentPlaceholders = {
+  career_update: 'Share the progress, milestone, or lesson you want your network to see...',
+  job_tip: 'Share a practical resume, interview, or job-search tip that helped you...',
+  job_share: 'Add why this role may be useful for the community...',
+  analysis_share: 'Share what the analysis revealed and what you are improving next...',
+  question: 'Ask the community anything about job search, resumes, interviews, or career decisions...'
+};
+
 function toDatetimeLocal(value) {
   if (!value) return '';
   const date = new Date(value);
@@ -47,10 +55,12 @@ function isPastScheduleValue(value) {
   return Number.isNaN(date.getTime()) || date.getTime() <= Date.now();
 }
 
-export default function PostComposer({ open, onClose, onCreated, onUpdated, recentAnalyses = [], initialJob = null, initialPost = null }) {
+export default function PostComposer({ open, onClose, onCreated, onUpdated, recentAnalyses = [], initialJob = null, initialPost = null, initialPostType = '' }) {
   const isEditing = Boolean(initialPost?.id);
-  const [step, setStep] = useState(isEditing || initialJob ? 2 : 1);
-  const [postType, setPostType] = useState(initialPost?.post_type || (initialJob ? 'job_share' : ''));
+  const shouldSkipTypeStep = isEditing || initialJob || initialPostType;
+  const defaultPostType = initialPost?.post_type || (initialJob ? 'job_share' : initialPostType || '');
+  const [step, setStep] = useState(shouldSkipTypeStep ? 2 : 1);
+  const [postType, setPostType] = useState(defaultPostType);
   const [content, setContent] = useState(initialPost?.content || '');
   const [careerUpdateType, setCareerUpdateType] = useState(initialPost?.career_update_type || '');
   const [analysisId, setAnalysisId] = useState(initialPost?.analysis_id || '');
@@ -71,8 +81,9 @@ export default function PostComposer({ open, onClose, onCreated, onUpdated, rece
 
   useEffect(() => {
     if (!open) return;
-    setStep(isEditing || initialJob ? 2 : 1);
-    setPostType(initialPost?.post_type || (initialJob ? 'job_share' : ''));
+    const nextPostType = initialPost?.post_type || (initialJob ? 'job_share' : initialPostType || '');
+    setStep(isEditing || initialJob || initialPostType ? 2 : 1);
+    setPostType(nextPostType);
     setContent(initialPost?.content || '');
     setCareerUpdateType(initialPost?.career_update_type || '');
     setAnalysisId(initialPost?.analysis_id || '');
@@ -83,15 +94,16 @@ export default function PostComposer({ open, onClose, onCreated, onUpdated, rece
     });
     setScheduledAt(isScheduledFuture(initialPost?.scheduled_at) ? toDatetimeLocal(initialPost?.scheduled_at) : '');
     setError('');
-  }, [open, initialPost?.id, initialJob?.id]);
+  }, [open, initialPost?.id, initialJob?.id, initialPostType]);
 
   if (!open) {
     return null;
   }
 
   function resetAndClose() {
-    setStep(isEditing || initialJob ? 2 : 1);
-    setPostType(initialPost?.post_type || (initialJob ? 'job_share' : ''));
+    const nextPostType = initialPost?.post_type || (initialJob ? 'job_share' : initialPostType || '');
+    setStep(isEditing || initialJob || initialPostType ? 2 : 1);
+    setPostType(nextPostType);
     setContent(initialPost?.content || '');
     setCareerUpdateType(initialPost?.career_update_type || '');
     setAnalysisId(initialPost?.analysis_id || '');
@@ -202,7 +214,7 @@ export default function PostComposer({ open, onClose, onCreated, onUpdated, rece
               <textarea
                 className="app-input mt-2 min-h-36"
                 maxLength={500}
-                placeholder={postType === 'question' ? 'Ask the community anything about job search, resumes, interviews, or career decisions...' : 'Share a career update...'}
+                placeholder={contentPlaceholders[postType] || 'Share a career update...'}
                 value={content}
                 onChange={(event) => setContent(event.target.value)}
                 required
