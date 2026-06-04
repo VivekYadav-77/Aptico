@@ -227,10 +227,10 @@ export default function PostComposer({ open, onClose, onCreated, onUpdated, rece
                 <label className="block">
                   <span className="app-field-label">Which analysis do you want to share?</span>
                   <select className="app-input mt-2" value={analysisId} onChange={(event) => setAnalysisId(event.target.value)} disabled={!recentAnalyses.length}>
-                    <option value="">{recentAnalyses.length ? 'Choose an analysis' : 'No recent analyses available here'}</option>
-                    {recentAnalyses.slice(0, 5).map((analysis) => (
+                    <option value="">{recentAnalyses.length ? 'Choose a saved analysis report' : 'No shareable saved analyses available here'}</option>
+                    {recentAnalyses.slice(0, 10).map((analysis) => (
                       <option key={analysis.id} value={analysis.id}>
-                        {analysis.company_name || analysis.companyName || 'Role Analysis'} - {analysis.confidence_score || analysis.confidenceScore || 0}% match
+                        {analysis.company_name || analysis.companyName || 'Role Analysis'} - {analysis.jobTitle || 'Target Role'} - {analysis.confidence_score || analysis.confidenceScore || 0}% match
                       </option>
                     ))}
                   </select>

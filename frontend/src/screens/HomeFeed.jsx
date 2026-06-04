@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from '@/lib/router-compat.jsx';
 import { useSelector } from 'react-redux';
 import AppShell from '../components/AppShell.jsx';
@@ -23,6 +23,7 @@ import {
   sendConnectionRequest
 } from '../api/socialApi.js';
 import { selectAuth } from '../store/authSlice.js';
+import { selectAnalysisHistory } from '../store/historySlice.js';
 
 const filters = [
   ['All', null],
@@ -275,6 +276,7 @@ function PostCard({ post, currentUserId, onPostChanged, onDeleted, onEdit, onSho
 
 export default function HomeFeed() {
   const auth = useSelector(selectAuth);
+  const analysisHistory = useSelector(selectAnalysisHistory);
   const [searchParams] = useSearchParams();
   const focusedPostId = searchParams.get('postId');
   const focusedCommentId = searchParams.get('commentId');
@@ -297,6 +299,21 @@ export default function HomeFeed() {
   const [connectNote, setConnectNote] = useState('');
   const [toast, setToast] = useState('');
   const [highlightedPostId, setHighlightedPostId] = useState(null);
+
+  const recentAnalyses = useMemo(() => {
+    return analysisHistory
+      .filter((analysis) => analysis.id)
+      .slice(0, 10)
+      .map((analysis) => ({
+        id: analysis.id,
+        company_name: analysis.companyName || analysis.stage1?.companyName || 'Role Analysis',
+        companyName: analysis.companyName || analysis.stage1?.companyName || 'Role Analysis',
+        confidence_score: analysis.confidenceScore ?? analysis.stage1?.confidenceScore ?? 0,
+        confidenceScore: analysis.confidenceScore ?? analysis.stage1?.confidenceScore ?? 0,
+        jobTitle: analysis.jobTitle || analysis.stage1?.jobTitle || 'Target Role',
+        createdAt: analysis.createdAt
+      }));
+  }, [analysisHistory]);
 
   useEffect(() => {
     getMyProfile().then(setProfile).catch(() => null);
@@ -567,6 +584,7 @@ export default function HomeFeed() {
       <PostComposer
         open={composerOpen}
         initialPostType={initialComposerType}
+        recentAnalyses={recentAnalyses}
         onClose={closeComposer}
         onCreated={(post) => {
           if (viewMode === 'mine' || !isScheduledFuture(post.scheduled_at)) {
