@@ -3,6 +3,7 @@ import { useDispatch } from 'react-redux';
 import { useQueryClient } from '@tanstack/react-query';
 import { createRejectionLog } from '../api/rejectionApi.js';
 import { updateAuthUser } from '../store/authSlice.js';
+import ContainedSelect from './ContainedSelect.jsx';
 
 const stageOptions = [
   { value: 'resume', label: 'Resume screen', xp: 50 },
@@ -202,17 +203,15 @@ export default function RejectionModal({ isOpen, onClose, onSuccess }) {
 
             <label className="block">
               <span className="app-field-label">Stage</span>
-              <select
-                className="app-input mt-2"
+              <ContainedSelect
+                className="mt-2"
                 value={form.stageRejected}
-                onChange={(event) => setForm((current) => ({ ...current, stageRejected: event.target.value }))}
-              >
-                {stageOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label} (+{option.xp} XP)
-                  </option>
-                ))}
-              </select>
+                onChange={(nextValue) => setForm((current) => ({ ...current, stageRejected: nextValue }))}
+                options={stageOptions.map((option) => ({
+                  value: option.value,
+                  label: `${option.label} (+${option.xp} XP)`
+                }))}
+              />
             </label>
 
             <div className="rounded-[1.4rem] border border-[var(--accent)]/20 bg-[var(--accent-soft)] px-4 py-4">

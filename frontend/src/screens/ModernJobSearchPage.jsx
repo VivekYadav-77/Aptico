@@ -5,6 +5,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import api from '../api/axios.js';
 import { fetchJobs } from '../api/jobsApi.js';
 import AppShell from '../components/AppShell.jsx';
+import ContainedSelect from '../components/ContainedSelect.jsx';
 import { selectAuth } from '../store/authSlice.js';
 import { clearJobSearchState, selectCurrentAnalysis, selectJobSearchState, setJobSearchState } from '../store/historySlice.js';
 import { saveSavedJobDetails } from '../utils/savedJobsStorage.js';
@@ -571,18 +572,12 @@ export default function ModernJobSearchPage() {
 
             <div className="flex-1 space-y-2 block">
               <span className="app-field-label">Job type</span>
-              <div className="relative mt-2">
-                <select
-                  value={formState.jobType}
-                  onChange={(event) => updateField('jobType', event.target.value)}
-                  className="app-input text-sm w-full appearance-none pr-10"
-                >
-                  {JOB_TYPE_OPTIONS.map((option) => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
-                  ))}
-                </select>
-                <span className="material-symbols-outlined pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[var(--muted)] text-[18px]">expand_more</span>
-              </div>
+              <ContainedSelect
+                className="mt-2"
+                value={formState.jobType}
+                onChange={(nextValue) => updateField('jobType', nextValue)}
+                options={JOB_TYPE_OPTIONS}
+              />
             </div>
 
             <button
