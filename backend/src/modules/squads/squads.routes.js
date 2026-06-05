@@ -1,5 +1,7 @@
 import {
+  getMySquadLeaderboardRankController,
   getMySquadController,
+  getSquadLeaderboardController,
   joinSquadController,
   logSquadAppController,
   pingSquadController
@@ -22,6 +24,8 @@ export default async function squadRoutes(app) {
   app.post('/join', { preHandler: authenticateRequest }, joinSquadController);
   app.post('/log-app', { preHandler: authenticateRequest, config: strictSquadRateLimit }, logSquadAppController);
   app.get('/my-squad', { preHandler: authenticateRequest }, getMySquadController);
+  app.get('/leaderboard', { preHandler: authenticateRequest }, getSquadLeaderboardController);
+  app.get('/leaderboard/my-rank', { preHandler: authenticateRequest }, getMySquadLeaderboardRankController);
   app.post('/ping', { preHandler: authenticateRequest, config: strictSquadRateLimit }, pingSquadController);
   app.get('/comms', {
     preHandler: authenticateRequest,

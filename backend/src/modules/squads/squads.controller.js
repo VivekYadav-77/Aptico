@@ -2,6 +2,7 @@ import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { applicationLogs, notifications, squadActivities, squadMembers, squads, users } from '../../db/schema.js';
 import { applyXpDecayIfNeeded, calculateApplicationXp, getTodayIntegrityCounts, grantXp, shouldShadowban } from '../../shared/services/xp-engine.service.js';
+import { getLeaderboard, getMyLeaderboardRank, recordSquadScoreEvent } from './squad-leaderboard.service.js';
 import {
   injectAppLoggedCommsEvent,
   injectDailyBriefingController,
@@ -218,26 +219,30 @@ function getContributionState(memberApps) {
 }
 
 async function createSquadActivity(db, values) {
-  await db.insert(squadActivities).values({
+  const inserted = await db.insert(squadActivities).values({
     squadId: values.squadId,
     userId: values.userId || null,
     activityType: values.activityType,
     eventDate: values.eventDate || getCurrentDateKey(),
     quantity: values.quantity || 0,
     metadata: values.metadata || {}
-  });
+  }).returning({ id: squadActivities.id });
+
+  return inserted[0] || null;
 }
 
 async function insertApplicationLog(db, values) {
   try {
-    await db.insert(applicationLogs).values(values);
+    const inserted = await db.insert(applicationLogs).values(values).returning({ id: applicationLogs.id });
+    return inserted[0] || null;
   } catch (error) {
     if (!isMissingJobUrlColumnError(error)) {
       throw error;
     }
 
     const { jobUrl: _jobUrl, ...fallbackValues } = values;
-    await db.insert(applicationLogs).values(fallbackValues);
+    const inserted = await db.insert(applicationLogs).values(fallbackValues).returning({ id: applicationLogs.id });
+    return inserted[0] || null;
   }
 }
 
@@ -651,6 +656,18 @@ async function grantGoalRewardIfNeeded(db, squadId, actorUserId) {
     )
   ]);
 
+  await recordSquadScoreEvent(db, {
+    squadId,
+    userId: actorUserId,
+    eventType: 'weekly_goal',
+    sourceType: 'weekly_goal',
+    sourceId: `${squadId}:${currentWeek}`,
+    metadata: {
+      weeklyGoal: Number(squad.weeklyGoal || DEFAULT_WEEKLY_GOAL),
+      totalApps
+    }
+  });
+
   return true;
 }
 
@@ -769,7 +786,7 @@ export async function logSquadAppController(request, reply) {
       body.roleTitle
     );
 
-    await insertApplicationLog(request.server.db, {
+    const appLog = await insertApplicationLog(request.server.db, {
       userId: request.auth.userId,
       squadId: membership.squadId,
       companyName: body.companyName,
@@ -794,7 +811,7 @@ export async function logSquadAppController(request, reply) {
         })
         .where(eq(squadMembers.userId, request.auth.userId));
 
-      await createSquadActivity(request.server.db, {
+      const activity = await createSquadActivity(request.server.db, {
         squadId: membership.squadId,
         userId: request.auth.userId,
         activityType: 'apps_logged',
@@ -804,6 +821,21 @@ export async function logSquadAppController(request, reply) {
           companyName: body.companyName,
           roleTitle: body.roleTitle,
           jobUrl: body.jobUrl || null,
+          xpEarned
+        }
+      });
+
+      await recordSquadScoreEvent(request.server.db, {
+        squadId: membership.squadId,
+        userId: request.auth.userId,
+        eventType: 'application',
+        sourceType: 'application_log',
+        sourceId: appLog?.id || activity?.id || `${request.auth.userId}:${Date.now()}`,
+        metadata: {
+          companyName: body.companyName,
+          roleTitle: body.roleTitle,
+          jobUrl: body.jobUrl || null,
+          activityId: activity?.id || null,
           xpEarned
         }
       });
@@ -900,12 +932,23 @@ export async function pingSquadController(request, reply) {
       )
     );
 
-    await createSquadActivity(request.server.db, {
+    const activity = await createSquadActivity(request.server.db, {
       squadId: membership.squadId,
       userId: request.auth.userId,
       activityType: 'squad_ping',
       eventDate: getCurrentDateKey(),
       quantity: targetRows.length,
+      metadata: {
+        targetCount: targetRows.length
+      }
+    });
+
+    await recordSquadScoreEvent(request.server.db, {
+      squadId: membership.squadId,
+      userId: request.auth.userId,
+      eventType: 'ping',
+      sourceType: 'squad_ping',
+      sourceId: activity?.id || `${membership.squadId}:${request.auth.userId}:${Date.now()}`,
       metadata: {
         targetCount: targetRows.length
       }
@@ -917,5 +960,36 @@ export async function pingSquadController(request, reply) {
     });
   } catch (error) {
     return sendError(reply, error, 'Could not send squad ping.');
+  }
+}
+
+export async function getSquadLeaderboardController(request, reply) {
+  try {
+    requireDatabase(request.server.db);
+    const leaderboard = await getLeaderboard(request.server.db, {
+      period: request.query?.period,
+      limit: Number(request.query?.limit || 25)
+    });
+
+    return reply.send({
+      success: true,
+      data: leaderboard
+    });
+  } catch (error) {
+    return sendError(reply, error, 'Could not load squad leaderboard.');
+  }
+}
+
+export async function getMySquadLeaderboardRankController(request, reply) {
+  try {
+    requireDatabase(request.server.db);
+    const rank = await getMyLeaderboardRank(request.server.db, request.auth.userId, request.query?.period);
+
+    return reply.send({
+      success: true,
+      data: rank
+    });
+  } catch (error) {
+    return sendError(reply, error, 'Could not load your squad rank.');
   }
 }

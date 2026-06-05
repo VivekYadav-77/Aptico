@@ -42,11 +42,19 @@ function formatDate(value) {
   return Number.isNaN(parsedDate.getTime()) ? value : parsedDate.toLocaleString();
 }
 
+function getCurrentPeriod() {
+  return new Date().toISOString().slice(0, 7);
+}
+
 export default function ControlCenter() {
   const auth = useSelector(selectAuth);
   const [roleCheckComplete, setRoleCheckComplete] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
   const [dashboardData, setDashboardData] = useState({ adminOverview: null, apiUsageMetrics: [], adminUsers: [] });
+  const [leaderboardPeriod, setLeaderboardPeriod] = useState(getCurrentPeriod());
+  const [leaderboardReview, setLeaderboardReview] = useState(null);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [leaderboardMessage, setLeaderboardMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -92,6 +100,50 @@ export default function ControlCenter() {
       isActive = false;
     };
   }, [isAuthorized, roleCheckComplete]);
+
+  useEffect(() => {
+    if (!roleCheckComplete || !isAuthorized) return;
+
+    let isActive = true;
+
+    async function loadLeaderboardReview() {
+      setLeaderboardLoading(true);
+      setLeaderboardMessage('');
+      try {
+        const response = await api.get('/api/admin/squad-leaderboard', {
+          params: { period: leaderboardPeriod }
+        });
+        if (isActive) setLeaderboardReview(response.data?.data || null);
+      } catch (requestError) {
+        if (isActive) {
+          setLeaderboardMessage(requestError.response?.data?.error || 'Could not load squad leaderboard review.');
+        }
+      } finally {
+        if (isActive) setLeaderboardLoading(false);
+      }
+    }
+
+    loadLeaderboardReview();
+    return () => {
+      isActive = false;
+    };
+  }, [isAuthorized, leaderboardPeriod, roleCheckComplete]);
+
+  async function finalizeLeaderboard() {
+    setLeaderboardLoading(true);
+    setLeaderboardMessage('');
+    try {
+      const response = await api.post('/api/admin/squad-leaderboard/finalize', {
+        period: leaderboardPeriod
+      });
+      setLeaderboardReview(response.data?.data || null);
+      setLeaderboardMessage('Monthly squad rewards published.');
+    } catch (requestError) {
+      setLeaderboardMessage(requestError.response?.data?.error || 'Could not finalize squad leaderboard.');
+    } finally {
+      setLeaderboardLoading(false);
+    }
+  }
 
   const usageTotal = dashboardData.apiUsageMetrics.reduce((sum, item) => sum + item.requestCount, 0);
   const pieBackground = useMemo(() => {
@@ -199,6 +251,68 @@ export default function ControlCenter() {
                 ))}
               </div>
             </article>
+          </section>
+
+          <section className="mt-6 app-panel">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <p className="app-kicker">Squad leaderboard review</p>
+                <h2 className="mt-3 text-2xl font-black text-[var(--text)]">Monthly reward approval</h2>
+                <p className="mt-2 max-w-2xl text-sm leading-7 text-[var(--muted-strong)]">
+                  Review quality scores and suspicious flags before publishing the top three digital rewards.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <input
+                  type="month"
+                  value={leaderboardPeriod}
+                  onChange={(event) => setLeaderboardPeriod(event.target.value || getCurrentPeriod())}
+                  className="app-input h-10 w-40"
+                />
+                <button type="button" onClick={finalizeLeaderboard} className="app-button" disabled={leaderboardLoading || !(leaderboardReview?.entries || []).length}>
+                  <span className="material-symbols-outlined text-[18px]">verified</span>
+                  Publish top 3
+                </button>
+              </div>
+            </div>
+
+            {leaderboardMessage ? (
+              <div className="mt-5 rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-3 text-sm font-bold text-[var(--muted-strong)]">
+                {leaderboardMessage}
+              </div>
+            ) : null}
+
+            <div className="mt-6 grid gap-3">
+              {leaderboardLoading && !leaderboardReview ? (
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] p-5 text-sm text-[var(--muted-strong)]">Loading squad scores...</div>
+              ) : (leaderboardReview?.entries || []).length ? (
+                leaderboardReview.entries.slice(0, 10).map((entry) => (
+                  <article key={entry.squadId} className="rounded-3xl border border-[var(--border)] bg-[var(--panel-soft)] p-5">
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                      <div>
+                        <div className="flex items-center gap-3">
+                          <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--panel)] text-lg font-black text-[var(--text)]">{entry.rank}</span>
+                          <div>
+                            <p className="text-lg font-black text-[var(--text)]">{entry.squadName}</p>
+                            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--muted-strong)]">
+                              {entry.activeMemberCount} active members - {entry.suspiciousEventCount} suspicious events
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="app-chip">{entry.eligiblePoints} eligible</span>
+                        <span className="app-chip">-{entry.spamPenalty} penalty</span>
+                        <span className="app-chip">{entry.qualityScore} score</span>
+                        {entry.reward ? <span className="app-chip">{entry.reward.title}</span> : null}
+                      </div>
+                    </div>
+                  </article>
+                ))
+              ) : (
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] p-5 text-sm text-[var(--muted-strong)]">No squad score events for this month.</div>
+              )}
+            </div>
           </section>
 
           <section className="mt-6 app-panel">

@@ -489,6 +489,83 @@ export const squadActivities = pgTable(
   })
 );
 
+export const squadScoreEvents = pgTable(
+  'squad_score_events',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    squadId: uuid('squad_id')
+      .notNull()
+      .references(() => squads.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    period: varchar('period', { length: 7 }).notNull(),
+    eventDate: date('event_date').notNull(),
+    eventType: varchar('event_type', { length: 40 }).notNull(),
+    sourceType: varchar('source_type', { length: 40 }).notNull(),
+    sourceId: text('source_id').notNull(),
+    rawPoints: integer('raw_points').notNull().default(0),
+    eligiblePoints: integer('eligible_points').notNull().default(0),
+    spamStatus: varchar('spam_status', { length: 30 }).notNull().default('clear'),
+    reason: varchar('reason', { length: 80 }).notNull().default('eligible'),
+    metadata: jsonb('metadata').notNull().default({}),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    squadPeriodIdx: index('squad_score_events_squad_period_idx').on(table.squadId, table.period),
+    userDateTypeIdx: index('squad_score_events_user_date_type_idx').on(table.userId, table.eventDate, table.eventType),
+    eventTypePeriodIdx: index('squad_score_events_event_type_period_idx').on(table.eventType, table.period),
+    sourceIdx: uniqueIndex('squad_score_events_source_idx').on(table.sourceType, table.sourceId)
+  })
+);
+
+export const squadMonthlyScores = pgTable(
+  'squad_monthly_scores',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    squadId: uuid('squad_id')
+      .notNull()
+      .references(() => squads.id, { onDelete: 'cascade' }),
+    period: varchar('period', { length: 7 }).notNull(),
+    eligiblePoints: integer('eligible_points').notNull().default(0),
+    rawPoints: integer('raw_points').notNull().default(0),
+    spamPenalty: integer('spam_penalty').notNull().default(0),
+    qualityScore: integer('quality_score').notNull().default(0),
+    suspiciousEventCount: integer('suspicious_event_count').notNull().default(0),
+    activeMemberCount: integer('active_member_count').notNull().default(0),
+    rank: integer('rank'),
+    reviewStatus: varchar('review_status', { length: 30 }).notNull().default('active'),
+    publishedAt: timestamp('published_at', { withTimezone: true }),
+    finalizedAt: timestamp('finalized_at', { withTimezone: true }),
+    metadata: jsonb('metadata').notNull().default({}),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    periodRankIdx: index('squad_monthly_scores_period_rank_idx').on(table.period, table.rank),
+    squadPeriodIdx: uniqueIndex('squad_monthly_scores_squad_period_idx').on(table.squadId, table.period)
+  })
+);
+
+export const squadMonthlyRewards = pgTable(
+  'squad_monthly_rewards',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    squadId: uuid('squad_id')
+      .notNull()
+      .references(() => squads.id, { onDelete: 'cascade' }),
+    period: varchar('period', { length: 7 }).notNull(),
+    rank: integer('rank').notNull(),
+    stickerId: varchar('sticker_id', { length: 80 }).notNull(),
+    title: varchar('title', { length: 120 }).notNull(),
+    xpBonus: integer('xp_bonus').notNull().default(0),
+    approvedBy: uuid('approved_by').references(() => users.id, { onDelete: 'set null' }),
+    approvedAt: timestamp('approved_at', { withTimezone: true }).defaultNow().notNull(),
+    metadata: jsonb('metadata').notNull().default({})
+  },
+  (table) => ({
+    periodRankIdx: uniqueIndex('squad_monthly_rewards_period_rank_idx').on(table.period, table.rank),
+    squadPeriodIdx: uniqueIndex('squad_monthly_rewards_squad_period_idx').on(table.squadId, table.period)
+  })
+);
+
 export const squadMessages = pgTable(
   'squad_messages',
   {
@@ -695,5 +772,30 @@ export const squadActivitiesRelations = relations(squadActivities, ({ one }) => 
   user: one(users, {
     fields: [squadActivities.userId],
     references: [users.id]
+  })
+}));
+
+export const squadScoreEventsRelations = relations(squadScoreEvents, ({ one }) => ({
+  squad: one(squads, {
+    fields: [squadScoreEvents.squadId],
+    references: [squads.id]
+  }),
+  user: one(users, {
+    fields: [squadScoreEvents.userId],
+    references: [users.id]
+  })
+}));
+
+export const squadMonthlyScoresRelations = relations(squadMonthlyScores, ({ one }) => ({
+  squad: one(squads, {
+    fields: [squadMonthlyScores.squadId],
+    references: [squads.id]
+  })
+}));
+
+export const squadMonthlyRewardsRelations = relations(squadMonthlyRewards, ({ one }) => ({
+  squad: one(squads, {
+    fields: [squadMonthlyRewards.squadId],
+    references: [squads.id]
   })
 }));

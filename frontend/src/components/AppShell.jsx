@@ -306,12 +306,12 @@ export default function AppShell({ title, description, actions, children, banner
                 <button
                   type="button"
                   className={`group relative flex items-center gap-1.5 px-3.5 py-1.5 text-[13px] font-medium rounded-lg transition-all duration-200 cursor-pointer ${
-                    ['/squads', '/people', '/wins', '/portfolio-generator', '/interview-prep', '/rewards', '/saved-jobs', '/analysis-history'].some(path => location.pathname === path)
+                    ['/squads', '/squad-leaderboard', '/people', '/wins', '/portfolio-generator', '/interview-prep', '/rewards', '/saved-jobs', '/analysis-history'].some(path => location.pathname === path)
                       ? 'bg-white/[0.08] text-[var(--text)] shadow-sm'
                       : 'text-[var(--muted-strong)] hover:text-[var(--text)] hover:bg-white/[0.04]'
                   }`}
                 >
-                  <span className={`material-symbols-outlined text-[16px] transition-all duration-200 ${['/squads', '/people', '/wins', '/portfolio-generator', '/interview-prep', '/rewards', '/saved-jobs', '/analysis-history'].some(path => location.pathname === path) ? 'text-[var(--text)]' : 'text-[var(--muted-strong)] group-hover:text-[var(--text)]'}`}>apps</span>
+                  <span className={`material-symbols-outlined text-[16px] transition-all duration-200 ${['/squads', '/squad-leaderboard', '/people', '/wins', '/portfolio-generator', '/interview-prep', '/rewards', '/saved-jobs', '/analysis-history'].some(path => location.pathname === path) ? 'text-[var(--text)]' : 'text-[var(--muted-strong)] group-hover:text-[var(--text)]'}`}>apps</span>
                   <span className="relative z-10 tracking-wide">Apps</span>
                   <span className="material-symbols-outlined text-[16px] transition-transform duration-200 group-hover:translate-y-0.5">expand_more</span>
                 </button>
@@ -324,7 +324,7 @@ export default function AppShell({ title, description, actions, children, banner
                       </div>
                       <div className="grid grid-cols-2 gap-1">
                         {NAV_ITEMS.filter(item =>
-                          ['/squads', '/people', '/wins', '/portfolio-generator', '/interview-prep', '/rewards', '/saved-jobs', '/analysis-history'].includes(item.to)
+                          ['/squads', '/squad-leaderboard', '/people', '/wins', '/portfolio-generator', '/interview-prep', '/rewards', '/saved-jobs', '/analysis-history'].includes(item.to)
                         ).map((subTab) => {
                           const isSubActive = location.pathname === subTab.to;
                           return (

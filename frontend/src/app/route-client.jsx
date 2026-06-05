@@ -28,6 +28,7 @@ import SavedJobsPage from '../screens/SavedJobsPage.jsx';
 import SettingsPage from '../screens/SettingsPage.jsx';
 import ShadowResume from '../screens/ShadowResume.jsx';
 import SquadDashboard from '../screens/SquadDashboard.jsx';
+import SquadLeaderboardPage from '../screens/SquadLeaderboardPage.jsx';
 import LegalPage from '../screens/LegalPage.jsx';
 import { selectAuth } from '../store/authSlice.js';
 
@@ -55,6 +56,7 @@ const routes = {
   savedJobs: SavedJobsPage,
   settings: SettingsPage,
   shadowResume: ShadowResume,
+  squadLeaderboard: SquadLeaderboardPage,
   squads: SquadDashboard,
   legal: LegalPage
 };

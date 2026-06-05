@@ -1,12 +1,23 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { refreshTokens } from '../../db/schema.js';
+import { finalizeMonthlyLeaderboard, getLeaderboard } from '../squads/squad-leaderboard.service.js';
 
 const ACCESS_TOKEN_BLACKLIST_TTL_SECONDS = 15 * 60;
 const REDIS_DISPATCH_WINDOW_MS = 200;
 
 const paramsSchema = z.object({
   userId: z.string().uuid()
+});
+
+const leaderboardQuerySchema = z.object({
+  period: z.string().regex(/^\d{4}-\d{2}$/).optional()
+});
+
+const finalizeLeaderboardSchema = z.object({
+  period: z.string().regex(/^\d{4}-\d{2}$/).optional(),
+  approvedSquadIds: z.array(z.string().uuid()).max(3).optional(),
+  disqualifiedSquadIds: z.array(z.string().uuid()).optional()
 });
 
 function wait(durationMs) {
@@ -16,6 +27,68 @@ function wait(durationMs) {
 }
 
 export default async function adminRoutes(app) {
+  app.get('/squad-leaderboard', async (request, reply) => {
+    try {
+      const query = leaderboardQuerySchema.parse(request.query || {});
+      const db = request.server.db;
+
+      if (!db) {
+        return reply.code(503).send({
+          success: false,
+          error: 'Database is not configured yet.'
+        });
+      }
+
+      const leaderboard = await getLeaderboard(db, {
+        period: query.period,
+        limit: 100
+      });
+
+      return reply.send({
+        success: true,
+        data: leaderboard
+      });
+    } catch (error) {
+      const statusCode = error.name === 'ZodError' ? 400 : error.statusCode || 500;
+      return reply.code(statusCode).send({
+        success: false,
+        error: error.message || 'Could not load squad leaderboard review.'
+      });
+    }
+  });
+
+  app.post('/squad-leaderboard/finalize', async (request, reply) => {
+    try {
+      const body = finalizeLeaderboardSchema.parse(request.body || {});
+      const db = request.server.db;
+
+      if (!db) {
+        return reply.code(503).send({
+          success: false,
+          error: 'Database is not configured yet.'
+        });
+      }
+
+      const leaderboard = await finalizeMonthlyLeaderboard(db, {
+        period: body.period,
+        approvedBy: request.auth.userId,
+        approvedSquadIds: body.approvedSquadIds || null,
+        disqualifiedSquadIds: body.disqualifiedSquadIds || []
+      });
+
+      return reply.send({
+        success: true,
+        data: leaderboard
+      });
+    } catch (error) {
+      const statusCode = error.name === 'ZodError' ? 400 : error.statusCode || 500;
+      return reply.code(statusCode).send({
+        success: false,
+        error: error.message || 'Could not finalize squad leaderboard.'
+      });
+    }
+  });
+
   app.post('/revoke/:userId', async (request, reply) => {
     const startedAt = Date.now();
 

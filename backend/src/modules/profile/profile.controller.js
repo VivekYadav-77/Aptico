@@ -783,6 +783,9 @@ const STICKER_REQUIREMENTS = {
   // Event
   'event_pioneer': { type: 'join_before', value: '2027-01-01' }, 'event_squad_champion': { type: 'squad_goal', value: 1 }, 'event_top_1_percent': { type: 'xp_rank', value: 1 },
   'event_bug_hunter': { type: 'bug_report', value: 1 }, 'event_contributor': { type: 'repo_contribution', value: 1 }, 'event_alpha': { type: 'test_phase', value: 'alpha' }, 'event_beta': { type: 'test_phase', value: 'beta' },
+  'event_squad_monthly_gold': { type: 'monthly_squad_reward', value: 1 },
+  'event_squad_monthly_silver': { type: 'monthly_squad_reward', value: 2 },
+  'event_squad_monthly_bronze': { type: 'monthly_squad_reward', value: 3 },
 };
 
 const MAX_EQUIPPED = 4;
@@ -942,6 +945,7 @@ function meetsRequirement(req, stats) {
     case 'bug_report':          return true;
     case 'repo_contribution':   return true;
     case 'test_phase':          return true;
+    case 'monthly_squad_reward': return false;
     
     case 'beta_tester':        return (stats.betaTester || 0) >= req.value;
     default:                   return false;

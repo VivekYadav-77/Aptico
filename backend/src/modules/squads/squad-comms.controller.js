@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, gte, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { notifications, profileSettings, squadMembers, squadMessages, squads } from '../../db/schema.js';
+import { recordSquadScoreEvent } from './squad-leaderboard.service.js';
 
 const QUICK_SIGNALS = new Set(['HYPE', 'ON_IT', 'MISSION_SECURED', 'LEAD_VOUCHED', 'SHIELD_UP']);
 const ARCHETYPE_LABELS = {
@@ -277,7 +278,7 @@ async function notifySynergyBurst(db, squadId, actorMemberId) {
     )
   );
 
-  await db.insert(squadMessages).values({
+  const inserted = await db.insert(squadMessages).values({
     squadId,
     senderMemberId: actorMemberId,
     messageType: 'system',
@@ -287,11 +288,13 @@ async function notifySynergyBurst(db, squadId, actorMemberId) {
       alias: 'System'
     },
     milestonePhase: 0
-  });
+  }).returning({ id: squadMessages.id });
+
+  return inserted[0] || null;
 }
 
 async function insertSystemMessage(db, { squadId, senderMemberId = null, content, metadata = {}, milestonePhase = 0 }) {
-  await db.insert(squadMessages).values({
+  const inserted = await db.insert(squadMessages).values({
     squadId,
     senderMemberId,
     messageType: 'system',
@@ -301,7 +304,9 @@ async function insertSystemMessage(db, { squadId, senderMemberId = null, content
       ...metadata
     },
     milestonePhase
-  });
+  }).returning({ id: squadMessages.id });
+
+  return inserted[0] || null;
 }
 
 async function getCurrentPhaseForSquad(db, squadId, weeklyGoal) {
@@ -573,7 +578,17 @@ export async function postMessageController(request, reply) {
           })
           .where(eq(squads.id, context.squadId));
 
-        await notifySynergyBurst(request.server.db, context.squadId, context.memberId);
+        const burstMessage = await notifySynergyBurst(request.server.db, context.squadId, context.memberId);
+        await recordSquadScoreEvent(request.server.db, {
+          squadId: context.squadId,
+          userId: request.auth.userId,
+          eventType: 'synergy_burst',
+          sourceType: 'synergy_burst',
+          sourceId: burstMessage?.id || `${context.squadId}:${new Date().toISOString().slice(0, 10)}`,
+          metadata: {
+            alias: context.alias
+          }
+        });
       } else {
         await request.server.db
           .update(squads)
@@ -610,6 +625,30 @@ export async function postMessageController(request, reply) {
         milestonePhase: squadMessages.milestonePhase,
         createdAt: squadMessages.createdAt
       });
+
+    const scoreEventTypeByMessageType = {
+      text: 'text_message',
+      quick_signal: 'quick_signal',
+      sticker_drop: 'sticker_drop',
+      signal_drop: 'signal_drop',
+      accolade: 'accolade'
+    };
+
+    await recordSquadScoreEvent(request.server.db, {
+      squadId: context.squadId,
+      userId: request.auth.userId,
+      eventType: scoreEventTypeByMessageType[body.messageType],
+      sourceType: 'squad_message',
+      sourceId: inserted[0].id,
+      metadata: {
+        messageType: body.messageType,
+        content,
+        alias: context.alias,
+        archetypeRole: context.archetypeRole,
+        targetAlias: metadata.targetAlias || null,
+        url: metadata.url || null
+      }
+    });
 
     return reply.code(201).send({
       success: true,
@@ -649,7 +688,7 @@ export async function setArchetypeController(request, reply) {
     const progress = await getSquadProgress(request.server.db, context.squadId, context.squad.weeklyGoal);
     const currentPhase = getMilestonePhase(progress.progressPercent);
 
-    await insertSystemMessage(request.server.db, {
+    const roleMessage = await insertSystemMessage(request.server.db, {
       squadId: context.squadId,
       senderMemberId: context.memberId,
       content: `${context.alias} has taken the role of The ${ARCHETYPE_LABELS[body.role]}.`,
@@ -659,6 +698,18 @@ export async function setArchetypeController(request, reply) {
         archetypeRole: body.role
       },
       milestonePhase: currentPhase
+    });
+
+    await recordSquadScoreEvent(request.server.db, {
+      squadId: context.squadId,
+      userId: request.auth.userId,
+      eventType: 'archetype_selected',
+      sourceType: 'squad_archetype',
+      sourceId: roleMessage?.id || `${context.memberId}:${body.role}:${context.squad.weekOf}`,
+      metadata: {
+        role: body.role,
+        alias: context.alias
+      }
     });
 
     return reply.send({
