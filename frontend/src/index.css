@@ -24,6 +24,9 @@
   --warning-text: #92400e;
   --danger-soft: rgba(239, 68, 68, 0.12);
   --danger-border: rgba(239, 68, 68, 0.24);
+  --success-soft: rgba(16, 185, 129, 0.12);
+  --success-border: rgba(16, 185, 129, 0.28);
+  --success-strong: #047857;
   --navbar-height: 4rem;
   --sidebar-width: 15rem;
   --sidebar-collapsed: 4rem;
@@ -53,6 +56,9 @@ html.dark {
   --warning-text: #fbbf24;
   --danger-soft: rgba(248, 113, 113, 0.12);
   --danger-border: rgba(248, 113, 113, 0.24);
+  --success-soft: rgba(52, 211, 153, 0.12);
+  --success-border: rgba(52, 211, 153, 0.28);
+  --success-strong: #6ee7b7;
 }
 
 /* ─── RESET & BASE ───────────────────────────────────────────── */
@@ -64,6 +70,7 @@ body,
 
 html {
   scroll-behavior: smooth;
+  overflow-x: clip;
 }
 
 body {
@@ -76,10 +83,38 @@ body {
     radial-gradient(circle at top right, rgba(113, 161, 255, 0.07), transparent 20%),
     var(--bg);
   color: var(--text);
+  overflow-x: clip;
 }
 
 * {
   box-sizing: border-box;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+button,
+input,
+select,
+textarea {
+  min-width: 0;
+}
+
+p,
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+li,
+a,
+span {
+  overflow-wrap: anywhere;
 }
 
 /* ─── LAYOUT PRIMITIVES ──────────────────────────────────────── */
@@ -125,6 +160,7 @@ body {
 
 .app-page {
   min-height: 100vh;
+  overflow-x: clip;
 }
 
 .app-container {
@@ -275,6 +311,16 @@ body {
   padding: 0.45rem 0.8rem;
   font-size: 0.75rem;
   font-weight: 600;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.hide-scrollbar {
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
 }
 
 /* ─── MATERIAL SYMBOLS ───────────────────────────────────────── */

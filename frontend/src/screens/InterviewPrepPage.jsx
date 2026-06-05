@@ -27,25 +27,25 @@ function InterviewPrepCard({ analysis, dispatch, openAnalysis }) {
   const [isExpanded, setIsExpanded] = useState(false);
 
   return (
-    <article className={`app-panel flex flex-col relative transition-all duration-300 overflow-hidden ${isExpanded ? 'shadow-xl border-[var(--border-strong)]' : 'hover:border-[var(--border-strong)]'}`}>
+    <article className={`app-panel flex min-w-0 flex-col relative transition-all duration-300 overflow-hidden ${isExpanded ? 'shadow-xl border-[var(--border-strong)]' : 'hover:border-[var(--border-strong)]'}`}>
       <div 
         className="absolute top-0 left-0 w-1.5 h-full bg-[var(--ui-brand)] transition-opacity duration-300" 
         style={{ opacity: isExpanded ? 1 : 0 }}
       />
       
       <div 
-        className={`flex flex-wrap items-start justify-between gap-4 cursor-pointer pl-1 ${isExpanded ? 'pb-2' : ''}`}
+        className={`flex min-w-0 flex-col gap-4 cursor-pointer pl-1 sm:flex-row sm:items-start sm:justify-between ${isExpanded ? 'pb-2' : ''}`}
         onClick={() => setIsExpanded(!isExpanded)}
       >
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <p className="app-kicker">Saved prep set</p>
-          <h2 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[var(--text)] transition-colors">
+          <h2 className="mt-2 text-xl font-black text-[var(--text)] transition-colors [overflow-wrap:break-word] sm:text-2xl sm:tracking-[-0.04em]">
             {analysis.companyName || analysis.stage1?.companyName || 'Interview prep'}
           </h2>
           <p className="mt-2 text-sm text-[var(--muted-strong)]">{formatDateTime(analysis.createdAt)}</p>
         </div>
         
-        <div className="flex flex-wrap gap-2 items-center" onClick={e => e.stopPropagation()}>
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:justify-end" onClick={e => e.stopPropagation()}>
           <button type="button" onClick={() => openAnalysis(analysis)} className="app-button-secondary">Open workspace</button>
           <button
             type="button"
@@ -57,7 +57,7 @@ function InterviewPrepCard({ analysis, dispatch, openAnalysis }) {
           <button
             type="button"
             onClick={() => setIsExpanded(!isExpanded)}
-            className="ml-1 flex h-10 w-10 items-center justify-center rounded-full hover:bg-[var(--panel-soft)] transition-colors focus:outline-none"
+            className="ml-auto flex h-10 w-10 shrink-0 items-center justify-center rounded-full hover:bg-[var(--panel-soft)] transition-colors focus:outline-none sm:ml-1"
             aria-label={isExpanded ? "Collapse details" : "Expand details"}
           >
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`transform transition-transform duration-300 text-[var(--muted-strong)] ${isExpanded ? 'rotate-180' : ''}`}>
@@ -69,9 +69,9 @@ function InterviewPrepCard({ analysis, dispatch, openAnalysis }) {
 
       <div className={`grid transition-[grid-template-rows,opacity] duration-300 ease-in-out ${isExpanded ? 'grid-rows-[1fr] opacity-100 mt-4' : 'grid-rows-[0fr] opacity-0 mt-0 pointer-events-none'}`}>
         <div className="overflow-hidden">
-          <div className="space-y-6 pb-2 pl-1">
+          <div className="space-y-5 pb-2 pl-1 sm:space-y-6">
             {analysis.stage2?.interviewQuestions?.length ? (
-              <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] p-6 transition-colors hover:border-[var(--ui-brand)]/20">
+              <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] p-4 transition-colors hover:border-[var(--ui-brand)]/20 sm:p-6">
                 <p className="app-field-label flex items-center gap-2">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[var(--ui-brand)]">
                     <rect width="18" height="18" x="3" y="4" rx="2" ry="2"/>
@@ -89,7 +89,7 @@ function InterviewPrepCard({ analysis, dispatch, openAnalysis }) {
                 </p>
                 <ol className="mt-5 grid gap-4">
                   {analysis.stage2.interviewQuestions.map((question, index) => (
-                    <li key={`${analysis.id || analysis.localId}-question-${index}`} className="flex gap-4 rounded-[1rem] border border-[var(--border)] bg-[var(--panel)] px-5 py-4 text-sm leading-7 text-[var(--text)] transition-all hover:border-[var(--ui-brand)]/30 hover:bg-[var(--panel-soft)] hover:shadow-sm">
+                    <li key={`${analysis.id || analysis.localId}-question-${index}`} className="flex gap-3 rounded-[1rem] border border-[var(--border)] bg-[var(--panel)] px-4 py-4 text-sm leading-7 text-[var(--text)] transition-all hover:border-[var(--ui-brand)]/30 hover:bg-[var(--panel-soft)] hover:shadow-sm sm:gap-4 sm:px-5">
                       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--ui-brand)]/10 text-xs font-bold text-[var(--ui-brand)]">
                         {index + 1}
                       </span>
@@ -101,7 +101,7 @@ function InterviewPrepCard({ analysis, dispatch, openAnalysis }) {
             ) : null}
 
             {analysis.stage2?.salaryCoach ? (
-              <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] p-6 transition-colors hover:border-green-500/20">
+              <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel-soft)] p-4 transition-colors hover:border-green-500/20 sm:p-6">
                 <p className="app-field-label flex items-center gap-2">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-500">
                     <circle cx="12" cy="12" r="10"/>
@@ -110,7 +110,7 @@ function InterviewPrepCard({ analysis, dispatch, openAnalysis }) {
                   </svg>
                   Salary negotiation prep
                 </p>
-                <div className="mt-5 rounded-[1rem] border border-[var(--border)] bg-[var(--panel)] px-5 py-6 transition-colors hover:bg-[var(--panel-soft)]">
+                <div className="mt-5 rounded-[1rem] border border-[var(--border)] bg-[var(--panel)] px-4 py-5 transition-colors hover:bg-[var(--panel-soft)] sm:px-5 sm:py-6">
                   <pre className="whitespace-pre-wrap font-sans text-sm leading-7 text-[var(--text)]">
                     {analysis.stage2.salaryCoach}
                   </pre>

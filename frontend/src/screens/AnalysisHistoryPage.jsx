@@ -603,30 +603,30 @@ function LearningPathView({ content }) {
         const barWidth = Math.round((hours / maxHours) * 100);
 
         return (
-          <article key={`${item.skill}-${index}`} className={`overflow-hidden rounded-[2rem] border transition-all ${isExpanded ? 'border-[var(--accent)]/30 shadow-[0_4px_20px_rgba(78,222,163,0.06)] bg-[var(--panel)]' : 'border-[var(--border)] bg-[var(--panel-soft)] hover:border-[var(--accent)]/20'}`}>
+          <article key={`${item.skill}-${index}`} className={`min-w-0 overflow-hidden rounded-[1.5rem] border transition-all sm:rounded-[2rem] ${isExpanded ? 'border-[var(--accent)]/30 shadow-[0_4px_20px_rgba(78,222,163,0.06)] bg-[var(--panel)]' : 'border-[var(--border)] bg-[var(--panel-soft)] hover:border-[var(--accent)]/20'}`}>
             <button
               type="button"
               onClick={() => setExpandedIndex(isExpanded ? -1 : index)}
-              className="flex w-full flex-col gap-4 p-6 text-left transition-colors"
+              className="flex w-full min-w-0 flex-col gap-4 p-4 text-left transition-colors sm:p-6"
             >
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-4 min-w-0">
+              <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+                <div className="flex min-w-0 items-start gap-3 sm:items-center sm:gap-4">
                   <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border transition-colors ${isExpanded ? 'bg-[var(--accent)] border-[var(--accent)] text-[#003824]' : 'bg-[var(--panel)] border-[var(--border)] text-[var(--accent-strong)]'}`}>
                     <span className="material-symbols-outlined text-[20px]">school</span>
                   </span>
                   <div className="min-w-0">
-                    <p className="text-lg font-black text-[var(--text)]">{item.skill}</p>
-                    {missingSkill ? <p className="mt-1 text-sm leading-relaxed text-[var(--muted-strong)] truncate">{missingSkill}</p> : null}
+                    <p className="text-base font-black leading-snug text-[var(--text)] [overflow-wrap:break-word] sm:text-lg">{item.skill}</p>
+                    {missingSkill ? <p className="mt-1 text-sm leading-relaxed text-[var(--muted-strong)] [overflow-wrap:break-word] sm:truncate">{missingSkill}</p> : null}
                   </div>
                 </div>
-                <div className="flex items-center gap-3 flex-shrink-0">
+                <div className="flex w-full flex-wrap items-center gap-2 pl-[3.25rem] sm:w-auto sm:flex-shrink-0 sm:justify-end sm:gap-3 sm:pl-0">
                   {daysRequired ? (
                     <span className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-3 py-1 text-[10px] uppercase tracking-[0.18em] font-bold text-[var(--muted-strong)]">
                       {daysRequired}d
                     </span>
                   ) : null}
                   <span className={`rounded-full border px-3 py-1 text-[10px] uppercase tracking-[0.18em] font-bold ${hourColors.badge}`}>{hours || 0}h</span>
-                  <span className={`material-symbols-outlined transition-transform duration-300 text-[var(--muted)] ${isExpanded ? 'rotate-180' : ''}`}>expand_more</span>
+                  <span className={`ml-auto material-symbols-outlined transition-transform duration-300 text-[var(--muted)] sm:ml-0 ${isExpanded ? 'rotate-180' : ''}`}>expand_more</span>
                 </div>
               </div>
               <div>
@@ -641,14 +641,14 @@ function LearningPathView({ content }) {
             </button>
 
             {isExpanded ? (
-              <div className="space-y-6 border-t border-[var(--border)] p-6 animate-in slide-in-from-top-2 duration-200">
+              <div className="space-y-5 border-t border-[var(--border)] p-4 animate-in slide-in-from-top-2 duration-200 sm:space-y-6 sm:p-6">
                 <div className="grid gap-4 md:grid-cols-2">
-                  <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-5 relative overflow-hidden">
+                  <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-4 relative overflow-hidden sm:p-5">
                     <div className="absolute top-0 left-0 w-1 h-full bg-amber-500/50 rounded-r" />
                     <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-[var(--muted)] mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-[14px]">psychology</span>Skill Gap</p>
                     <p className="text-sm leading-relaxed text-[var(--text)]">{missingSkill || 'No missing-skill summary was returned.'}</p>
                   </div>
-                  <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-5 relative overflow-hidden">
+                  <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-4 relative overflow-hidden sm:p-5">
                     <div className="absolute top-0 left-0 w-1 h-full bg-[var(--accent)]/50 rounded-r" />
                     <p className="text-[10px] uppercase tracking-[0.2em] font-bold text-[var(--muted)] mb-3 flex items-center gap-2"><span className="material-symbols-outlined text-[14px]">calendar_month</span>Duration</p>
                     <p className="text-sm leading-relaxed text-[var(--text)]">{daysRequired ? `${daysRequired} days estimated` : 'No estimate returned'}</p>
@@ -668,7 +668,7 @@ function LearningPathView({ content }) {
                           href={resource.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="group/ref flex flex-col gap-2 rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-4 transition-all hover:border-[var(--accent)]/40 hover:shadow-[0_4px_15px_rgba(78,222,163,0.06)]"
+                          className="group/ref flex min-w-0 flex-col gap-2 rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-4 transition-all hover:border-[var(--accent)]/40 hover:shadow-[0_4px_15px_rgba(78,222,163,0.06)]"
                         >
                           <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
@@ -890,7 +890,7 @@ function AnalysisHistoryCard({ analysis, isExpanded, onToggle, dispatch }) {
 
   return (
     <div className={`group rounded-[2rem] border transition-all overflow-hidden flex flex-col ${isExpanded ? 'border-[var(--accent)]/50 shadow-[0_0_40px_rgba(78,222,163,0.05)] bg-[var(--panel)]' : 'border-[var(--border)] bg-[var(--panel)] hover:border-[var(--accent)]/30 hover:shadow-[0_8px_30px_rgba(0,0,0,0.12)] hover:-translate-y-0.5'}`}>
-       <div className="flex flex-col sm:flex-row sm:items-center justify-between p-6 sm:p-8 cursor-pointer relative" onClick={onToggle}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-8 cursor-pointer relative" onClick={onToggle}>
          <div className="absolute inset-0 bg-gradient-to-r from-[var(--accent)]/5 to-transparent opacity-0 transition-opacity group-hover:opacity-100 pointer-events-none" />
          <div className="relative z-10 flex-1 min-w-0 pr-4">
             <div className="flex items-center gap-3 mb-2">
@@ -907,7 +907,7 @@ function AnalysisHistoryCard({ analysis, isExpanded, onToggle, dispatch }) {
             </p>
          </div>
          
-         <div className="relative z-10 flex items-center gap-6 mt-4 sm:mt-0 pl-4 sm:border-l border-[var(--border)]">
+          <div className="relative z-10 flex items-center gap-6 mt-4 sm:mt-0 sm:pl-4 sm:border-l border-[var(--border)]">
             <div className="flex flex-col items-end justify-center">
                <span className="text-[10px] uppercase tracking-wider text-[var(--muted)] font-bold mb-0.5">Match score</span>
                <div className="flex items-baseline gap-1">
@@ -936,7 +936,7 @@ function AnalysisHistoryCard({ analysis, isExpanded, onToggle, dispatch }) {
        </div>
 
        {isExpanded && (
-         <div className="relative border-t border-[var(--border)] p-6 sm:p-10 bg-[var(--panel-soft)] overflow-hidden animate-in slide-in-from-top-2 duration-300">
+          <div className="relative border-t border-[var(--border)] p-4 sm:p-10 bg-[var(--panel-soft)] overflow-hidden animate-in slide-in-from-top-2 duration-300">
             <div className="absolute top-0 right-0 p-32 bg-[radial-gradient(circle_at_top_right,rgba(78,222,163,0.08),transparent_60%)] pointer-events-none" />
             
             <div className="relative z-10 space-y-10">
@@ -1003,7 +1003,7 @@ function AnalysisHistoryCard({ analysis, isExpanded, onToggle, dispatch }) {
                     ))}
                   </div>
 
-                  <div className="rounded-[2rem] border border-[var(--border)] bg-[var(--panel)] p-6 sm:p-8 shadow-xl">
+                  <div className="rounded-[1.5rem] border border-[var(--border)] bg-[var(--panel)] p-4 shadow-xl sm:rounded-[2rem] sm:p-8">
                     <div className="mb-8 border-b border-[var(--border)] pb-4 flex items-center gap-3">
                       <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent-strong)]">
                          <span className="material-symbols-outlined text-[16px]">visibility</span>

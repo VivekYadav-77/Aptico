@@ -45,6 +45,21 @@ const LINKS = [
   { from: 'gamification', to: 'squad' },
 ];
 
+const LINK_ANIMATION_TIMINGS = [
+  [2.5, 0.1],
+  [3.2, 0.5],
+  [2.8, 0.9],
+  [3.7, 1.2],
+  [2.4, 0.3],
+  [3.4, 1.6],
+  [2.9, 0.7],
+  [3.9, 1.4],
+  [2.6, 0.2],
+  [3.1, 1.1],
+  [3.6, 0.8],
+  [2.7, 1.8],
+];
+
 function getNodeBounds(type) {
   if (type === 'input' || type === 'output') return { w: 180, h: 48 };
   if (type === 'node') return { w: 48, h: 48 };
@@ -80,9 +95,7 @@ export default function ApticoArchitectureDiagram() {
 
       const pathD = getStepPath(startX, startY, endX, endY);
       
-      // We assign random durations to make the animation feel organic
-      const dur = (Math.random() * 2 + 2).toFixed(1); // 2s to 4s
-      const delay = (Math.random() * 2).toFixed(1);
+      const [dur, delay] = LINK_ANIMATION_TIMINGS[idx % LINK_ANIMATION_TIMINGS.length];
 
       return (
         <g key={`${link.from}-${link.to}-${idx}`}>

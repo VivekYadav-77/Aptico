@@ -56,20 +56,20 @@ export default function PortfolioGenerator() {
       description="Turn your Aptico profile into a GitHub README that starts with a live Aptico badge and routes inbound traffic back to your AI shadow resume."
       actions={
         readme ? (
-          <div className="flex items-center gap-3 animate-fade-in-up">
-            <button type="button" onClick={() => setShowBadgePreview(true)} className="app-button-secondary transition-all hover:border-[var(--accent)] hover:text-[var(--accent)] group">
-              <span className="material-symbols-outlined text-[18px] transition-transform group-hover:scale-110">visibility</span>
-              Preview badge
+          <div className="grid w-full grid-cols-3 gap-2 animate-fade-in-up sm:flex sm:w-auto sm:items-center sm:gap-3">
+            <button type="button" onClick={() => setShowBadgePreview(true)} className="app-button-secondary min-h-14 flex-col px-2 py-3 text-center text-xs leading-tight transition-all hover:border-[var(--accent)] hover:text-[var(--accent)] group sm:min-h-0 sm:flex-row sm:px-5 sm:py-[0.85rem] sm:text-sm">
+              <span className="material-symbols-outlined shrink-0 text-[18px] leading-none transition-transform group-hover:scale-110">visibility</span>
+              <span>Preview badge</span>
             </button>
-            <a href={readme.shadowResumeUrl} target="_blank" rel="noreferrer" className="app-button-secondary transition-all hover:border-[var(--accent)] hover:text-[var(--accent)] group">
-              <span className="material-symbols-outlined text-[18px] transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5">open_in_new</span>
-              Shadow resume
+            <a href={readme.shadowResumeUrl} target="_blank" rel="noreferrer" className="app-button-secondary min-h-14 flex-col px-2 py-3 text-center text-xs leading-tight transition-all hover:border-[var(--accent)] hover:text-[var(--accent)] group sm:min-h-0 sm:flex-row sm:px-5 sm:py-[0.85rem] sm:text-sm">
+              <span className="material-symbols-outlined shrink-0 text-[18px] leading-none transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5">open_in_new</span>
+              <span>Shadow resume</span>
             </a>
-            <button type="button" onClick={handleCopy} className="app-button shadow-[0_0_15px_rgba(59,201,142,0.4)] hover:shadow-[0_0_25px_rgba(59,201,142,0.6)] group" disabled={copying}>
-              <span className="material-symbols-outlined text-[18px] transition-transform group-hover:scale-110">
+            <button type="button" onClick={handleCopy} className="app-button min-h-14 flex-col px-2 py-3 text-center text-xs leading-tight shadow-[0_0_15px_rgba(59,201,142,0.4)] hover:shadow-[0_0_25px_rgba(59,201,142,0.6)] group sm:min-h-0 sm:flex-row sm:px-5 sm:py-[0.85rem] sm:text-sm" disabled={copying}>
+              <span className="material-symbols-outlined shrink-0 text-[18px] leading-none transition-transform group-hover:scale-110">
                 {copying ? 'check' : 'content_copy'}
               </span>
-              {copying ? 'Copied!' : 'Copy markdown'}
+              <span>{copying ? 'Copied!' : 'Copy markdown'}</span>
             </button>
           </div>
         ) : null

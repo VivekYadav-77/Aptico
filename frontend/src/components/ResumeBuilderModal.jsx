@@ -1068,17 +1068,17 @@ export default function ResumeBuilderModal({ open, onClose, profile, educationEn
   return (
     <div className="fixed inset-0 z-[300] flex flex-col bg-black/60 backdrop-blur-md animate-fade-in">
       {/* ── Top bar ── */}
-      <header className="flex items-center justify-between px-6 py-4 border-b border-[var(--border)] bg-[var(--panel)]/95 backdrop-blur-xl shrink-0">
-        <div className="flex items-center gap-3">
+      <header className="relative z-30 flex shrink-0 items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--panel)]/95 px-4 py-3 backdrop-blur-xl sm:gap-3 sm:px-6 sm:py-4">
+        <div className="flex min-w-0 items-center gap-3">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/20">
             <span className="material-symbols-outlined text-[18px] text-[var(--accent-strong)]">description</span>
           </span>
-          <div>
+          <div className="min-w-0">
             <h2 className="text-lg font-black tracking-tight text-[var(--text)]">Resume Builder</h2>
-            <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--muted)]">{TEMPLATES.length} templates available</p>
+            <p className="truncate text-[10px] font-bold uppercase tracking-[0.15em] text-[var(--muted)]">{TEMPLATES.length} templates available</p>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
           <div ref={downloadMenuRef} className="relative">
             <button
               type="button"
@@ -1086,10 +1086,10 @@ export default function ResumeBuilderModal({ open, onClose, profile, educationEn
               disabled={Boolean(downloading)}
               aria-haspopup="menu"
               aria-expanded={downloadMenuOpen}
-              className="app-button flex items-center gap-2 shadow-lg shadow-[var(--accent)]/20 disabled:opacity-60"
+              className="app-button flex h-9 w-14 items-center gap-1 px-2 py-2 text-xs shadow-lg shadow-[var(--accent)]/20 disabled:opacity-60 sm:h-auto sm:w-auto sm:gap-2 sm:px-5 sm:py-[0.85rem] sm:text-sm"
             >
               <span className="material-symbols-outlined text-[18px]">{downloading ? 'progress_activity' : 'download'}</span>
-              {downloading ? 'Generating...' : 'Download'}
+              <span className="hidden sm:inline">{downloading ? 'Generating...' : 'Download'}</span>
               {!downloading && <span className="material-symbols-outlined text-[18px]">expand_more</span>}
             </button>
             {downloadMenuOpen && (
@@ -1105,53 +1105,55 @@ export default function ResumeBuilderModal({ open, onClose, profile, educationEn
               </div>
             )}
           </div>
-          <button onClick={onClose} className="flex h-9 w-9 items-center justify-center rounded-xl hover:bg-[var(--panel-strong)] transition text-[var(--muted-strong)] hover:text-[var(--text)]">
+          <button onClick={onClose} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl hover:bg-[var(--panel-strong)] transition text-[var(--muted-strong)] hover:text-[var(--text)]">
             <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
         </div>
       </header>
 
       {/* ── Body ── */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
         {/* Sidebar - template selector */}
         {!readonly && (
-          <aside className="w-[280px] shrink-0 border-r border-[var(--border)] bg-[var(--panel)]/80 backdrop-blur-xl overflow-y-auto p-5 space-y-2.5">
-            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--muted)] mb-3">Choose Template</p>
-            {TEMPLATES.map(t => (
-              <button
-                key={t.id}
-                onClick={() => setSelectedId(t.id)}
-                className={`w-full rounded-2xl border p-4 text-left transition-all ${
-                  selectedId === t.id
-                    ? 'border-[var(--accent)]/50 bg-[var(--accent-soft)] shadow-[0_4px_20px_rgba(78,222,163,0.1)] ring-1 ring-[var(--accent)]'
-                    : 'border-[var(--border)] bg-[var(--panel)] hover:border-[var(--accent)]/30 hover:bg-[var(--panel-soft)]'
-                }`}
-              >
-                <div className="flex items-center gap-3 mb-2">
-                  <span
-                    className="flex h-8 w-8 items-center justify-center rounded-lg"
-                    style={{ background: selectedId === t.id ? `${t.color}20` : 'var(--panel-soft)' }}
-                  >
+          <aside className="relative z-10 shrink-0 border-b border-[var(--border)] bg-[var(--panel)]/80 p-4 backdrop-blur-xl lg:w-[280px] lg:overflow-y-auto lg:border-b-0 lg:border-r lg:p-5">
+            <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--muted)]">Choose Template</p>
+            <div className="flex gap-3 overflow-x-auto pb-2 [-webkit-overflow-scrolling:touch] lg:block lg:space-y-2.5 lg:overflow-visible lg:pb-0">
+              {TEMPLATES.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => setSelectedId(t.id)}
+                  className={`w-32 shrink-0 rounded-2xl border p-3 text-left transition-all sm:w-56 sm:p-4 lg:w-full ${
+                    selectedId === t.id
+                      ? 'border-[var(--accent)]/50 bg-[var(--accent-soft)] shadow-[0_4px_20px_rgba(78,222,163,0.1)] ring-1 ring-[var(--accent)]'
+                      : 'border-[var(--border)] bg-[var(--panel)] hover:border-[var(--accent)]/30 hover:bg-[var(--panel-soft)]'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 sm:mb-2 sm:gap-3">
                     <span
-                      className="material-symbols-outlined text-[16px]"
-                      style={{ color: selectedId === t.id ? t.color : 'var(--muted)' }}
-                    >{t.icon}</span>
-                  </span>
-                  <span className="text-sm font-black text-[var(--text)]">{t.label}</span>
-                  {selectedId === t.id && (
-                    <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)] text-white">
-                      <span className="material-symbols-outlined text-[12px]">check</span>
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg"
+                      style={{ background: selectedId === t.id ? `${t.color}20` : 'var(--panel-soft)' }}
+                    >
+                      <span
+                        className="material-symbols-outlined text-[16px]"
+                        style={{ color: selectedId === t.id ? t.color : 'var(--muted)' }}
+                      >{t.icon}</span>
                     </span>
-                  )}
-                </div>
-                <p className="text-[11px] font-medium text-[var(--muted-strong)] leading-relaxed">{t.desc}</p>
-              </button>
-            ))}
+                    <span className="min-w-0 truncate text-sm font-black text-[var(--text)]">{t.label}</span>
+                    {selectedId === t.id && (
+                      <span className="ml-auto flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-white">
+                        <span className="material-symbols-outlined text-[12px]">check</span>
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-2 hidden text-[11px] font-medium leading-relaxed text-[var(--muted-strong)] sm:block lg:mt-0">{t.desc}</p>
+                </button>
+              ))}
+            </div>
           </aside>
         )}
 
         {/* Preview area */}
-        <div className="flex-1 overflow-auto bg-[var(--panel-strong)]/50 px-4 py-6 sm:px-8 flex flex-col items-center">
+        <div className="flex min-h-0 flex-1 flex-col items-center overflow-auto bg-[var(--panel-strong)]/50 px-3 py-4 sm:px-6 sm:py-6 lg:px-8">
           <div className="mb-4 flex w-full max-w-[210mm] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-[10px] font-black uppercase tracking-[0.22em] text-[var(--muted)]">A4 Preview</p>
@@ -1174,7 +1176,8 @@ export default function ResumeBuilderModal({ open, onClose, profile, educationEn
             </div>
           )}
 
-          <div className="relative w-[210mm] min-h-[297mm] bg-white shadow-2xl ring-1 ring-black/10">
+          <div className="w-[calc(210mm*0.43)] min-[480px]:w-[calc(210mm*0.54)] sm:w-[calc(210mm*0.68)] md:w-[calc(210mm*0.82)] lg:w-[210mm]">
+          <div className="relative h-[calc(297mm*0.43)] w-[210mm] origin-top-left scale-[0.43] bg-white shadow-2xl ring-1 ring-black/10 min-[480px]:h-[calc(297mm*0.54)] min-[480px]:scale-[0.54] sm:h-[calc(297mm*0.68)] sm:scale-[0.68] md:h-[calc(297mm*0.82)] md:scale-[0.82] lg:min-h-[297mm] lg:scale-100">
             {resumeOverflows && (
               <div className="pointer-events-none absolute inset-x-0 top-[297mm] z-10 flex items-center">
                 <span className="h-px flex-1 border-t border-dashed border-amber-400/80" />
@@ -1192,6 +1195,7 @@ export default function ResumeBuilderModal({ open, onClose, profile, educationEn
             >
               <selected.Component data={data} />
             </div>
+          </div>
           </div>
         </div>
       </div>
