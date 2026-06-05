@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   buildRankedLeaderboardFromRows,
+  canAutoApprove,
+  getReviewReasons,
   getPeriodBounds,
   REWARD_BY_RANK
 } from '../src/modules/squads/squad-leaderboard.service.js';
@@ -102,5 +104,83 @@ describe('Squad leaderboard scoring', () => {
     assert.equal(REWARD_BY_RANK[1].stickerId, 'event_squad_monthly_gold');
     assert.equal(REWARD_BY_RANK[2].xpBonus, 200);
     assert.equal(REWARD_BY_RANK[3].title, 'Monthly Squad Bronze');
+  });
+
+  it('adds rank deltas and reward-rank markers', () => {
+    const rows = [
+      {
+        squadId: 'squad-a',
+        squadName: 'Alpha',
+        userId: 'user-a',
+        eventType: 'application',
+        rawPoints: 100,
+        eligiblePoints: 100,
+        spamStatus: 'clear',
+        createdAt: new Date('2026-06-02T10:00:00Z')
+      },
+      {
+        squadId: 'squad-b',
+        squadName: 'Beta',
+        userId: 'user-b',
+        eventType: 'application',
+        rawPoints: 80,
+        eligiblePoints: 80,
+        spamStatus: 'clear',
+        createdAt: new Date('2026-06-02T11:00:00Z')
+      },
+      {
+        squadId: 'squad-c',
+        squadName: 'Gamma',
+        userId: 'user-c',
+        eventType: 'application',
+        rawPoints: 50,
+        eligiblePoints: 50,
+        spamStatus: 'clear',
+        createdAt: new Date('2026-06-02T12:00:00Z')
+      },
+      {
+        squadId: 'squad-d',
+        squadName: 'Delta',
+        userId: 'user-d',
+        eventType: 'application',
+        rawPoints: 20,
+        eligiblePoints: 20,
+        spamStatus: 'clear',
+        createdAt: new Date('2026-06-02T13:00:00Z')
+      }
+    ];
+
+    const ranked = buildRankedLeaderboardFromRows(rows, '2026-06');
+
+    assert.equal(ranked[0].nextRankDelta, 0);
+    assert.equal(ranked[0].previousRankDelta, 20);
+    assert.equal(ranked[1].nextRankDelta, 20);
+    assert.equal(ranked[1].previousRankDelta, 30);
+    assert.equal(ranked[2].isRewardRank, true);
+    assert.equal(ranked[3].isRewardRank, false);
+  });
+
+  it('requires promoted reward candidates to pass the fraud guard', () => {
+    const cleanEntry = {
+      eligiblePoints: 50,
+      spamPenalty: 15,
+      suspiciousEventCount: 3,
+      activeMemberCount: 2
+    };
+    const flaggedEntry = {
+      eligiblePoints: 49,
+      spamPenalty: 16,
+      suspiciousEventCount: 4,
+      activeMemberCount: 1
+    };
+
+    assert.equal(canAutoApprove(cleanEntry), true);
+    assert.equal(canAutoApprove(flaggedEntry), false);
+    assert.deepEqual(getReviewReasons(flaggedEntry), [
+      'spam_penalty_high',
+      'too_many_suspicious_events',
+      'not_enough_active_members',
+      'not_enough_eligible_points'
+    ]);
   });
 });

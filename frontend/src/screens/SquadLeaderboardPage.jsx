@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import AppShell from '../components/AppShell.jsx';
-import { getMySquadLeaderboardRank, getSquadLeaderboard } from '../api/squadApi.js';
+import { getSquadLeaderboard } from '../api/squadApi.js';
 
 const REWARD_PREVIEW = {
   1: { label: 'Gold', icon: 'workspace_premium', xp: 300, tone: 'text-amber-300', border: 'border-amber-400/40' },
@@ -36,6 +36,10 @@ function ReviewBadge({ status }) {
   const copy =
     status === 'published'
       ? 'Rewards published'
+      : status === 'partial_review'
+        ? 'Some rewards need review'
+        : status === 'needs_review'
+          ? 'Needs review'
       : status === 'provisional'
         ? 'Pending admin review'
         : 'Live scoring';
@@ -45,6 +49,43 @@ function ReviewBadge({ status }) {
       <span className="material-symbols-outlined text-[16px]">{status === 'published' ? 'verified' : status === 'provisional' ? 'hourglass_top' : 'bolt'}</span>
       {copy}
     </span>
+  );
+}
+
+function RewardStatus({ entry }) {
+  const status = entry?.rewardStatus || 'live';
+  const labels = {
+    live: 'Live',
+    pending: 'Pending',
+    auto_approved: 'Auto-approved',
+    needs_review: 'Needs review',
+    published: 'Published',
+    not_reward_rank: 'No reward'
+  };
+
+  return (
+    <span className={`rounded-full px-3 py-1 text-xs font-black uppercase tracking-[0.14em] ${
+      status === 'published' || status === 'auto_approved'
+        ? 'bg-emerald-500/12 text-emerald-300'
+        : status === 'needs_review'
+          ? 'bg-amber-500/12 text-amber-300'
+          : 'bg-[var(--panel)] text-[var(--muted-strong)]'
+    }`}>
+      {labels[status] || status}
+    </span>
+  );
+}
+
+function RankDelta({ entry }) {
+  if (!entry) return null;
+  const nextRankDelta = Number(entry.nextRankDelta || 0);
+  const previousRankDelta = Number(entry.previousRankDelta || 0);
+
+  return (
+    <div className="mt-3 flex flex-wrap gap-2 text-xs font-bold text-[var(--muted-strong)]">
+      {entry.rank > 1 ? <span>{nextRankDelta} behind #{entry.rank - 1}</span> : <span>Top ranked</span>}
+      {previousRankDelta ? <span>{previousRankDelta} ahead of #{entry.rank + 1}</span> : null}
+    </div>
   );
 }
 
@@ -103,7 +144,6 @@ function Breakdown({ breakdown = {} }) {
 export default function SquadLeaderboardPage() {
   const [period, setPeriod] = useState(getCurrentPeriod());
   const [leaderboard, setLeaderboard] = useState(null);
-  const [myRank, setMyRank] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -114,14 +154,10 @@ export default function SquadLeaderboardPage() {
       setLoading(true);
       setError('');
       try {
-        const [leaderboardResponse, rankResponse] = await Promise.all([
-          getSquadLeaderboard({ period }),
-          getMySquadLeaderboardRank({ period })
-        ]);
+        const leaderboardResponse = await getSquadLeaderboard({ period, limit: 50 });
 
         if (!isActive) return;
         setLeaderboard(leaderboardResponse.data || null);
-        setMyRank(rankResponse.data?.entry || null);
       } catch (apiError) {
         if (isActive) {
           setError(apiError.response?.data?.error || 'Could not load the squad leaderboard.');
@@ -138,7 +174,9 @@ export default function SquadLeaderboardPage() {
   }, [period]);
 
   const entries = leaderboard?.entries || [];
-  const podium = useMemo(() => [entries[0], entries[1], entries[2]], [entries]);
+  const podium = useMemo(() => leaderboard?.podium?.length ? leaderboard.podium : [entries[0], entries[1], entries[2]], [entries, leaderboard?.podium]);
+  const myRank = leaderboard?.myRank || null;
+  const shouldPinMyRank = myRank && !entries.some((entry) => entry.squadId === myRank.squadId);
 
   return (
     <AppShell
@@ -186,30 +224,49 @@ export default function SquadLeaderboardPage() {
                 <h2 className="mt-3 text-2xl font-black text-[var(--text)]">Quality score table</h2>
               </div>
               <span className="rounded-full border border-[var(--border)] px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-[var(--muted-strong)]">
-                {entries.length} squads
+                {leaderboard?.totalSquads || entries.length} squads
               </span>
             </div>
+
+            {shouldPinMyRank ? (
+              <article className="mt-6 rounded-3xl border border-[var(--accent)]/50 bg-[var(--accent)]/10 p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--accent-strong)]">Your squad position</p>
+                    <h3 className="mt-2 text-lg font-black text-[var(--text)]">#{myRank.rank} {myRank.squadName}</h3>
+                    <RankDelta entry={myRank} />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <RewardStatus entry={myRank} />
+                    <span className="app-chip">{myRank.qualityScore} score</span>
+                  </div>
+                </div>
+              </article>
+            ) : null}
 
             <div className="mt-6 space-y-3">
               {loading ? (
                 <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] p-6 text-center text-sm text-[var(--muted-strong)]">Loading leaderboard...</div>
               ) : entries.length ? (
                 entries.map((entry) => (
-                  <article key={entry.squadId} className="rounded-3xl border border-[var(--border)] bg-[var(--panel-soft)] p-5">
+                  <article key={entry.squadId} className={`rounded-3xl border p-5 ${entry.isCurrentUserSquad ? 'border-[var(--accent)]/50 bg-[var(--accent)]/10' : 'border-[var(--border)] bg-[var(--panel-soft)]'}`}>
                     <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-3">
                           <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[var(--panel)] text-lg font-black text-[var(--text)]">{entry.rank}</span>
                           <div>
-                            <h3 className="text-lg font-black text-[var(--text)]">{entry.squadName}</h3>
+                            <h3 className="text-lg font-black text-[var(--text)]">
+                              {entry.squadName} {entry.isCurrentUserSquad ? <span className="ml-2 text-xs text-[var(--accent-strong)]">Your squad</span> : null}
+                            </h3>
                             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--muted-strong)]">
                               {entry.activeMemberCount} active members - {entry.suspiciousEventCount} flags
                             </p>
                           </div>
                         </div>
+                        <RankDelta entry={entry} />
                         <Breakdown breakdown={entry.breakdown} />
                       </div>
-                      <div className="grid grid-cols-3 gap-3 text-center sm:min-w-[360px]">
+                      <div className="grid grid-cols-3 gap-3 text-center sm:min-w-[420px]">
                         <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-3">
                           <p className="text-xl font-black text-[var(--text)]">{entry.eligiblePoints}</p>
                           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted-strong)]">eligible</p>
@@ -221,6 +278,9 @@ export default function SquadLeaderboardPage() {
                         <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-3">
                           <p className="text-xl font-black text-[var(--accent-strong)]">{entry.qualityScore}</p>
                           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--muted-strong)]">score</p>
+                        </div>
+                        <div className="col-span-3 flex justify-end">
+                          <RewardStatus entry={entry} />
                         </div>
                       </div>
                     </div>
@@ -247,6 +307,7 @@ export default function SquadLeaderboardPage() {
                   </div>
                   <span className="text-5xl font-black text-[var(--accent-strong)]">#{myRank.rank}</span>
                 </div>
+                <RankDelta entry={myRank} />
                 <div className="mt-6 grid grid-cols-2 gap-3">
                   <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] p-4">
                     <p className="text-2xl font-black text-[var(--text)]">{myRank.qualityScore}</p>

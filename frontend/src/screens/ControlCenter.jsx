@@ -129,15 +129,16 @@ export default function ControlCenter() {
     };
   }, [isAuthorized, leaderboardPeriod, roleCheckComplete]);
 
-  async function finalizeLeaderboard() {
+  async function finalizeLeaderboard(payload = {}) {
     setLeaderboardLoading(true);
     setLeaderboardMessage('');
     try {
       const response = await api.post('/api/admin/squad-leaderboard/finalize', {
-        period: leaderboardPeriod
+        period: leaderboardPeriod,
+        ...payload
       });
       setLeaderboardReview(response.data?.data || null);
-      setLeaderboardMessage('Monthly squad rewards published.');
+      setLeaderboardMessage(payload.action === 'approve' ? 'Squad reward approved.' : payload.action === 'disqualify' ? 'Squad disqualified.' : payload.action === 'promote_next_eligible' ? 'Next eligible squad promoted.' : 'Monthly squad rewards published.');
     } catch (requestError) {
       setLeaderboardMessage(requestError.response?.data?.error || 'Could not finalize squad leaderboard.');
     } finally {
@@ -269,9 +270,9 @@ export default function ControlCenter() {
                   onChange={(event) => setLeaderboardPeriod(event.target.value || getCurrentPeriod())}
                   className="app-input h-10 w-40"
                 />
-                <button type="button" onClick={finalizeLeaderboard} className="app-button" disabled={leaderboardLoading || !(leaderboardReview?.entries || []).length}>
-                  <span className="material-symbols-outlined text-[18px]">verified</span>
-                  Publish top 3
+                <button type="button" onClick={() => finalizeLeaderboard({ action: 'promote_next_eligible' })} className="app-button-secondary" disabled={leaderboardLoading || !(leaderboardReview?.entries || []).length}>
+                  <span className="material-symbols-outlined text-[18px]">upgrade</span>
+                  Promote next
                 </button>
               </div>
             </div>
@@ -304,8 +305,22 @@ export default function ControlCenter() {
                         <span className="app-chip">{entry.eligiblePoints} eligible</span>
                         <span className="app-chip">-{entry.spamPenalty} penalty</span>
                         <span className="app-chip">{entry.qualityScore} score</span>
+                        <span className="app-chip">{entry.rewardStatus || 'live'}</span>
                         {entry.reward ? <span className="app-chip">{entry.reward.title}</span> : null}
+                        {entry.rewardStatus === 'needs_review' ? (
+                          <>
+                            <button type="button" className="app-button-secondary !px-3 !py-1.5 text-xs" onClick={() => finalizeLeaderboard({ action: 'approve', squadId: entry.squadId })} disabled={leaderboardLoading}>
+                              Approve
+                            </button>
+                            <button type="button" className="app-button-secondary !px-3 !py-1.5 text-xs" onClick={() => finalizeLeaderboard({ action: 'disqualify', squadId: entry.squadId })} disabled={leaderboardLoading}>
+                              Disqualify
+                            </button>
+                          </>
+                        ) : null}
                       </div>
+                      {entry.reviewReasons?.length ? (
+                        <p className="mt-3 text-xs font-bold text-amber-300 lg:text-right">Review: {entry.reviewReasons.join(', ')}</p>
+                      ) : null}
                     </div>
                   </article>
                 ))

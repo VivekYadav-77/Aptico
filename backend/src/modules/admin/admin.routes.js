@@ -16,6 +16,8 @@ const leaderboardQuerySchema = z.object({
 
 const finalizeLeaderboardSchema = z.object({
   period: z.string().regex(/^\d{4}-\d{2}$/).optional(),
+  action: z.enum(['publish_top_3', 'approve', 'disqualify', 'promote_next_eligible']).optional(),
+  squadId: z.string().uuid().optional(),
   approvedSquadIds: z.array(z.string().uuid()).max(3).optional(),
   disqualifiedSquadIds: z.array(z.string().uuid()).optional()
 });
@@ -72,6 +74,8 @@ export default async function adminRoutes(app) {
       const leaderboard = await finalizeMonthlyLeaderboard(db, {
         period: body.period,
         approvedBy: request.auth.userId,
+        action: body.action || 'publish_top_3',
+        squadId: body.squadId || null,
         approvedSquadIds: body.approvedSquadIds || null,
         disqualifiedSquadIds: body.disqualifiedSquadIds || []
       });

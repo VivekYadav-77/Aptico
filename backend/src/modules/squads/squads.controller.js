@@ -968,7 +968,9 @@ export async function getSquadLeaderboardController(request, reply) {
     requireDatabase(request.server.db);
     const leaderboard = await getLeaderboard(request.server.db, {
       period: request.query?.period,
-      limit: Number(request.query?.limit || 25)
+      limit: Number(request.query?.limit || 50),
+      userId: request.auth.userId,
+      includeMyRank: true
     });
 
     return reply.send({

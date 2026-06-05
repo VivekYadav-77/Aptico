@@ -16,6 +16,13 @@ export const REWARD_BY_RANK = {
   3: { stickerId: 'event_squad_monthly_bronze', title: 'Monthly Squad Bronze', xpBonus: 100 }
 };
 
+const AUTO_APPROVAL_GUARD = {
+  maxSpamPenalty: 15,
+  maxSuspiciousEventCount: 3,
+  minActiveMemberCount: 2,
+  minEligiblePoints: 50
+};
+
 const EVENT_RULES = {
   application: { points: 10, cap: 5, window: 'day', capGroup: 'application' },
   weekly_goal: { points: 60, cap: 1, window: 'week', scope: 'squad', capGroup: 'weekly_goal' },
@@ -53,6 +60,10 @@ export function getPeriodBounds(period = toPeriod()) {
   const end = new Date(start);
   end.setUTCMonth(end.getUTCMonth() + 1);
   return { period: safePeriod, start, end };
+}
+
+function isClosedPeriod(period) {
+  return parsePeriod(period) < toPeriod();
 }
 
 function getWeekBounds(date = new Date()) {
@@ -334,7 +345,7 @@ function summarizeScoreRows(rows, period, publishedMap = new Map()) {
 }
 
 export function buildRankedLeaderboardFromRows(rows, period, publishedMap = new Map()) {
-  return summarizeScoreRows(rows, period, publishedMap)
+  const ranked = summarizeScoreRows(rows, period, publishedMap)
     .sort((a, b) => {
       if (b.qualityScore !== a.qualityScore) return b.qualityScore - a.qualityScore;
       if (a.suspiciousEventCount !== b.suspiciousEventCount) return a.suspiciousEventCount - b.suspiciousEventCount;
@@ -342,6 +353,17 @@ export function buildRankedLeaderboardFromRows(rows, period, publishedMap = new 
       return new Date(a.lastValidAt || 0).getTime() - new Date(b.lastValidAt || 0).getTime();
     })
     .map((entry, index) => ({ ...entry, rank: index + 1 }));
+
+  return ranked.map((entry, index) => {
+    const previousEntry = index > 0 ? ranked[index - 1] : null;
+    const nextEntry = index < ranked.length - 1 ? ranked[index + 1] : null;
+    return {
+      ...entry,
+      nextRankDelta: previousEntry ? Math.max(0, previousEntry.qualityScore - entry.qualityScore) : 0,
+      previousRankDelta: nextEntry ? Math.max(0, entry.qualityScore - nextEntry.qualityScore) : 0,
+      isRewardRank: entry.rank <= 3
+    };
+  });
 }
 
 async function getPublishedRewards(db, period) {
@@ -354,7 +376,8 @@ async function getPublishedRewards(db, period) {
         stickerId: row.stickerId,
         title: row.title,
         xpBonus: Number(row.xpBonus || 0),
-        approvedAt: row.approvedAt
+        approvedAt: row.approvedAt,
+        mode: row.metadata?.mode || 'manual'
       }
     ])
   );
@@ -385,7 +408,8 @@ export async function refreshMonthlyScores(db, periodInput) {
       squadId: squadMonthlyScores.squadId,
       reviewStatus: squadMonthlyScores.reviewStatus,
       publishedAt: squadMonthlyScores.publishedAt,
-      finalizedAt: squadMonthlyScores.finalizedAt
+      finalizedAt: squadMonthlyScores.finalizedAt,
+      metadata: squadMonthlyScores.metadata
     })
     .from(squadMonthlyScores)
     .where(eq(squadMonthlyScores.period, period));
@@ -393,6 +417,7 @@ export async function refreshMonthlyScores(db, periodInput) {
 
   for (const entry of ranked) {
     const status = statusBySquad.get(entry.squadId);
+    const currentMetadata = status?.metadata || {};
     await db
       .insert(squadMonthlyScores)
       .values({
@@ -409,8 +434,11 @@ export async function refreshMonthlyScores(db, periodInput) {
         publishedAt: status?.publishedAt || null,
         finalizedAt: status?.finalizedAt || null,
         metadata: {
+          ...currentMetadata,
           breakdown: entry.breakdown,
-          lastValidAt: entry.lastValidAt
+          lastValidAt: entry.lastValidAt,
+          nextRankDelta: entry.nextRankDelta,
+          previousRankDelta: entry.previousRankDelta
         },
         updatedAt: new Date()
       })
@@ -425,8 +453,11 @@ export async function refreshMonthlyScores(db, periodInput) {
           activeMemberCount: entry.activeMemberCount,
           rank: entry.rank,
           metadata: {
+            ...currentMetadata,
             breakdown: entry.breakdown,
-            lastValidAt: entry.lastValidAt
+            lastValidAt: entry.lastValidAt,
+            nextRankDelta: entry.nextRankDelta,
+            previousRankDelta: entry.previousRankDelta
           },
           updatedAt: new Date()
         }
@@ -436,36 +467,209 @@ export async function refreshMonthlyScores(db, periodInput) {
   return ranked;
 }
 
-export async function getLeaderboard(db, { period: periodInput, limit = 25 } = {}) {
+export function getReviewReasons(entry) {
+  const reasons = [];
+  if (entry.spamPenalty > AUTO_APPROVAL_GUARD.maxSpamPenalty) reasons.push('spam_penalty_high');
+  if (entry.suspiciousEventCount > AUTO_APPROVAL_GUARD.maxSuspiciousEventCount) reasons.push('too_many_suspicious_events');
+  if (entry.activeMemberCount < AUTO_APPROVAL_GUARD.minActiveMemberCount) reasons.push('not_enough_active_members');
+  if (entry.eligiblePoints < AUTO_APPROVAL_GUARD.minEligiblePoints) reasons.push('not_enough_eligible_points');
+  return reasons;
+}
+
+export function canAutoApprove(entry) {
+  return getReviewReasons(entry).length === 0;
+}
+
+async function grantMonthlyReward(db, { entry, period, rank, approvedBy = null, approvedAt = new Date(), mode = 'auto' }) {
+  const reward = REWARD_BY_RANK[rank];
+  if (!reward) return false;
+
+  const insertedReward = await db
+    .insert(squadMonthlyRewards)
+    .values({
+      squadId: entry.squadId,
+      period,
+      rank,
+      stickerId: reward.stickerId,
+      title: reward.title,
+      xpBonus: reward.xpBonus,
+      approvedBy,
+      approvedAt,
+      metadata: {
+        qualityScore: entry.qualityScore,
+        mode
+      }
+    })
+    .onConflictDoNothing()
+    .returning({ id: squadMonthlyRewards.id });
+
+  if (!insertedReward[0]) {
+    return false;
+  }
+
+  const members = await db.select({ userId: squadMembers.userId }).from(squadMembers).where(eq(squadMembers.squadId, entry.squadId));
+
+  await Promise.all(
+    members.map(async (member) => {
+      await db
+        .update(users)
+        .set({ resilienceXp: sql`${users.resilienceXp} + ${reward.xpBonus}` })
+        .where(eq(users.id, member.userId));
+      await addStickerToUserSettings(db, member.userId, reward.stickerId);
+    })
+  );
+
+  return true;
+}
+
+export async function autoFinalizeClosedPeriodIfNeeded(db, periodInput) {
   const period = parsePeriod(periodInput);
+  if (!isClosedPeriod(period)) {
+    return { finalized: false, reason: 'period_active' };
+  }
+
+  const existingFinalized = await db
+    .select({ count: sql`count(*)::int` })
+    .from(squadMonthlyScores)
+    .where(and(eq(squadMonthlyScores.period, period), sql`${squadMonthlyScores.finalizedAt} is not null`));
+
+  if (Number(existingFinalized[0]?.count || 0) > 0) {
+    return { finalized: false, reason: 'already_finalized' };
+  }
+
   const ranked = await refreshMonthlyScores(db, period);
-  const rewards = await getPublishedRewards(db, period);
+  const topThree = ranked.slice(0, 3);
+  const now = new Date();
+
+  for (const entry of ranked) {
+    const isTopThree = entry.rank <= 3;
+    const reviewReasons = isTopThree ? getReviewReasons(entry) : [];
+    const autoApproved = isTopThree && reviewReasons.length === 0;
+    const needsReview = isTopThree && reviewReasons.length > 0;
+
+    await db
+      .update(squadMonthlyScores)
+      .set({
+        reviewStatus: autoApproved ? 'auto_approved' : needsReview ? 'needs_review' : 'reviewed',
+        finalizedAt: now,
+        publishedAt: autoApproved ? now : null,
+        metadata: {
+          breakdown: entry.breakdown,
+          lastValidAt: entry.lastValidAt,
+          nextRankDelta: entry.nextRankDelta,
+          previousRankDelta: entry.previousRankDelta,
+          autoFinalized: true,
+          reviewReasons
+        },
+        updatedAt: now
+      })
+      .where(and(eq(squadMonthlyScores.period, period), eq(squadMonthlyScores.squadId, entry.squadId)));
+
+    if (autoApproved) {
+      await grantMonthlyReward(db, { entry, period, rank: entry.rank, approvedAt: now, mode: 'auto' });
+    }
+  }
+
   return {
-    period,
-    reviewStatus: rewards.size ? 'published' : period === toPeriod() ? 'active' : 'provisional',
-    entries: ranked.slice(0, limit).map((entry) => ({
-      ...entry,
-      reward: rewards.get(entry.squadId) || entry.reward || null
-    }))
+    finalized: true,
+    autoApprovedCount: topThree.filter(canAutoApprove).length,
+    needsReviewCount: topThree.filter((entry) => !canAutoApprove(entry)).length
   };
 }
 
-export async function getMyLeaderboardRank(db, userId, periodInput) {
-  const period = parsePeriod(periodInput);
+function decorateEntries({ entries, statusBySquad, rewards, currentSquadId = null }) {
+  return entries.map((entry) => {
+    const status = statusBySquad.get(entry.squadId);
+    const reward = rewards.get(entry.squadId) || entry.reward || null;
+    const reviewReasons = Array.isArray(status?.metadata?.reviewReasons) ? status.metadata.reviewReasons : getReviewReasons(entry);
+    const rewardStatus = reward
+      ? reward.mode === 'auto' ? 'auto_approved' : 'published'
+      : status?.reviewStatus === 'auto_approved'
+        ? 'auto_approved'
+        : status?.reviewStatus === 'needs_review'
+          ? 'needs_review'
+          : entry.rank <= 3
+            ? isClosedPeriod(entry.period) ? 'pending' : 'live'
+            : 'not_reward_rank';
+
+    return {
+      ...entry,
+      isCurrentUserSquad: Boolean(currentSquadId && entry.squadId === currentSquadId),
+      isRewardRank: entry.rank <= 3,
+      reward,
+      rewardStatus,
+      reviewReason: reviewReasons[0] || null,
+      reviewReasons
+    };
+  });
+}
+
+async function getStatusBySquad(db, period) {
+  const rows = await db
+    .select({
+      squadId: squadMonthlyScores.squadId,
+      reviewStatus: squadMonthlyScores.reviewStatus,
+      metadata: squadMonthlyScores.metadata,
+      publishedAt: squadMonthlyScores.publishedAt,
+      finalizedAt: squadMonthlyScores.finalizedAt
+    })
+    .from(squadMonthlyScores)
+    .where(eq(squadMonthlyScores.period, period));
+
+  return new Map(rows.map((row) => [row.squadId, row]));
+}
+
+async function getCurrentSquadId(db, userId) {
+  if (!userId) return null;
   const membership = await db
     .select({ squadId: squadMembers.squadId })
     .from(squadMembers)
     .where(eq(squadMembers.userId, userId))
     .limit(1);
+  return membership[0]?.squadId || null;
+}
 
-  if (!membership[0]) {
-    return { period, entry: null };
+export async function getLeaderboard(db, { period: periodInput, limit = 50, userId = null, includeMyRank = false, skipAutoFinalize = false } = {}) {
+  const period = parsePeriod(periodInput);
+  if (!skipAutoFinalize) {
+    await autoFinalizeClosedPeriodIfNeeded(db, period);
   }
 
-  const leaderboard = await getLeaderboard(db, { period, limit: 500 });
+  const ranked = await refreshMonthlyScores(db, period);
+  const rewards = await getPublishedRewards(db, period);
+  const statusBySquad = await getStatusBySquad(db, period);
+  const currentSquadId = await getCurrentSquadId(db, userId);
+  const safeLimit = Math.max(1, Math.min(100, Number(limit || 50)));
+  const visibleEntries = ranked.slice(0, safeLimit);
+  const decoratedVisible = decorateEntries({ entries: visibleEntries, statusBySquad, rewards, currentSquadId });
+  const myEntry = currentSquadId ? ranked.find((entry) => entry.squadId === currentSquadId) || null : null;
+  const decoratedMyEntry = myEntry ? decorateEntries({ entries: [myEntry], statusBySquad, rewards, currentSquadId })[0] : null;
+  const publishedCount = rewards.size;
+  const needsReviewCount = [...statusBySquad.values()].filter((status) => status.reviewStatus === 'needs_review').length;
+
   return {
     period,
-    entry: leaderboard.entries.find((entry) => entry.squadId === membership[0].squadId) || null
+    reviewStatus: publishedCount ? (needsReviewCount ? 'partial_review' : 'published') : period === toPeriod() ? 'active' : needsReviewCount ? 'needs_review' : 'provisional',
+    entries: decoratedVisible,
+    podium: decoratedVisible.slice(0, 3),
+    myRank: includeMyRank ? decoratedMyEntry : null,
+    hasMore: ranked.length > safeLimit,
+    totalSquads: ranked.length,
+    autoFinalize: {
+      enabled: true,
+      closedPeriod: isClosedPeriod(period),
+      needsReviewCount,
+      publishedCount
+    }
+  };
+}
+
+export async function getMyLeaderboardRank(db, userId, periodInput) {
+  const period = parsePeriod(periodInput);
+  const leaderboard = await getLeaderboard(db, { period, limit: 100, userId, includeMyRank: true });
+  return {
+    period,
+    entry: leaderboard.myRank || null
   };
 }
 
@@ -498,19 +702,63 @@ async function addStickerToUserSettings(db, userId, stickerId) {
   }
 }
 
-export async function finalizeMonthlyLeaderboard(db, { period: periodInput, approvedBy, approvedSquadIds = null, disqualifiedSquadIds = [] }) {
+export async function finalizeMonthlyLeaderboard(db, { period: periodInput, approvedBy, approvedSquadIds = null, disqualifiedSquadIds = [], action = 'publish_top_3', squadId = null }) {
   const period = parsePeriod(periodInput);
   const disqualified = new Set(disqualifiedSquadIds || []);
-  const leaderboard = await getLeaderboard(db, { period, limit: 100 });
+  const leaderboard = await getLeaderboard(db, { period, limit: 100, skipAutoFinalize: true });
   const eligibleEntries = leaderboard.entries.filter((entry) => !disqualified.has(entry.squadId));
+  const now = new Date();
+
+  if (action === 'approve' && squadId) {
+    const entry = leaderboard.entries.find((item) => item.squadId === squadId);
+    if (entry?.rank && entry.rank <= 3) {
+      await grantMonthlyReward(db, { entry, period, rank: entry.rank, approvedBy, approvedAt: now, mode: 'manual_approve' });
+      await db
+        .update(squadMonthlyScores)
+        .set({ reviewStatus: 'approved', publishedAt: now, finalizedAt: now, updatedAt: now })
+        .where(and(eq(squadMonthlyScores.period, period), eq(squadMonthlyScores.squadId, squadId)));
+    }
+
+    return getLeaderboard(db, { period, limit: 50, skipAutoFinalize: true });
+  }
+
+  if (action === 'disqualify' && squadId) {
+    await db
+      .update(squadMonthlyScores)
+      .set({
+        reviewStatus: 'disqualified',
+        finalizedAt: now,
+        publishedAt: null,
+        updatedAt: now
+      })
+      .where(and(eq(squadMonthlyScores.period, period), eq(squadMonthlyScores.squadId, squadId)));
+
+    return getLeaderboard(db, { period, limit: 50, skipAutoFinalize: true });
+  }
+
+  if (action === 'promote_next_eligible') {
+    const rewardRows = await db.select({ rank: squadMonthlyRewards.rank }).from(squadMonthlyRewards).where(eq(squadMonthlyRewards.period, period));
+    const usedRanks = new Set(rewardRows.map((row) => Number(row.rank)));
+    const nextRank = [1, 2, 3].find((rank) => !usedRanks.has(rank));
+    const nextEntry = leaderboard.entries.find((entry) => entry.rank > 3 && entry.rewardStatus !== 'needs_review' && entry.rewardStatus !== 'published' && canAutoApprove(entry));
+
+    if (nextRank && nextEntry) {
+      await grantMonthlyReward(db, { entry: nextEntry, period, rank: nextRank, approvedBy, approvedAt: now, mode: 'promote_next_eligible' });
+      await db
+        .update(squadMonthlyScores)
+        .set({ reviewStatus: 'approved', publishedAt: now, finalizedAt: now, updatedAt: now })
+        .where(and(eq(squadMonthlyScores.period, period), eq(squadMonthlyScores.squadId, nextEntry.squadId)));
+    }
+
+    return getLeaderboard(db, { period, limit: 50, skipAutoFinalize: true });
+  }
+
   const winnerEntries = (approvedSquadIds?.length
     ? approvedSquadIds
         .map((squadId) => eligibleEntries.find((entry) => entry.squadId === squadId))
         .filter(Boolean)
     : eligibleEntries
   ).slice(0, 3);
-
-  const now = new Date();
 
   for (const entry of leaderboard.entries) {
     await db
@@ -526,42 +774,8 @@ export async function finalizeMonthlyLeaderboard(db, { period: periodInput, appr
 
   for (const [index, entry] of winnerEntries.entries()) {
     const rank = index + 1;
-    const reward = REWARD_BY_RANK[rank];
-
-    const insertedReward = await db
-      .insert(squadMonthlyRewards)
-      .values({
-        squadId: entry.squadId,
-        period,
-        rank,
-        stickerId: reward.stickerId,
-        title: reward.title,
-        xpBonus: reward.xpBonus,
-        approvedBy,
-        approvedAt: now,
-        metadata: {
-          qualityScore: entry.qualityScore
-        }
-      })
-      .onConflictDoNothing()
-      .returning({ id: squadMonthlyRewards.id });
-
-    if (!insertedReward[0]) {
-      continue;
-    }
-
-    const members = await db.select({ userId: squadMembers.userId }).from(squadMembers).where(eq(squadMembers.squadId, entry.squadId));
-
-    await Promise.all(
-      members.map(async (member) => {
-        await db
-          .update(users)
-          .set({ resilienceXp: sql`${users.resilienceXp} + ${reward.xpBonus}` })
-          .where(eq(users.id, member.userId));
-        await addStickerToUserSettings(db, member.userId, reward.stickerId);
-      })
-    );
+    await grantMonthlyReward(db, { entry, period, rank, approvedBy, approvedAt: now, mode: 'manual_publish' });
   }
 
-  return getLeaderboard(db, { period, limit: 25 });
+  return getLeaderboard(db, { period, limit: 50, skipAutoFinalize: true });
 }
