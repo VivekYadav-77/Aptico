@@ -54,6 +54,16 @@ function parsePeriod(period) {
   return toPeriod();
 }
 
+function requireNotFuturePeriod(period) {
+  const safePeriod = parsePeriod(period);
+  if (safePeriod > toPeriod()) {
+    const error = new Error('Future leaderboard periods are not available.');
+    error.statusCode = 400;
+    throw error;
+  }
+  return safePeriod;
+}
+
 export function getPeriodBounds(period = toPeriod()) {
   const safePeriod = parsePeriod(period);
   const start = new Date(`${safePeriod}-01T00:00:00Z`);
@@ -630,7 +640,7 @@ async function getCurrentSquadId(db, userId) {
 }
 
 export async function getLeaderboard(db, { period: periodInput, limit = 50, userId = null, includeMyRank = false, skipAutoFinalize = false } = {}) {
-  const period = parsePeriod(periodInput);
+  const period = requireNotFuturePeriod(periodInput);
   if (!skipAutoFinalize) {
     await autoFinalizeClosedPeriodIfNeeded(db, period);
   }
@@ -665,7 +675,7 @@ export async function getLeaderboard(db, { period: periodInput, limit = 50, user
 }
 
 export async function getMyLeaderboardRank(db, userId, periodInput) {
-  const period = parsePeriod(periodInput);
+  const period = requireNotFuturePeriod(periodInput);
   const leaderboard = await getLeaderboard(db, { period, limit: 100, userId, includeMyRank: true });
   return {
     period,
@@ -703,7 +713,7 @@ async function addStickerToUserSettings(db, userId, stickerId) {
 }
 
 export async function finalizeMonthlyLeaderboard(db, { period: periodInput, approvedBy, approvedSquadIds = null, disqualifiedSquadIds = [], action = 'publish_top_3', squadId = null }) {
-  const period = parsePeriod(periodInput);
+  const period = requireNotFuturePeriod(periodInput);
   const disqualified = new Set(disqualifiedSquadIds || []);
   const leaderboard = await getLeaderboard(db, { period, limit: 100, skipAutoFinalize: true });
   const eligibleEntries = leaderboard.entries.filter((entry) => !disqualified.has(entry.squadId));

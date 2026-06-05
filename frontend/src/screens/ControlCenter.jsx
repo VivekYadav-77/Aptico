@@ -46,6 +46,11 @@ function getCurrentPeriod() {
   return new Date().toISOString().slice(0, 7);
 }
 
+function clampPeriod(value) {
+  const currentPeriod = getCurrentPeriod();
+  return value && value <= currentPeriod ? value : currentPeriod;
+}
+
 export default function ControlCenter() {
   const auth = useSelector(selectAuth);
   const [roleCheckComplete, setRoleCheckComplete] = useState(false);
@@ -180,6 +185,7 @@ export default function ControlCenter() {
 
   if (!roleCheckComplete) return null;
   if (!isAuthorized) return <Navigate replace to="/" />;
+  const currentPeriod = getCurrentPeriod();
 
   return (
     <AppShell
@@ -267,7 +273,8 @@ export default function ControlCenter() {
                 <input
                   type="month"
                   value={leaderboardPeriod}
-                  onChange={(event) => setLeaderboardPeriod(event.target.value || getCurrentPeriod())}
+                  max={currentPeriod}
+                  onChange={(event) => setLeaderboardPeriod(clampPeriod(event.target.value))}
                   className="app-input h-10 w-40"
                 />
                 <button type="button" onClick={() => finalizeLeaderboard({ action: 'promote_next_eligible' })} className="app-button-secondary" disabled={leaderboardLoading || !(leaderboardReview?.entries || []).length}>

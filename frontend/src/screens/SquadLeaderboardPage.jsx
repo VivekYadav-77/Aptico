@@ -25,6 +25,11 @@ function getCurrentPeriod() {
   return new Date().toISOString().slice(0, 7);
 }
 
+function clampPeriod(value) {
+  const currentPeriod = getCurrentPeriod();
+  return value && value <= currentPeriod ? value : currentPeriod;
+}
+
 function formatPeriod(period) {
   if (!period) return 'This month';
   const date = new Date(`${period}-01T00:00:00Z`);
@@ -177,6 +182,7 @@ export default function SquadLeaderboardPage() {
   const podium = useMemo(() => leaderboard?.podium?.length ? leaderboard.podium : [entries[0], entries[1], entries[2]], [entries, leaderboard?.podium]);
   const myRank = leaderboard?.myRank || null;
   const shouldPinMyRank = myRank && !entries.some((entry) => entry.squadId === myRank.squadId);
+  const currentPeriod = getCurrentPeriod();
 
   return (
     <AppShell
@@ -188,7 +194,8 @@ export default function SquadLeaderboardPage() {
           <input
             type="month"
             value={period}
-            onChange={(event) => setPeriod(event.target.value || getCurrentPeriod())}
+            max={currentPeriod}
+            onChange={(event) => setPeriod(clampPeriod(event.target.value))}
             className="app-input h-10 w-40"
           />
         </label>

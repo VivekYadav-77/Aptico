@@ -3,6 +3,7 @@ import { describe, it } from 'node:test';
 import {
   buildRankedLeaderboardFromRows,
   canAutoApprove,
+  getLeaderboard,
   getReviewReasons,
   getPeriodBounds,
   REWARD_BY_RANK
@@ -182,5 +183,12 @@ describe('Squad leaderboard scoring', () => {
       'not_enough_active_members',
       'not_enough_eligible_points'
     ]);
+  });
+
+  it('rejects future leaderboard periods', async () => {
+    await assert.rejects(
+      () => getLeaderboard(null, { period: '2999-01' }),
+      (error) => error.statusCode === 400 && error.message === 'Future leaderboard periods are not available.'
+    );
   });
 });
