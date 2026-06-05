@@ -161,6 +161,9 @@ describe('Recruiter Shadow Resume prompt', () => {
     assert.match(prompt, /That information is not available in the public profile data\./);
     assert.match(prompt, /Answer using ONLY the public candidate data supplied below\./);
     assert.match(prompt, /Do not invent experience, education, projects, companies, dates, achievements, links, certifications, metrics, or skills\./);
+    assert.match(prompt, /Write like an experienced recruiter briefing a hiring manager/);
+    assert.match(prompt, /\*\*Summary:\*\*/);
+    assert.match(prompt, /\*\*Recruiter takeaways:\*\*/);
     assert.match(prompt, /Recruiter question: What is their salary expectation\?/);
   });
 

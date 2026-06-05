@@ -23,6 +23,139 @@ function getInitials(name) {
     .join('') || 'A';
 }
 
+function renderInlineText(text, keyPrefix) {
+  const parts = [];
+  const pattern = /(\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)|\*\*([^*]+)\*\*)/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      parts.push(text.slice(lastIndex, match.index));
+    }
+
+    if (match[2] && match[3]) {
+      parts.push(
+        <a
+          key={`${keyPrefix}-link-${match.index}`}
+          href={match[3]}
+          target="_blank"
+          rel="noreferrer"
+          className="font-bold text-[var(--accent-strong)] underline decoration-[var(--accent)]/30 underline-offset-4 transition hover:text-[var(--accent)]"
+        >
+          {match[2]}
+        </a>
+      );
+    } else if (match[4]) {
+      parts.push(
+        <strong key={`${keyPrefix}-strong-${match.index}`} className="font-black text-[var(--text)]">
+          {match[4]}
+        </strong>
+      );
+    }
+
+    lastIndex = pattern.lastIndex;
+  }
+
+  if (lastIndex < text.length) {
+    parts.push(text.slice(lastIndex));
+  }
+
+  return parts.length ? parts : text;
+}
+
+function renderTextBlock(text, keyPrefix) {
+  const lines = String(text || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const listItems = lines.filter((line) => /^[-*•]\s+/.test(line));
+
+  if (lines.length > 1 && listItems.length === lines.length) {
+    return (
+      <ul className="space-y-2">
+        {lines.map((line, index) => (
+          <li key={`${keyPrefix}-li-${index}`} className="flex gap-2 text-sm leading-6 text-[var(--text)]">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--accent)]" />
+            <span>{renderInlineText(line.replace(/^[-*•]\s+/, ''), `${keyPrefix}-li-${index}`)}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  return (
+    <p className="text-sm leading-7 text-[var(--text)]">
+      {renderInlineText(lines.join(' '), keyPrefix)}
+    </p>
+  );
+}
+
+function parseAssistantSections(content) {
+  const text = String(content || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+  const sectionPattern = /\*\*([^*\n]{2,80}?)\*\*/g;
+  const matches = [...text.matchAll(sectionPattern)].filter((match) => match[1].trim().endsWith(':'));
+
+  if (matches.length < 2) {
+    return { intro: text, sections: [] };
+  }
+
+  const intro = text.slice(0, matches[0].index).trim();
+  const sections = matches.map((match, index) => {
+    const nextMatch = matches[index + 1];
+    return {
+      title: match[1].replace(/:$/, '').trim(),
+      body: text.slice(match.index + match[0].length, nextMatch?.index ?? text.length).trim()
+    };
+  }).filter((section) => section.title && section.body);
+
+  return { intro, sections };
+}
+
+function AssistantMessageContent({ content }) {
+  const { intro, sections } = parseAssistantSections(content);
+
+  if (!sections.length) {
+    return (
+      <div className="space-y-3">
+        {String(content || '')
+          .split(/\n{2,}/)
+          .map((block) => block.trim())
+          .filter(Boolean)
+          .map((block, index) => (
+            <div key={`assistant-block-${index}`}>{renderTextBlock(block, `assistant-block-${index}`)}</div>
+          ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {intro ? (
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)]/70 px-4 py-3">
+          {renderTextBlock(intro, 'assistant-intro')}
+        </div>
+      ) : null}
+
+      <div className="grid gap-3">
+        {sections.map((section, index) => (
+          <section key={`${section.title}-${index}`} className="rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)]/55 px-4 py-3">
+            <div className="mb-2 flex items-center gap-2">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent-strong)]">
+                <span className="material-symbols-outlined text-[14px]">verified</span>
+              </span>
+              <h3 className="text-[11px] font-black uppercase tracking-[0.18em] text-[var(--accent-strong)]">
+                {section.title}
+              </h3>
+            </div>
+            {section.body ? renderTextBlock(section.body, `assistant-section-${index}`) : null}
+          </section>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function ShadowResume() {
   const { username } = useParams();
   const [profile, setProfile] = useState(null);
@@ -269,10 +402,10 @@ export default function ShadowResume() {
           </div>
         </aside>
 
-        <section className="flex min-h-[720px] flex-col overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--panel)]/90 backdrop-blur-md shadow-[0_20px_80px_rgba(0,0,0,0.08)] relative">
+        <section className="relative flex h-[calc(100vh-4rem)] min-h-[620px] max-h-[760px] min-w-0 flex-col overflow-hidden rounded-[28px] border border-[var(--border)] bg-[var(--panel)]/90 backdrop-blur-md shadow-[0_20px_80px_rgba(0,0,0,0.08)]">
           <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-[var(--accent)]/40 to-transparent" />
           
-          <div className="relative border-b border-[var(--border)]/60 bg-[var(--panel-soft)]/50 px-8 py-6 flex flex-col justify-center backdrop-blur-sm z-10">
+          <div className="relative z-10 flex shrink-0 flex-col justify-center border-b border-[var(--border)]/60 bg-[var(--panel-soft)]/50 px-6 py-5 backdrop-blur-sm sm:px-8 sm:py-6">
             <div className="flex items-center gap-3 mb-2">
                <div className="comms-pulse-active w-2.5 h-2.5 bg-[var(--accent)] rounded-full" />
                <p className="app-kicker !mb-0 text-[var(--accent)] tracking-[0.2em]">
@@ -287,8 +420,8 @@ export default function ShadowResume() {
             </p>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-8 py-6 custom-scrollbar bg-[var(--panel)] relative z-0">
-            <div className="flex flex-wrap gap-2 pb-8 sticky top-0 bg-gradient-to-b from-[var(--panel)] via-[var(--panel)] to-transparent pt-2 z-10">
+          <div className="custom-scrollbar relative z-0 min-h-0 flex-1 overflow-y-auto bg-[var(--panel)] px-5 py-5 sm:px-8 sm:py-6">
+            <div className="mb-6 flex flex-wrap gap-2 border-b border-[var(--border)]/50 pb-5">
               {suggestedPrompts.map((prompt) => (
                 <button
                   key={prompt}
@@ -309,7 +442,7 @@ export default function ShadowResume() {
                   className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in-up`}
                 >
                   <div
-                    className={`relative max-w-[85%] rounded-[24px] px-6 py-4 text-[14px] leading-relaxed shadow-md ${
+                    className={`relative max-w-[92%] rounded-[24px] px-5 py-4 text-[14px] leading-relaxed shadow-md sm:px-6 lg:max-w-[86%] ${
                       message.role === 'user'
                         ? 'bg-gradient-to-br from-[var(--accent)] to-[#2fa875] text-[#042b1c] rounded-br-[8px] font-medium border border-transparent'
                         : 'border border-[var(--border)] bg-[var(--panel)] text-[var(--text)] rounded-bl-[8px]'
@@ -320,7 +453,7 @@ export default function ShadowResume() {
                           <span className="material-symbols-outlined text-[14px] text-[var(--accent)]">smart_toy</span>
                        </div>
                     )}
-                    {message.content}
+                    {message.role === 'assistant' ? <AssistantMessageContent content={message.content} /> : message.content}
                   </div>
                 </div>
               ))}
@@ -343,7 +476,7 @@ export default function ShadowResume() {
             </div>
           </div>
 
-          <div className="border-t border-[var(--border)]/60 bg-[var(--panel-soft)]/30 px-8 py-5 backdrop-blur-md relative z-10">
+          <div className="relative z-10 shrink-0 border-t border-[var(--border)]/60 bg-[var(--panel-soft)]/30 px-5 py-4 backdrop-blur-md sm:px-8 sm:py-5">
             {error ? (
               <div className="mb-4 rounded-2xl border border-[var(--danger-border)] bg-[var(--danger-soft)] px-4 py-3 text-[13px] text-red-500 flex items-center gap-2 shadow-sm animate-fade-in-up">
                  <span className="material-symbols-outlined text-[18px]">error</span>
