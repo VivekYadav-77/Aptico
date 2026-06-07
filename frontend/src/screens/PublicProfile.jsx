@@ -662,9 +662,22 @@ export default function PublicProfile() {
                                   <StickerShowcase 
                                     equippedStickers={profile.enriched_settings.equippedStickers || []} 
                                     unlockedStickers={profile.enriched_settings.unlockedStickers || []}
+                                    squadRewardHistory={profile.enriched_settings.squadRewardHistory || []}
                                     userName={profile.name || username}
                                     onSeeAll={() => setStickerGalleryOpen(true)}
                                   />
+                              </div>
+                            )}
+
+                            {profile.enriched_settings?.squadProofSummary?.totalClaimed > 0 && (
+                              <div className="mt-5 rounded-2xl border border-[var(--accent)]/20 bg-[var(--accent)]/10 p-4 backdrop-blur-sm">
+                                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--accent-strong)]">Squad Proof</p>
+                                <p className="mt-2 text-sm font-bold leading-6 text-[var(--text)]">
+                                  Best monthly finish #{profile.enriched_settings.squadProofSummary.bestRank} · {profile.enriched_settings.squadProofSummary.totalClaimed} verified squad reward{profile.enriched_settings.squadProofSummary.totalClaimed === 1 ? '' : 's'}
+                                </p>
+                                <p className="mt-1 text-xs leading-5 text-[var(--muted-strong)]">
+                                  Latest: {profile.enriched_settings.squadProofSummary.latest?.title} earned {profile.enriched_settings.squadProofSummary.latest?.periodLabel || profile.enriched_settings.squadProofSummary.latest?.period} with {profile.enriched_settings.squadProofSummary.latest?.squadName}.
+                                </p>
                               </div>
                             )}
                           </div>
@@ -1422,6 +1435,7 @@ export default function PublicProfile() {
           isOpen={stickerGalleryOpen} 
           onClose={() => setStickerGalleryOpen(false)} 
           unlockedStickers={profile?.enriched_settings?.unlockedStickers || []} 
+          squadRewardHistory={profile?.enriched_settings?.squadRewardHistory || []}
           userName={profile?.name || username}
         />
       )}

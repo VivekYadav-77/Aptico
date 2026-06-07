@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import AppShell from '../components/AppShell.jsx';
-import { getSquadLeaderboard } from '../api/squadApi.js';
+import { getSquadLeaderboard, getSquadRewardHistory } from '../api/squadApi.js';
 
 const REWARD_PREVIEW = {
   1: {
@@ -356,7 +356,7 @@ function PreviousWinnersPanel({ leaderboard, period }) {
   );
 }
 
-function RankRow({ entry, maxScore, index }) {
+function RankRow({ entry, maxScore, index, onHistory }) {
   const integrityTone = entry.suspiciousEventCount ? 'text-amber-300' : 'text-emerald-300';
 
   return (
@@ -414,8 +414,12 @@ function RankRow({ entry, maxScore, index }) {
               <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--muted-strong)]">score</p>
             </div>
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-end gap-2">
             <RewardStatus entry={entry} />
+            <button type="button" onClick={() => onHistory?.(entry)} className="app-button-secondary !px-3 !py-1.5 text-xs">
+              <span className="material-symbols-outlined text-[15px]">history</span>
+              History
+            </button>
           </div>
         </div>
       </div>
@@ -567,13 +571,99 @@ function PinnedMyRank({ myRank }) {
   );
 }
 
+function SquadHistoryModal({ history, loading, error, onClose }) {
+  if (!history && !loading && !error) return null;
+
+  return (
+    <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/60 p-4 backdrop-blur-md" onClick={onClose}>
+      <div className="max-h-[88vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="app-kicker">Squad history</p>
+            <h2 className="mt-2 text-2xl font-black text-[var(--text)]">{history?.squadName || 'Squad performance'}</h2>
+          </div>
+          <button type="button" onClick={onClose} className="app-button-secondary !h-10 !w-10 !p-0" aria-label="Close squad history">
+            <span className="material-symbols-outlined text-[18px]">close</span>
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="mt-6 space-y-3">
+            {[1, 2, 3].map((item) => <div key={item} className="h-20 rounded-xl skeleton-shimmer" />)}
+          </div>
+        ) : error ? (
+          <div className="mt-6 rounded-xl border border-[var(--danger-border)] bg-[var(--danger-soft)] p-4 text-sm font-bold text-rose-300">{error}</div>
+        ) : (
+          <>
+            <div className="mt-6 grid gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-4">
+                <p className="text-2xl font-black text-[var(--text)]">{history?.bestRank ? `#${history.bestRank}` : '-'}</p>
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--muted-strong)]">best finish</p>
+              </div>
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-4">
+                <p className="text-2xl font-black text-[var(--text)]">{history?.podiumFinishes || 0}</p>
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--muted-strong)]">podiums</p>
+              </div>
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-4">
+                <p className="text-2xl font-black text-[var(--text)]">{history?.rewardWins || 0}</p>
+                <p className="text-xs font-bold uppercase tracking-[0.14em] text-[var(--muted-strong)]">rewards</p>
+              </div>
+            </div>
+
+            <div className="mt-6 space-y-3">
+              {(history?.entries || []).length ? history.entries.map((entry) => (
+                <div key={`${entry.period}-${entry.rank}`} className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-4">
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-black text-[var(--text)]">{formatPeriod(entry.period)} · Rank #{entry.rank || '-'}</p>
+                      <p className="mt-1 text-xs font-bold text-[var(--muted-strong)]">{entry.qualityScore} score · {entry.activeMemberCount} active members · {entry.suspiciousEventCount} integrity flags</p>
+                    </div>
+                    {entry.reward ? (
+                      <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-black text-emerald-300">
+                        <span className="material-symbols-outlined text-[15px]">verified</span>
+                        {entry.reward.title}
+                      </span>
+                    ) : (
+                      <span className="app-chip">No reward</span>
+                    )}
+                  </div>
+                </div>
+              )) : (
+                <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-6 text-center text-sm font-bold text-[var(--muted-strong)]">
+                  No monthly history has been cached for this squad yet.
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function SquadLeaderboardPage() {
   const [period, setPeriod] = useState(getCurrentPeriod());
   const [leaderboard, setLeaderboard] = useState(null);
   const [previousLeaderboard, setPreviousLeaderboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [historyState, setHistoryState] = useState({ loading: false, error: '', data: null });
   const currentPeriod = getCurrentPeriod();
+
+  async function openSquadHistory(entry) {
+    if (!entry?.squadId) return;
+    setHistoryState({ loading: true, error: '', data: { squadName: entry.squadName, entries: [] } });
+    try {
+      const response = await getSquadRewardHistory(entry.squadId, { limit: 12 });
+      setHistoryState({ loading: false, error: '', data: response.data || null });
+    } catch (apiError) {
+      setHistoryState({
+        loading: false,
+        error: apiError.response?.data?.error || 'Could not load squad history.',
+        data: { squadName: entry.squadName, entries: [] }
+      });
+    }
+  }
 
   async function loadLeaderboard() {
     setLoading(true);
@@ -677,7 +767,7 @@ export default function SquadLeaderboardPage() {
                 ) : entries.length ? (
                   <div className="space-y-3">
                     {entries.map((entry, index) => (
-                      <RankRow key={entry.squadId} entry={entry} maxScore={maxScore} index={index} />
+                      <RankRow key={entry.squadId} entry={entry} maxScore={maxScore} index={index} onHistory={openSquadHistory} />
                     ))}
                   </div>
                 ) : (
@@ -696,6 +786,12 @@ export default function SquadLeaderboardPage() {
           </aside>
         </div>
       </div>
+      <SquadHistoryModal
+        history={historyState.data}
+        loading={historyState.loading}
+        error={historyState.error}
+        onClose={() => setHistoryState({ loading: false, error: '', data: null })}
+      />
     </AppShell>
   );
 }

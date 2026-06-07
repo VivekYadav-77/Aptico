@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from '@/lib/router-compat.jsx';
 import AppShell from '../components/AppShell.jsx';
 import { fetchStickerStats, unlockSticker, equipStickers } from '../api/profileApi.js';
@@ -53,6 +53,98 @@ function reqLabel(req) {
 
 function getMonthlySquadRewardReadiness(req, stats) {
   return (stats.monthlySquadRewardReadiness || []).find((item) => Number(item.rank) === Number(req.value)) || null;
+}
+
+function isMonthlySquadSticker(sticker) {
+  return sticker?.requirement?.type === 'monthly_squad_reward';
+}
+
+function getSquadProofForSticker(history = [], stickerId) {
+  return (history || []).filter((item) => item.stickerId === stickerId);
+}
+
+function SquadRewardsSection({ stats, unlockedIds, equippedIds, squadRewardHistory, onUnlock, onToggleEquip, unlocking }) {
+  const monthlyStickers = STICKER_REGISTRY.filter(isMonthlySquadSticker);
+
+  return (
+    <section className="rounded-2xl border border-[var(--accent)]/20 bg-[var(--panel)]/80 p-6 shadow-sm">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--accent-strong)]">Squad Rewards</p>
+          <h2 className="mt-2 text-2xl font-black text-[var(--text)]">Verified monthly squad proof</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--muted-strong)]">
+            Awarded for consistent, clean contribution to a top monthly squad. Previous months stay as permanent profile proof.
+          </p>
+        </div>
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] px-4 py-3 text-sm font-black text-[var(--text)]">
+          {squadRewardHistory.length} claimed
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-3">
+        {monthlyStickers.map((sticker) => {
+          const readiness = getMonthlySquadRewardReadiness(sticker.requirement, stats || {});
+          const proofs = getSquadProofForSticker(squadRewardHistory, sticker.id);
+          const latestProof = proofs[0] || null;
+          const isUnlocked = unlockedIds.includes(sticker.id);
+          const isEquipped = equippedIds.includes(sticker.id);
+          const rc = RARITY_CONFIG[sticker.rarity];
+          const pct = Number(readiness?.progress || (isUnlocked ? 100 : 0));
+
+          return (
+            <article key={sticker.id} className={`rounded-2xl border ${rc.border} ${isUnlocked ? rc.bg : 'bg-[var(--panel-soft)]/45'} p-5`}>
+              <div className="flex items-start gap-4">
+                <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border ${rc.border} bg-white/10`}>
+                  <StickerIcon sticker={sticker} size={56} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className={`text-base font-black ${rc.textColor}`}>{sticker.name}</p>
+                  <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-[var(--muted-strong)]">Rank #{sticker.requirement.value} reward</p>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--panel)]/70 p-4">
+                {latestProof ? (
+                  <>
+                    <p className="text-sm font-black text-[var(--text)]">{latestProof.title}</p>
+                    <p className="mt-1 text-xs leading-5 text-[var(--muted-strong)]">
+                      Earned {latestProof.periodLabel || latestProof.period} with {latestProof.squadName}. {latestProof.verificationLabel}.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-sm font-black text-[var(--text)]">{readiness?.status ? readiness.status.replace(/_/g, ' ') : 'Not ready'}</p>
+                    <p className="mt-1 text-xs leading-5 text-[var(--muted-strong)]">{readiness?.copy || 'Build clean contribution across multiple days.'}</p>
+                  </>
+                )}
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--border)]">
+                  <div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.max(0, Math.min(100, pct))}%`, background: sticker.color }} />
+                </div>
+              </div>
+
+              {proofs.length > 1 ? (
+                <p className="mt-3 text-xs font-bold text-[var(--muted-strong)]">Also earned {proofs.length - 1} earlier month{proofs.length - 1 === 1 ? '' : 's'}.</p>
+              ) : null}
+
+              <div className="mt-4 flex gap-2">
+                {readiness?.claimable ? (
+                  <button onClick={() => onUnlock(sticker.id)} disabled={unlocking === sticker.id} className="flex-1 rounded-xl bg-gradient-to-r from-[var(--accent)] to-[var(--accent-strong)] px-3 py-2 text-xs font-bold text-white shadow-lg transition-all hover:scale-[1.02] disabled:opacity-50">
+                    {unlocking === sticker.id ? 'Claiming...' : latestProof ? 'Claim New Month' : 'Claim Reward'}
+                  </button>
+                ) : isUnlocked ? (
+                  <button onClick={() => onToggleEquip(sticker.id)} className={`flex-1 rounded-xl px-3 py-2 text-xs font-bold transition-all ${isEquipped ? 'bg-[var(--accent)] text-white shadow-md' : 'border border-[var(--border)] text-[var(--text)] hover:border-[var(--accent)] hover:text-[var(--accent-strong)]'}`}>
+                    {isEquipped ? 'Showcased' : 'Add to Showcase'}
+                  </button>
+                ) : (
+                  <div className="flex-1 rounded-xl border border-dashed border-[var(--border)] px-3 py-2 text-center text-[10px] font-bold uppercase tracking-wider text-[var(--muted)]">Locked</div>
+                )}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
 }
 
 function formatRequirementCopy(req, isUnlocked = false) {
@@ -188,6 +280,7 @@ export default function RewardsPage() {
   const [stats, setStats] = useState(null);
   const [unlockedIds, setUnlockedIds] = useState([]);
   const [equippedIds, setEquippedIds] = useState([]);
+  const [squadRewardHistory, setSquadRewardHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('milestone');
   const [confetti, setConfetti] = useState(false);
@@ -197,7 +290,12 @@ export default function RewardsPage() {
 
   useEffect(() => {
     fetchStickerStats()
-      .then((data) => { setStats(data.stats); setUnlockedIds(data.unlockedStickers || []); setEquippedIds(data.equippedStickers || []); })
+      .then((data) => {
+        setStats(data.stats);
+        setUnlockedIds(data.unlockedStickers || []);
+        setEquippedIds(data.equippedStickers || []);
+        setSquadRewardHistory(data.squadRewardHistory || []);
+      })
       .catch(() => setToast('Failed to load sticker data.'))
       .finally(() => setLoading(false));
   }, []);
@@ -207,6 +305,7 @@ export default function RewardsPage() {
     try {
       const result = await unlockSticker(stickerId);
       setUnlockedIds(result.unlockedStickers || []);
+      if (Array.isArray(result.squadRewardHistory)) setSquadRewardHistory(result.squadRewardHistory);
       if (!result.alreadyUnlocked) { setConfetti(true); setToast(`🎉 Unlocked: ${getStickerById(stickerId)?.name}!`); }
       else { setToast('Already unlocked!'); }
     } catch (e) { setToast(e?.response?.data?.error || 'Cannot unlock yet.'); }
@@ -225,7 +324,7 @@ export default function RewardsPage() {
     finally { setTimeout(() => setToast(''), 3000); }
   }
 
-  const filteredStickers = STICKER_REGISTRY.filter((s) => s.category === activeCategory);
+  const filteredStickers = useMemo(() => STICKER_REGISTRY.filter((s) => s.category === activeCategory && !isMonthlySquadSticker(s)), [activeCategory]);
 
   if (loading) {
     return (
@@ -297,6 +396,16 @@ export default function RewardsPage() {
         </div>
 
         {/* ── Showcase Preview ── */}
+        <SquadRewardsSection
+          stats={stats}
+          unlockedIds={unlockedIds}
+          equippedIds={equippedIds}
+          squadRewardHistory={squadRewardHistory}
+          onUnlock={handleUnlock}
+          onToggleEquip={handleToggleEquip}
+          unlocking={unlocking}
+        />
+
         {equippedIds.length > 0 && (
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--panel)]/70 backdrop-blur-xl p-6 shadow-sm">
             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)] mb-4">Your Showcase (visible on profile)</p>
@@ -439,6 +548,7 @@ export default function RewardsPage() {
               const achievementLabel = isUnlocked ? 'Earned for' : 'How to unlock';
               const achievementCopy = isSecret ? 'Secret achievement. Keep exploring Aptico to discover this reward.' : formatRequirementCopy(s.requirement, isUnlocked);
               const meaningCopy = isSecret ? 'This reward stays hidden until you unlock it, so the exact value it represents is part of the discovery.' : getStickerMeaning(s);
+              const squadProofs = isMonthlySquadSticker(s) ? getSquadProofForSticker(squadRewardHistory, s.id) : [];
 
               return (
                 <>
@@ -460,6 +570,20 @@ export default function RewardsPage() {
                       <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--muted)]">Represents</p>
                       <p className="mt-1 text-sm font-semibold leading-relaxed text-[var(--text)]">{meaningCopy}</p>
                     </div>
+
+                    {squadProofs.length ? (
+                      <div>
+                        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--muted)]">Verified squad proof</p>
+                        <div className="mt-2 space-y-2">
+                          {squadProofs.slice(0, 3).map((proof) => (
+                            <div key={proof.rewardId || `${proof.period}-${proof.rank}`} className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3">
+                              <p className="text-sm font-black text-[var(--text)]">{proof.title} · Rank #{proof.rank}</p>
+                              <p className="mt-1 text-xs leading-5 text-[var(--muted-strong)]">Earned {proof.periodLabel || proof.period} with {proof.squadName}. {proof.verificationLabel}.</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
 
                     {!isUnlocked && !isSecret && (
                       <div>

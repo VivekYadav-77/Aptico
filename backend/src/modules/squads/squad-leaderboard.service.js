@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { and, eq, gte, inArray, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lt, sql } from 'drizzle-orm';
 import {
   squadMembers,
   squadMonthlyRewards,
@@ -666,6 +666,83 @@ export async function getMyLeaderboardRank(db, userId, periodInput) {
   return {
     period,
     entry: leaderboard.myRank || null
+  };
+}
+
+export async function getSquadRewardHistory(db, squadId, { limit = 12 } = {}) {
+  const safeLimit = Math.max(1, Math.min(36, Number(limit || 12)));
+  const scoreRows = await db
+    .select({
+      squadId: squadMonthlyScores.squadId,
+      squadName: squads.squadName,
+      period: squadMonthlyScores.period,
+      rank: squadMonthlyScores.rank,
+      qualityScore: squadMonthlyScores.qualityScore,
+      eligiblePoints: squadMonthlyScores.eligiblePoints,
+      spamPenalty: squadMonthlyScores.spamPenalty,
+      suspiciousEventCount: squadMonthlyScores.suspiciousEventCount,
+      activeMemberCount: squadMonthlyScores.activeMemberCount,
+      reviewStatus: squadMonthlyScores.reviewStatus,
+      publishedAt: squadMonthlyScores.publishedAt,
+      finalizedAt: squadMonthlyScores.finalizedAt,
+      metadata: squadMonthlyScores.metadata
+    })
+    .from(squadMonthlyScores)
+    .innerJoin(squads, eq(squadMonthlyScores.squadId, squads.id))
+    .where(eq(squadMonthlyScores.squadId, squadId))
+    .orderBy(desc(squadMonthlyScores.period))
+    .limit(safeLimit);
+
+  const rewardRows = await db
+    .select({
+      period: squadMonthlyRewards.period,
+      rank: squadMonthlyRewards.rank,
+      stickerId: squadMonthlyRewards.stickerId,
+      title: squadMonthlyRewards.title,
+      xpBonus: squadMonthlyRewards.xpBonus,
+      approvedAt: squadMonthlyRewards.approvedAt,
+      metadata: squadMonthlyRewards.metadata
+    })
+    .from(squadMonthlyRewards)
+    .where(eq(squadMonthlyRewards.squadId, squadId));
+  const rewardByPeriod = new Map(rewardRows.map((row) => [row.period, row]));
+
+  const entries = scoreRows.map((row) => {
+    const reward = rewardByPeriod.get(row.period) || null;
+    return {
+      squadId: row.squadId,
+      squadName: row.squadName,
+      period: row.period,
+      rank: Number(row.rank || 0),
+      qualityScore: Number(row.qualityScore || 0),
+      eligiblePoints: Number(row.eligiblePoints || 0),
+      spamPenalty: Number(row.spamPenalty || 0),
+      suspiciousEventCount: Number(row.suspiciousEventCount || 0),
+      activeMemberCount: Number(row.activeMemberCount || 0),
+      reviewStatus: row.reviewStatus,
+      publishedAt: row.publishedAt,
+      finalizedAt: row.finalizedAt,
+      reward: reward
+        ? {
+            rank: Number(reward.rank),
+            stickerId: reward.stickerId,
+            title: reward.title,
+            xpBonus: Number(reward.xpBonus || 0),
+            approvedAt: reward.approvedAt,
+            mode: reward.metadata?.mode || 'manual'
+          }
+        : null
+    };
+  });
+
+  return {
+    squadId,
+    squadName: entries[0]?.squadName || null,
+    bestRank: entries.length ? Math.min(...entries.map((entry) => entry.rank || 999)) : null,
+    podiumFinishes: entries.filter((entry) => entry.rank > 0 && entry.rank <= 3).length,
+    rewardWins: entries.filter((entry) => entry.reward).length,
+    latest: entries[0] || null,
+    entries
   };
 }
 

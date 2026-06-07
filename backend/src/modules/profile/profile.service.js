@@ -171,6 +171,40 @@ function normalizeTopProjects(topProjects, featured = []) {
     : [];
 }
 
+function formatSquadRewardPeriod(period) {
+  if (!period) return '';
+  const date = new Date(`${period}-01T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return period;
+  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
+
+function normalizePublicSquadRewardHistory(history = []) {
+  if (!Array.isArray(history)) return [];
+  const seen = new Set();
+  return history
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => ({
+      rewardId: item.rewardId ? String(item.rewardId) : '',
+      stickerId: String(item.stickerId || ''),
+      title: String(item.title || 'Monthly Squad Reward'),
+      rank: Number(item.rank || 0),
+      period: String(item.period || ''),
+      periodLabel: String(item.periodLabel || formatSquadRewardPeriod(item.period)),
+      squadName: String(item.squadName || 'Winning squad'),
+      claimedAt: item.claimedAt ? String(item.claimedAt) : '',
+      verificationLabel: String(item.verificationLabel || 'Aptico verified clean monthly contribution'),
+      xpBonus: Number(item.xpBonus || 0)
+    }))
+    .filter((item) => {
+      if (!item.stickerId || !item.rank || !item.period) return false;
+      const key = item.rewardId || `${item.squadName}:${item.period}:${item.rank}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => String(b.period).localeCompare(String(a.period)) || Number(a.rank) - Number(b.rank));
+}
+
 function calculateLongestStreak(dateKeys) {
   if (!dateKeys.length) {
     return 0;
@@ -698,7 +732,19 @@ export async function getPublicProfile(db, username, viewerId = null) {
     banner_url: rawSettings.banner_url || null,
     banner_preference: rawSettings.banner_preference || 'badge',
     equippedStickers: Array.isArray(rawSettings.equippedStickers) ? rawSettings.equippedStickers : [],
-    unlockedStickers: Array.isArray(rawSettings.unlockedStickers) ? rawSettings.unlockedStickers : []
+    unlockedStickers: Array.isArray(rawSettings.unlockedStickers) ? rawSettings.unlockedStickers : [],
+    squadRewardHistory: normalizePublicSquadRewardHistory(rawSettings.squadRewardHistory),
+    squadProofSummary: (() => {
+      const history = normalizePublicSquadRewardHistory(rawSettings.squadRewardHistory);
+      const latest = history[0] || null;
+      const bestRank = history.length ? Math.min(...history.map((item) => Number(item.rank || 99))) : null;
+      return {
+        totalClaimed: history.length,
+        bestRank,
+        latest,
+        currentSquad: latest?.squadName || null
+      };
+    })()
   };
 
   // About section

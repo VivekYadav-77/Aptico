@@ -12,7 +12,7 @@ function StickerIcon({ sticker, size = 32 }) {
  * (avoiding overflow-hidden traps in nested containers).
  * @param {{ equippedStickers: string[], unlockedStickers: string[], userName: string, onSeeAll: () => void }} props
  */
-export default function StickerShowcase({ equippedStickers = [], unlockedStickers = [], userName = 'User', onSeeAll }) {
+export default function StickerShowcase({ equippedStickers = [], unlockedStickers = [], squadRewardHistory = [], userName = 'User', onSeeAll }) {
   const [activeTooltip, setActiveTooltip] = useState(null);
 
   const stickers = useMemo(() => {
@@ -48,6 +48,7 @@ export default function StickerShowcase({ equippedStickers = [], unlockedSticker
           const rc = RARITY_CONFIG[s.rarity];
           const isHovered = activeTooltip === s.id;
           const category = STICKER_CATEGORIES?.find(c => c.id === s.category)?.name || 'Achievement';
+          const squadProof = (squadRewardHistory || []).find((item) => item.stickerId === s.id);
 
           return (
             <div
@@ -76,6 +77,14 @@ export default function StickerShowcase({ equippedStickers = [], unlockedSticker
                     </div>
                     <p className={`text-sm font-black leading-tight ${rc.textColor}`}>{s.name}</p>
                     <p className="mt-1.5 text-xs text-[var(--text)] leading-relaxed opacity-90">{s.description}</p>
+                    {squadProof ? (
+                      <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-3 text-left">
+                        <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[var(--muted)]">Verified squad proof</p>
+                        <p className="mt-1 text-xs font-bold leading-5 text-[var(--text)]">
+                          Rank #{squadProof.rank} in {squadProof.periodLabel || squadProof.period} with {squadProof.squadName}.
+                        </p>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               )}

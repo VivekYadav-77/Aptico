@@ -549,7 +549,22 @@ export default function ProfilePage() {
 
                         {profile.equippedStickers?.length > 0 && (
                           <div className="mt-5">
-                            <StickerShowcase equippedStickers={profile.equippedStickers} />
+                            <StickerShowcase
+                              equippedStickers={profile.equippedStickers}
+                              squadRewardHistory={profile.squadRewardHistory || []}
+                            />
+                          </div>
+                        )}
+
+                        {profile.squadRewardHistory?.length > 0 && (
+                          <div className="mt-5 rounded-2xl border border-[var(--accent)]/20 bg-[var(--accent)]/10 p-4">
+                            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--accent-strong)]">Squad Proof</p>
+                            <p className="mt-2 text-sm font-bold leading-6 text-[var(--text)]">
+                              Best monthly finish #{Math.min(...profile.squadRewardHistory.map((item) => Number(item.rank || 99)))} · {profile.squadRewardHistory.length} verified reward{profile.squadRewardHistory.length === 1 ? '' : 's'}
+                            </p>
+                            <p className="mt-1 text-xs leading-5 text-[var(--muted-strong)]">
+                              Latest: {profile.squadRewardHistory[0]?.title} earned {profile.squadRewardHistory[0]?.periodLabel || profile.squadRewardHistory[0]?.period} with {profile.squadRewardHistory[0]?.squadName}.
+                            </p>
                           </div>
                         )}
 

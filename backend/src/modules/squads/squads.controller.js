@@ -1,8 +1,8 @@
 import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { applicationLogs, notifications, squadActivities, squadMembers, squads, users } from '../../db/schema.js';
+import { applicationLogs, notifications, profileSettings, squadActivities, squadMembers, squads, users } from '../../db/schema.js';
 import { applyXpDecayIfNeeded, calculateApplicationXp, getTodayIntegrityCounts, grantXp, shouldShadowban } from '../../shared/services/xp-engine.service.js';
-import { getLeaderboard, getMyLeaderboardRank, recordSquadScoreEvent } from './squad-leaderboard.service.js';
+import { getLeaderboard, getMyLeaderboardRank, getSquadRewardHistory, recordSquadScoreEvent } from './squad-leaderboard.service.js';
 import {
   injectAppLoggedCommsEvent,
   injectDailyBriefingController,
@@ -25,6 +25,38 @@ const logAppSchema = z.object({
 const pingSchema = z.object({
   message: z.string().trim().max(140).optional().nullable()
 });
+
+const squadIdParamSchema = z.object({
+  squadId: z.string().uuid()
+});
+
+function normalizeSquadRewardHistory(history = []) {
+  if (!Array.isArray(history)) return [];
+  const seen = new Set();
+  return history
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => ({
+      rewardId: item.rewardId ? String(item.rewardId) : '',
+      stickerId: String(item.stickerId || ''),
+      title: String(item.title || 'Monthly Squad Reward'),
+      rank: Number(item.rank || 0),
+      period: String(item.period || ''),
+      periodLabel: String(item.periodLabel || item.period || ''),
+      squadId: item.squadId ? String(item.squadId) : '',
+      squadName: String(item.squadName || 'Winning squad'),
+      claimedAt: item.claimedAt ? String(item.claimedAt) : '',
+      verificationLabel: String(item.verificationLabel || 'Aptico verified clean monthly contribution'),
+      xpBonus: Number(item.xpBonus || 0)
+    }))
+    .filter((item) => {
+      if (!item.stickerId || !item.rank || !item.period) return false;
+      const key = item.rewardId || `${item.squadId}:${item.period}:${item.rank}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => String(b.period).localeCompare(String(a.period)) || Number(a.rank) - Number(b.rank));
+}
 
 const SQUAD_SIZE = 4;
 const DEFAULT_WEEKLY_GOAL = 40;
@@ -993,5 +1025,48 @@ export async function getMySquadLeaderboardRankController(request, reply) {
     });
   } catch (error) {
     return sendError(reply, error, 'Could not load your squad rank.');
+  }
+}
+
+export async function getMySquadRewardHistoryController(request, reply) {
+  try {
+    requireDatabase(request.server.db);
+    const rows = await request.server.db
+      .select({ settingsJson: profileSettings.settingsJson })
+      .from(profileSettings)
+      .where(eq(profileSettings.userId, request.auth.userId))
+      .limit(1);
+    const history = normalizeSquadRewardHistory(rows[0]?.settingsJson?.squadRewardHistory);
+
+    return reply.send({
+      success: true,
+      data: {
+        history,
+        summary: {
+          totalClaimed: history.length,
+          bestRank: history.length ? Math.min(...history.map((item) => Number(item.rank || 99))) : null,
+          latest: history[0] || null
+        }
+      }
+    });
+  } catch (error) {
+    return sendError(reply, error, 'Could not load squad reward history.');
+  }
+}
+
+export async function getSquadRewardHistoryController(request, reply) {
+  try {
+    requireDatabase(request.server.db);
+    const { squadId } = squadIdParamSchema.parse(request.params || {});
+    const history = await getSquadRewardHistory(request.server.db, squadId, {
+      limit: Number(request.query?.limit || 12)
+    });
+
+    return reply.send({
+      success: true,
+      data: history
+    });
+  } catch (error) {
+    return sendError(reply, error, 'Could not load squad history.');
   }
 }

@@ -5,7 +5,7 @@ import StickerVisual from './StickerVisual.jsx';
 /**
  * StickerInventoryModal - Displays all unlocked stickers for a user in a premium gallery view.
  */
-export default function StickerInventoryModal({ isOpen, onClose, unlockedStickers = [], userName = 'User' }) {
+export default function StickerInventoryModal({ isOpen, onClose, unlockedStickers = [], squadRewardHistory = [], userName = 'User' }) {
   const [activeCategory, setActiveCategory] = useState('all');
   const [hoveredSticker, setHoveredSticker] = useState(null);
 
@@ -137,6 +137,11 @@ export default function StickerInventoryModal({ isOpen, onClose, unlockedSticker
 
             {hoveredSticker ? (
               <div className="flex-1 flex flex-col p-12 items-center justify-center text-center animate-fade-in" key={hoveredSticker.id}>
+                {(() => {
+                  const squadProofs = (squadRewardHistory || []).filter((item) => item.stickerId === hoveredSticker.id);
+                  const latestProof = squadProofs[0] || null;
+                  return (
+                    <>
                 {/* Large Preview */}
                 <div className="relative mb-14 group">
                    <div className={`absolute inset-0 blur-[100px] opacity-30 transition-opacity duration-1000 ${RARITY_CONFIG[hoveredSticker.rarity].bg}`} />
@@ -172,6 +177,19 @@ export default function StickerInventoryModal({ isOpen, onClose, unlockedSticker
                   {hoveredSticker.description}
                 </p>
 
+                {latestProof ? (
+                  <div className="w-full max-w-sm p-6 rounded-[2rem] bg-emerald-500/[0.06] border border-emerald-400/15 text-left mb-6">
+                    <p className="text-[9px] font-black text-emerald-300 uppercase tracking-[0.35em] mb-3">Verified squad proof</p>
+                    <p className="text-base font-black text-white">{latestProof.title}</p>
+                    <p className="mt-2 text-sm leading-6 text-white/55">
+                      Rank #{latestProof.rank} in {latestProof.periodLabel || latestProof.period} with {latestProof.squadName}. {latestProof.verificationLabel}.
+                    </p>
+                    {squadProofs.length > 1 ? (
+                      <p className="mt-3 text-xs font-bold uppercase tracking-[0.18em] text-white/30">{squadProofs.length} verified months</p>
+                    ) : null}
+                  </div>
+                ) : null}
+
                 {/* Requirement Met Card */}
                 {hoveredSticker.requirement && (
                   <div className="w-full max-w-xs p-8 rounded-[2rem] bg-white/[0.02] border border-white/[0.05] text-left relative overflow-hidden group hover:border-white/10 transition-colors">
@@ -196,6 +214,9 @@ export default function StickerInventoryModal({ isOpen, onClose, unlockedSticker
                     </div>
                   </div>
                 )}
+                    </>
+                  );
+                })()}
               </div>
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center p-12 text-center opacity-10">

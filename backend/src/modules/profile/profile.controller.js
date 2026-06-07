@@ -340,15 +340,22 @@ async function getStoredProfileSettings(db, userId) {
 export async function calculateMonthlySquadRewardReadiness(db, userId, rewardRank = null) {
   const rows = await db
     .select({
+      rewardId: squadMonthlyRewards.id,
       squadId: squadMonthlyRewards.squadId,
+      squadName: squads.squadName,
       period: squadMonthlyRewards.period,
       rank: squadMonthlyRewards.rank,
+      stickerId: squadMonthlyRewards.stickerId,
+      title: squadMonthlyRewards.title,
+      xpBonus: squadMonthlyRewards.xpBonus,
+      approvedAt: squadMonthlyRewards.approvedAt,
       eventType: squadScoreEvents.eventType,
       eligiblePoints: squadScoreEvents.eligiblePoints,
       spamStatus: squadScoreEvents.spamStatus,
       createdAt: squadScoreEvents.createdAt
     })
     .from(squadMonthlyRewards)
+    .innerJoin(squads, eq(squadMonthlyRewards.squadId, squads.id))
     .innerJoin(
       squadScoreEvents,
       and(
@@ -363,9 +370,15 @@ export async function calculateMonthlySquadRewardReadiness(db, userId, rewardRan
   for (const row of rows) {
     const key = `${row.squadId}:${row.period}:${row.rank}`;
     const current = grouped.get(key) || {
+      rewardId: row.rewardId,
       squadId: row.squadId,
+      squadName: row.squadName,
       period: row.period,
       rank: Number(row.rank),
+      stickerId: row.stickerId,
+      title: row.title,
+      xpBonus: Number(row.xpBonus || 0),
+      approvedAt: row.approvedAt,
       rows: []
     };
     current.rows.push(row);
@@ -373,9 +386,15 @@ export async function calculateMonthlySquadRewardReadiness(db, userId, rewardRan
   }
 
   return [...grouped.values()].map((group) => ({
+    rewardId: group.rewardId,
     squadId: group.squadId,
+    squadName: group.squadName,
     period: group.period,
     rank: group.rank,
+    stickerId: group.stickerId,
+    title: group.title,
+    xpBonus: group.xpBonus,
+    approvedAt: group.approvedAt,
     ...evaluateMonthlySquadRewardReadiness(group.rows, { hasPublishedReward: true })
   }));
 }
@@ -405,23 +424,31 @@ export async function upsertProfileSettingsController(request, reply) {
     const sanitizedBody = sanitizeProfileSettings(body);
 
     const existing = await request.server.db
-      .select({ id: profileSettings.id })
+      .select({ id: profileSettings.id, settingsJson: profileSettings.settingsJson })
       .from(profileSettings)
       .where(eq(profileSettings.userId, request.auth.userId))
       .limit(1);
+    const existingSettings = existing[0]?.settingsJson || {};
+    const preservedServerSettings = {
+      ...(Array.isArray(existingSettings.unlockedStickers) ? { unlockedStickers: existingSettings.unlockedStickers } : {}),
+      ...(Array.isArray(existingSettings.equippedStickers) ? { equippedStickers: existingSettings.equippedStickers } : {}),
+      ...(existingSettings.monthlySquadReward ? { monthlySquadReward: existingSettings.monthlySquadReward } : {}),
+      ...(Array.isArray(existingSettings.squadRewardHistory) ? { squadRewardHistory: normalizeSquadRewardHistory(existingSettings.squadRewardHistory) } : {})
+    };
+    const nextSettings = { ...sanitizedBody, ...preservedServerSettings };
 
     if (existing[0]) {
       await request.server.db
         .update(profileSettings)
         .set({
-          settingsJson: sanitizedBody,
+          settingsJson: nextSettings,
           updatedAt: new Date()
         })
         .where(eq(profileSettings.id, existing[0].id));
     } else {
       await request.server.db.insert(profileSettings).values({
         userId: request.auth.userId,
-        settingsJson: sanitizedBody
+        settingsJson: nextSettings
       });
     }
 
@@ -839,7 +866,70 @@ const MONTHLY_SQUAD_STICKER_XP = {
   event_squad_monthly_bronze: 100
 };
 
+const MONTHLY_SQUAD_STICKER_TITLE = {
+  event_squad_monthly_gold: 'Apex Crown Squad',
+  event_squad_monthly_silver: 'Silver Surge Squad',
+  event_squad_monthly_bronze: 'Bronze Spark Squad'
+};
+
 const MONTHLY_REWARD_HIGH_PROOF_EVENTS = new Set(['application', 'weekly_goal', 'synergy_burst', 'archetype_selected']);
+
+function formatSquadRewardPeriod(period) {
+  if (!period) return '';
+  const date = new Date(`${period}-01T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return period;
+  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
+
+function getSquadRewardKey(reward) {
+  return reward?.rewardId || `${reward?.squadId || 'squad'}:${reward?.period || 'period'}:${reward?.rank || 'rank'}`;
+}
+
+function normalizeSquadRewardHistory(history = []) {
+  if (!Array.isArray(history)) return [];
+  const seen = new Set();
+  const normalized = history
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => ({
+      rewardId: item.rewardId ? String(item.rewardId) : '',
+      stickerId: String(item.stickerId || ''),
+      title: String(item.title || MONTHLY_SQUAD_STICKER_TITLE[item.stickerId] || 'Monthly Squad Reward'),
+      rank: Number(item.rank || 0),
+      period: String(item.period || ''),
+      periodLabel: String(item.periodLabel || formatSquadRewardPeriod(item.period)),
+      squadId: item.squadId ? String(item.squadId) : '',
+      squadName: String(item.squadName || 'Winning squad'),
+      claimedAt: item.claimedAt ? String(item.claimedAt) : '',
+      verificationLabel: String(item.verificationLabel || 'Aptico verified clean monthly contribution'),
+      xpBonus: Number(item.xpBonus || MONTHLY_SQUAD_STICKER_XP[item.stickerId] || 0)
+    }))
+    .filter((item) => item.stickerId && item.rank && item.period);
+
+  return normalized
+    .filter((item) => {
+      const key = item.rewardId || `${item.squadId}:${item.period}:${item.rank}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => String(b.period).localeCompare(String(a.period)) || Number(a.rank) - Number(b.rank));
+}
+
+function buildSquadRewardProof(reward, stickerId) {
+  return {
+    rewardId: getSquadRewardKey(reward),
+    stickerId,
+    title: reward.title || MONTHLY_SQUAD_STICKER_TITLE[stickerId] || 'Monthly Squad Reward',
+    rank: Number(reward.rank),
+    period: reward.period,
+    periodLabel: formatSquadRewardPeriod(reward.period),
+    squadId: reward.squadId,
+    squadName: reward.squadName || 'Winning squad',
+    claimedAt: new Date().toISOString(),
+    verificationLabel: 'Aptico verified clean monthly contribution',
+    xpBonus: Number(reward.xpBonus || MONTHLY_SQUAD_STICKER_XP[stickerId] || 0)
+  };
+}
 
 function getUtcWeekKey(date) {
   const weekStart = new Date(date);
@@ -1019,9 +1109,26 @@ async function getUserStats(db, userId) {
       claimable
     }));
     stats.monthlySquadRewards = [...readinessByRank.values()].filter((row) => row.claimable).map((row) => Number(row.rank));
+    stats.monthlySquadRewardOptions = [...readinessByRank.values()].map(({ rewardId, squadId, squadName, period, rank, stickerId, title, xpBonus, approvedAt, status, copy, progress, claimable }) => ({
+      rewardId,
+      squadId,
+      squadName,
+      period,
+      periodLabel: formatSquadRewardPeriod(period),
+      rank,
+      stickerId,
+      title,
+      xpBonus,
+      approvedAt,
+      status,
+      copy,
+      progress,
+      claimable
+    }));
   } catch {
     stats.monthlySquadRewardReadiness = [];
     stats.monthlySquadRewards = [];
+    stats.monthlySquadRewardOptions = [];
   }
 
   // Night owl / Early bird (check if any app was logged between midnight–4am or 4am–6am)
@@ -1135,25 +1242,59 @@ export async function unlockStickerController(request, reply) {
     const existing = await getStoredProfileSettings(request.server.db, request.auth.userId);
     const settings = existing || {};
     const unlocked = Array.isArray(settings.unlockedStickers) ? [...settings.unlockedStickers] : [];
+    const req = STICKER_REQUIREMENTS[stickerId];
+    const isMonthlySquadSticker = req?.type === 'monthly_squad_reward';
+    const history = normalizeSquadRewardHistory(settings.squadRewardHistory);
 
-    if (unlocked.includes(stickerId)) {
+    if (unlocked.includes(stickerId) && !isMonthlySquadSticker) {
       return reply.send({ success: true, data: { alreadyUnlocked: true, unlockedStickers: unlocked } });
     }
 
     // Validate requirement
-    const req = STICKER_REQUIREMENTS[stickerId];
     const stats = await getUserStats(request.server.db, request.auth.userId);
+    let squadRewardProof = null;
 
-    if (!meetsRequirement(req, stats)) {
+    if (isMonthlySquadSticker) {
+      const claimedRewardIds = new Set(history.map((item) => item.rewardId || `${item.squadId}:${item.period}:${item.rank}`));
+      const rewardOptions = (await calculateMonthlySquadRewardReadiness(request.server.db, request.auth.userId, req.value))
+        .filter((item) => item.claimable)
+        .sort((a, b) => String(a.period).localeCompare(String(b.period)));
+      const nextReward = rewardOptions.find((item) => !claimedRewardIds.has(getSquadRewardKey(item)));
+      if (nextReward) {
+        squadRewardProof = buildSquadRewardProof(nextReward, stickerId);
+      } else if (unlocked.includes(stickerId)) {
+        return reply.send({
+          success: true,
+          data: {
+            alreadyUnlocked: true,
+            unlockedStickers: unlocked,
+            squadRewardHistory: history
+          }
+        });
+      }
+
+      if (!squadRewardProof) {
+        return reply.code(403).send({ success: false, error: 'You have not met the requirements for this sticker yet.' });
+      }
+    }
+
+    if (!squadRewardProof && !meetsRequirement(req, stats)) {
       return reply.code(403).send({ success: false, error: 'You have not met the requirements for this sticker yet.' });
     }
 
-    unlocked.push(stickerId);
-    const updatedSettings = { ...settings, unlockedStickers: unlocked };
+    if (!unlocked.includes(stickerId)) {
+      unlocked.push(stickerId);
+    }
+    const updatedHistory = squadRewardProof ? normalizeSquadRewardHistory([squadRewardProof, ...history]) : history;
+    const updatedSettings = {
+      ...settings,
+      unlockedStickers: unlocked,
+      ...(isMonthlySquadSticker ? { squadRewardHistory: updatedHistory } : {})
+    };
 
     const existingRow = await request.server.db.select({ id: profileSettings.id }).from(profileSettings).where(eq(profileSettings.userId, request.auth.userId)).limit(1);
 
-    const xpBonus = MONTHLY_SQUAD_STICKER_XP[stickerId] || 0;
+    const xpBonus = isMonthlySquadSticker ? Number(squadRewardProof?.xpBonus || 0) : MONTHLY_SQUAD_STICKER_XP[stickerId] || 0;
     if (xpBonus) {
       await request.server.db
         .update(users)
@@ -1168,7 +1309,15 @@ export async function unlockStickerController(request, reply) {
       await request.server.db.insert(profileSettings).values({ userId: request.auth.userId, settingsJson: updatedSettings });
     }
 
-    return reply.send({ success: true, data: { unlockedStickers: unlocked, newSticker: stickerId } });
+    return reply.send({
+      success: true,
+      data: {
+        unlockedStickers: unlocked,
+        newSticker: stickerId,
+        squadRewardHistory: updatedHistory,
+        squadRewardProof
+      }
+    });
   } catch (error) {
     return reply.code(error.statusCode || 500).send({ success: false, error: error.message || 'Could not unlock sticker.' });
   }
@@ -1228,7 +1377,8 @@ export async function getStickerStatsController(request, reply) {
       data: {
         stats,
         unlockedStickers: Array.isArray(settings.unlockedStickers) ? settings.unlockedStickers : [],
-        equippedStickers: Array.isArray(settings.equippedStickers) ? settings.equippedStickers : []
+        equippedStickers: Array.isArray(settings.equippedStickers) ? settings.equippedStickers : [],
+        squadRewardHistory: normalizeSquadRewardHistory(settings.squadRewardHistory)
       }
     });
   } catch (error) {
