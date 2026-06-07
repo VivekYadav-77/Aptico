@@ -1,13 +1,11 @@
 import crypto from 'node:crypto';
 import { and, eq, gte, inArray, lt, sql } from 'drizzle-orm';
 import {
-  profileSettings,
   squadMembers,
   squadMonthlyRewards,
   squadMonthlyScores,
   squadScoreEvents,
-  squads,
-  users
+  squads
 } from '../../db/schema.js';
 
 export const REWARD_BY_RANK = {
@@ -517,18 +515,6 @@ async function grantMonthlyReward(db, { entry, period, rank, approvedBy = null, 
     return false;
   }
 
-  const members = await db.select({ userId: squadMembers.userId }).from(squadMembers).where(eq(squadMembers.squadId, entry.squadId));
-
-  await Promise.all(
-    members.map(async (member) => {
-      await db
-        .update(users)
-        .set({ resilienceXp: sql`${users.resilienceXp} + ${reward.xpBonus}` })
-        .where(eq(users.id, member.userId));
-      await addStickerToUserSettings(db, member.userId, reward.stickerId);
-    })
-  );
-
   return true;
 }
 
@@ -681,35 +667,6 @@ export async function getMyLeaderboardRank(db, userId, periodInput) {
     period,
     entry: leaderboard.myRank || null
   };
-}
-
-async function addStickerToUserSettings(db, userId, stickerId) {
-  const rows = await db
-    .select({ id: profileSettings.id, settingsJson: profileSettings.settingsJson })
-    .from(profileSettings)
-    .where(eq(profileSettings.userId, userId))
-    .limit(1);
-
-  const settings = rows[0]?.settingsJson || {};
-  const unlockedStickers = Array.isArray(settings.unlockedStickers) ? [...settings.unlockedStickers] : [];
-  if (!unlockedStickers.includes(stickerId)) {
-    unlockedStickers.push(stickerId);
-  }
-
-  const updatedSettings = {
-    ...settings,
-    unlockedStickers,
-    monthlySquadReward: stickerId
-  };
-
-  if (rows[0]) {
-    await db
-      .update(profileSettings)
-      .set({ settingsJson: updatedSettings, updatedAt: new Date() })
-      .where(eq(profileSettings.id, rows[0].id));
-  } else {
-    await db.insert(profileSettings).values({ userId, settingsJson: updatedSettings });
-  }
 }
 
 export async function finalizeMonthlyLeaderboard(db, { period: periodInput, approvedBy, approvedSquadIds = null, disqualifiedSquadIds = [], action = 'publish_top_3', squadId = null }) {

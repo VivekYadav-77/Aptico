@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { analyses, applicationLogs, connections, follows, generatedContent, profileSettings, rejectionLogs, savedJobs, squads, squadMembers, squadMonthlyRewards, userExperiences, userProfiles, users } from '../../db/schema.js';
+import { analyses, applicationLogs, connections, follows, generatedContent, profileSettings, rejectionLogs, savedJobs, squads, squadMembers, squadMonthlyRewards, squadScoreEvents, userExperiences, userProfiles, users } from '../../db/schema.js';
 import { env } from '../../config/env.js';
 import { generatePortfolioReadme } from '../analysis/gemini.service.js';
 import { ensureUserProfile } from './profile.service.js';
@@ -335,6 +335,49 @@ async function getStoredProfileSettings(db, userId) {
     .limit(1);
 
   return rows[0]?.settingsJson || null;
+}
+
+export async function calculateMonthlySquadRewardReadiness(db, userId, rewardRank = null) {
+  const rows = await db
+    .select({
+      squadId: squadMonthlyRewards.squadId,
+      period: squadMonthlyRewards.period,
+      rank: squadMonthlyRewards.rank,
+      eventType: squadScoreEvents.eventType,
+      eligiblePoints: squadScoreEvents.eligiblePoints,
+      spamStatus: squadScoreEvents.spamStatus,
+      createdAt: squadScoreEvents.createdAt
+    })
+    .from(squadMonthlyRewards)
+    .innerJoin(
+      squadScoreEvents,
+      and(
+        eq(squadScoreEvents.squadId, squadMonthlyRewards.squadId),
+        eq(squadScoreEvents.period, squadMonthlyRewards.period),
+        eq(squadScoreEvents.userId, userId)
+      )
+    )
+    .where(rewardRank ? eq(squadMonthlyRewards.rank, rewardRank) : sql`true`);
+
+  const grouped = new Map();
+  for (const row of rows) {
+    const key = `${row.squadId}:${row.period}:${row.rank}`;
+    const current = grouped.get(key) || {
+      squadId: row.squadId,
+      period: row.period,
+      rank: Number(row.rank),
+      rows: []
+    };
+    current.rows.push(row);
+    grouped.set(key, current);
+  }
+
+  return [...grouped.values()].map((group) => ({
+    squadId: group.squadId,
+    period: group.period,
+    rank: group.rank,
+    ...evaluateMonthlySquadRewardReadiness(group.rows, { hasPublishedReward: true })
+  }));
 }
 
 export async function getProfileSettingsController(request, reply) {
@@ -796,6 +839,104 @@ const MONTHLY_SQUAD_STICKER_XP = {
   event_squad_monthly_bronze: 100
 };
 
+const MONTHLY_REWARD_HIGH_PROOF_EVENTS = new Set(['application', 'weekly_goal', 'synergy_burst', 'archetype_selected']);
+
+function getUtcWeekKey(date) {
+  const weekStart = new Date(date);
+  const distanceFromMonday = (weekStart.getUTCDay() + 6) % 7;
+  weekStart.setUTCHours(0, 0, 0, 0);
+  weekStart.setUTCDate(weekStart.getUTCDate() - distanceFromMonday);
+  return weekStart.toISOString().slice(0, 10);
+}
+
+function getRewardReadinessStatus({ claimable, suspiciousEventCount, hasPublishedReward, cleanEligibleCount, highProofEventCount, readinessScore }) {
+  if (!hasPublishedReward) return 'not_ready';
+  if (suspiciousEventCount > 2) return 'needs_review';
+  if (claimable) return 'ready_to_claim';
+  if (!cleanEligibleCount || !highProofEventCount) return 'building';
+  if (readinessScore >= 45) return 'almost_ready';
+  return 'building';
+}
+
+function getRewardReadinessCopy(status) {
+  const copy = {
+    not_ready: 'Earn a published monthly squad reward first.',
+    building: 'Build clean contribution across multiple days.',
+    almost_ready: 'Keep showing up with proof-backed squad activity.',
+    ready_to_claim: 'Ready to claim.',
+    needs_review: 'Needs integrity review.'
+  };
+  return copy[status] || copy.building;
+}
+
+function getRewardReadinessProgress(status) {
+  const progress = {
+    not_ready: 0,
+    building: 35,
+    almost_ready: 75,
+    ready_to_claim: 100,
+    needs_review: 0
+  };
+  return progress[status] ?? 0;
+}
+
+export function evaluateMonthlySquadRewardReadiness(rows = [], { hasPublishedReward = false } = {}) {
+  const cleanEligibleRows = rows.filter((row) => Number(row.eligiblePoints || 0) > 0 && row.spamStatus === 'clear');
+  const activeDays = new Set();
+  const activeWeeks = new Set();
+  const eventTypes = new Set();
+  const dailyEligiblePoints = new Map();
+  const dailyEventCounts = new Map();
+  let highProofEventCount = 0;
+  let suspiciousEventCount = 0;
+
+  for (const row of rows) {
+    if (row.spamStatus !== 'clear') {
+      suspiciousEventCount += 1;
+    }
+  }
+
+  for (const row of cleanEligibleRows) {
+    const createdAt = row.createdAt ? new Date(row.createdAt) : null;
+    if (!createdAt || Number.isNaN(createdAt.getTime())) continue;
+    const dayKey = createdAt.toISOString().slice(0, 10);
+    activeDays.add(dayKey);
+    activeWeeks.add(getUtcWeekKey(createdAt));
+    eventTypes.add(row.eventType);
+    dailyEligiblePoints.set(dayKey, Number(dailyEligiblePoints.get(dayKey) || 0) + Number(row.eligiblePoints || 0));
+    dailyEventCounts.set(dayKey, Number(dailyEventCounts.get(dayKey) || 0) + 1);
+    if (MONTHLY_REWARD_HIGH_PROOF_EVENTS.has(row.eventType)) {
+      highProofEventCount += 1;
+    }
+  }
+
+  const maxDailyEligiblePoints = Math.max(0, ...dailyEligiblePoints.values());
+  const maxDailyEventCount = Math.max(0, ...dailyEventCounts.values());
+  const activeDayScore = Math.min(42, activeDays.size * 14);
+  const spreadScore = Math.min(18, activeWeeks.size * 9);
+  const proofScore = Math.min(18, highProofEventCount * 9);
+  const diversityScore = Math.min(10, eventTypes.size * 3);
+  const integrityPenalty = suspiciousEventCount * 15;
+  const burstPenalty = Math.max(0, maxDailyEligiblePoints - 45) * 0.35 + Math.max(0, maxDailyEventCount - 10) * 2;
+  const readinessScore = Math.max(0, activeDayScore + spreadScore + proofScore + diversityScore - integrityPenalty - burstPenalty);
+  const claimable = Boolean(hasPublishedReward && readinessScore >= 60 && cleanEligibleRows.length && suspiciousEventCount <= 2);
+  const status = getRewardReadinessStatus({
+    claimable,
+    suspiciousEventCount,
+    hasPublishedReward,
+    cleanEligibleCount: cleanEligibleRows.length,
+    highProofEventCount,
+    readinessScore
+  });
+
+  return {
+    claimable,
+    status,
+    copy: getRewardReadinessCopy(status),
+    progress: getRewardReadinessProgress(status)
+  };
+}
+
 async function getUserStats(db, userId) {
   const stats = {};
 
@@ -860,15 +1001,28 @@ async function getUserStats(db, userId) {
     }
   } catch { stats.squadGoalReached = 0; }
 
-  // Published monthly squad rewards available for claiming.
+  // Published monthly squad rewards available for consistency-based claiming.
   try {
-    const rewardRows = await db
-      .select({ rank: squadMonthlyRewards.rank })
-      .from(squadMonthlyRewards)
-      .innerJoin(squadMembers, eq(squadMembers.squadId, squadMonthlyRewards.squadId))
-      .where(eq(squadMembers.userId, userId));
-    stats.monthlySquadRewards = rewardRows.map((row) => Number(row.rank));
-  } catch { stats.monthlySquadRewards = []; }
+    const readinessRows = await calculateMonthlySquadRewardReadiness(db, userId);
+    const readinessByRank = new Map();
+    for (const row of readinessRows) {
+      const current = readinessByRank.get(row.rank);
+      if (!current || (row.claimable && !current.claimable) || Number(row.progress || 0) > Number(current.progress || 0)) {
+        readinessByRank.set(row.rank, row);
+      }
+    }
+    stats.monthlySquadRewardReadiness = [...readinessByRank.values()].map(({ rank, status, copy, progress, claimable }) => ({
+      rank,
+      status,
+      copy,
+      progress,
+      claimable
+    }));
+    stats.monthlySquadRewards = [...readinessByRank.values()].filter((row) => row.claimable).map((row) => Number(row.rank));
+  } catch {
+    stats.monthlySquadRewardReadiness = [];
+    stats.monthlySquadRewards = [];
+  }
 
   // Night owl / Early bird (check if any app was logged between midnight–4am or 4am–6am)
   try {

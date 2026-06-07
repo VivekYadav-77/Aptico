@@ -8,6 +8,7 @@ import {
   getPeriodBounds,
   REWARD_BY_RANK
 } from '../src/modules/squads/squad-leaderboard.service.js';
+import { evaluateMonthlySquadRewardReadiness } from '../src/modules/profile/profile.controller.js';
 
 describe('Squad leaderboard scoring', () => {
   it('uses UTC month boundaries', () => {
@@ -190,5 +191,56 @@ describe('Squad leaderboard scoring', () => {
       () => getLeaderboard(null, { period: '2999-01' }),
       (error) => error.statusCode === 400 && error.message === 'Future leaderboard periods are not available.'
     );
+  });
+
+  it('does not unlock monthly reward readiness from one eligible event', () => {
+    const readiness = evaluateMonthlySquadRewardReadiness([
+      { eventType: 'quick_signal', eligiblePoints: 1, spamStatus: 'clear', createdAt: new Date('2026-06-02T10:00:00Z') }
+    ], { hasPublishedReward: true });
+
+    assert.equal(readiness.claimable, false);
+    assert.equal(readiness.status, 'building');
+  });
+
+  it('blocks one-day monthly reward bursts even with high eligible points', () => {
+    const rows = [
+      { eventType: 'application', eligiblePoints: 10, spamStatus: 'clear', createdAt: new Date('2026-06-02T10:00:00Z') },
+      { eventType: 'weekly_goal', eligiblePoints: 60, spamStatus: 'clear', createdAt: new Date('2026-06-02T11:00:00Z') },
+      { eventType: 'synergy_burst', eligiblePoints: 20, spamStatus: 'clear', createdAt: new Date('2026-06-02T12:00:00Z') }
+    ];
+
+    const readiness = evaluateMonthlySquadRewardReadiness(rows, { hasPublishedReward: true });
+
+    assert.equal(readiness.claimable, false);
+    assert.notEqual(readiness.status, 'ready_to_claim');
+  });
+
+  it('allows monthly reward readiness for clean proof-backed consistency', () => {
+    const rows = [
+      { eventType: 'application', eligiblePoints: 10, spamStatus: 'clear', createdAt: new Date('2026-06-02T10:00:00Z') },
+      { eventType: 'quick_signal', eligiblePoints: 1, spamStatus: 'clear', createdAt: new Date('2026-06-05T10:00:00Z') },
+      { eventType: 'text_message', eligiblePoints: 1, spamStatus: 'clear', createdAt: new Date('2026-06-09T10:00:00Z') }
+    ];
+
+    const readiness = evaluateMonthlySquadRewardReadiness(rows, { hasPublishedReward: true });
+
+    assert.equal(readiness.claimable, true);
+    assert.equal(readiness.status, 'ready_to_claim');
+  });
+
+  it('holds monthly reward readiness for suspicious activity', () => {
+    const rows = [
+      { eventType: 'application', eligiblePoints: 10, spamStatus: 'clear', createdAt: new Date('2026-06-02T10:00:00Z') },
+      { eventType: 'quick_signal', eligiblePoints: 1, spamStatus: 'clear', createdAt: new Date('2026-06-05T10:00:00Z') },
+      { eventType: 'text_message', eligiblePoints: 1, spamStatus: 'clear', createdAt: new Date('2026-06-09T10:00:00Z') },
+      { eventType: 'text_message', eligiblePoints: 0, spamStatus: 'flagged', createdAt: new Date('2026-06-10T10:00:00Z') },
+      { eventType: 'quick_signal', eligiblePoints: 0, spamStatus: 'flagged', createdAt: new Date('2026-06-11T10:00:00Z') },
+      { eventType: 'application', eligiblePoints: 0, spamStatus: 'flagged', createdAt: new Date('2026-06-12T10:00:00Z') }
+    ];
+
+    const readiness = evaluateMonthlySquadRewardReadiness(rows, { hasPublishedReward: true });
+
+    assert.equal(readiness.claimable, false);
+    assert.equal(readiness.status, 'needs_review');
   });
 });

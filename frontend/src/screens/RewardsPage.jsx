@@ -51,6 +51,10 @@ function reqLabel(req) {
   return labels[req.type] || 'Special requirement';
 }
 
+function getMonthlySquadRewardReadiness(req, stats) {
+  return (stats.monthlySquadRewardReadiness || []).find((item) => Number(item.rank) === Number(req.value)) || null;
+}
+
 function formatRequirementCopy(req, isUnlocked = false) {
   const prefix = isUnlocked ? {
     xp: 'Reached',
@@ -109,7 +113,7 @@ function formatRequirementCopy(req, isUnlocked = false) {
     bug_report: `${isUnlocked ? 'Reported' : 'Report'} a product bug.`,
     repo_contribution: `${isUnlocked ? 'Contributed' : 'Contribute'} code to Aptico.`,
     test_phase: `${isUnlocked ? 'Participated' : 'Participate'} as a ${req.value} tester.`,
-    monthly_squad_reward: `${isUnlocked ? 'Earned' : 'Earn'} monthly squad rank #${req.value}.`,
+    monthly_squad_reward: isUnlocked ? `Earned monthly squad rank #${req.value}.` : 'Build clean contribution across multiple days with proof-backed squad activity.',
   };
 
   return labels[req.type] || (isUnlocked ? 'Completed a special Aptico achievement.' : 'Complete a special Aptico achievement.');
@@ -156,6 +160,11 @@ function getStickerMeaning(sticker) {
 }
 
 function reqProgress(req, stats) {
+  if (req.type === 'monthly_squad_reward') {
+    const readiness = getMonthlySquadRewardReadiness(req, stats);
+    return [readiness?.claimable ? 1 : 0, 1, readiness || null];
+  }
+
   const map = {
     xp: [stats.xp, req.value], streak: [stats.streak, req.value], total_applications: [stats.totalApplications, req.value],
     total_rejections: [stats.totalRejections, req.value], followers: [stats.followers, req.value], connections: [stats.connections, req.value],
@@ -169,7 +178,6 @@ function reqProgress(req, stats) {
     squad_contribution: [stats.squadGoalReached, 1], hired_silent: [stats.totalApplications >= 10 && stats.posts === 0 ? 1 : 0, 1],
     squad_connections: [stats.connections >= 20 ? 1 : 0, 1], join_order: [1, 1],
     xp_rank: [stats.xp >= 10000 ? 1 : 0, 1], bug_report: [1, 1], repo_contribution: [1, 1], test_phase: [1, 1],
-    monthly_squad_reward: [(stats.monthlySquadRewards || []).includes(req.value) ? 1 : 0, 1],
   };
   if (req.type === 'skill') return (stats.skills || []).includes(req.value) ? [1, 1] : [0, 1];
   if (req.type === 'join_before') return stats.joinDate < new Date(req.value) ? [1, 1] : [0, 1];
@@ -343,8 +351,10 @@ export default function RewardsPage() {
             const isEquipped = equippedIds.includes(sticker.id);
             const rc = RARITY_CONFIG[sticker.rarity];
             const isSecret = sticker.category === 'secret' && !isUnlocked;
-            const [current, target] = stats ? reqProgress(sticker.requirement, stats) : [0, 1];
-            const pct = Math.min(100, Math.round((current / target) * 100));
+            const [current, target, readiness] = stats ? reqProgress(sticker.requirement, stats) : [0, 1, null];
+            const pct = sticker.requirement.type === 'monthly_squad_reward'
+              ? Number(readiness?.progress || 0)
+              : Math.min(100, Math.round((current / target) * 100));
 
             return (
               <div key={sticker.id}
@@ -372,8 +382,8 @@ export default function RewardsPage() {
                 {!isUnlocked && !isSecret && (
                   <div className="mt-4">
                     <div className="flex items-center justify-between text-[10px] font-bold text-[var(--muted-strong)] mb-1">
-                      <span>{reqLabel(sticker.requirement)}</span>
-                      <span>{current}/{target}</span>
+                      <span>{readiness?.copy || reqLabel(sticker.requirement)}</span>
+                      <span>{readiness?.status ? readiness.status.replace(/_/g, ' ') : `${current}/${target}`}</span>
                     </div>
                     <div className="h-1.5 w-full rounded-full bg-[var(--border)] overflow-hidden">
                       <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: sticker.color }} />
@@ -421,8 +431,10 @@ export default function RewardsPage() {
               const isUnlocked = unlockedIds.includes(s.id);
               const isEquipped = equippedIds.includes(s.id);
               const isSecret = s.category === 'secret' && !isUnlocked;
-              const [current, target] = stats ? reqProgress(s.requirement, stats) : [0, 1];
-              const pct = Math.min(100, Math.round((current / target) * 100));
+              const [current, target, readiness] = stats ? reqProgress(s.requirement, stats) : [0, 1, null];
+              const pct = s.requirement.type === 'monthly_squad_reward'
+                ? Number(readiness?.progress || 0)
+                : Math.min(100, Math.round((current / target) * 100));
               const categoryName = STICKER_CATEGORIES.find((c) => c.id === s.category)?.name;
               const achievementLabel = isUnlocked ? 'Earned for' : 'How to unlock';
               const achievementCopy = isSecret ? 'Secret achievement. Keep exploring Aptico to discover this reward.' : formatRequirementCopy(s.requirement, isUnlocked);
@@ -453,12 +465,12 @@ export default function RewardsPage() {
                       <div>
                         <div className="mb-2 flex items-center justify-between gap-3 text-xs font-bold text-[var(--muted-strong)]">
                           <span className="uppercase tracking-[0.14em]">Progress</span>
-                          <span>{current.toLocaleString()}/{target.toLocaleString()} ({pct}%)</span>
+                          <span>{readiness?.status ? readiness.status.replace(/_/g, ' ') : `${current.toLocaleString()}/${target.toLocaleString()} (${pct}%)`}</span>
                         </div>
                         <div className="h-2 rounded-full bg-[var(--border)] overflow-hidden">
                           <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, background: s.color }} />
                         </div>
-                        <p className="mt-2 text-xs font-medium text-[var(--muted-strong)]">{reqLabel(s.requirement)}</p>
+                        <p className="mt-2 text-xs font-medium text-[var(--muted-strong)]">{readiness?.copy || reqLabel(s.requirement)}</p>
                       </div>
                     )}
                   </div>

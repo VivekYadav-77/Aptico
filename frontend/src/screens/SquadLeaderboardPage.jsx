@@ -523,7 +523,8 @@ function TrustPanel() {
     ['speed', 'Quality-weighted score', 'Rank uses eligible points after penalties, not raw activity volume.'],
     ['lock_clock', 'Capped low-proof actions', 'Light signals and messages help only within daily or weekly limits.'],
     ['policy', 'Integrity flags', 'Suspicious events reduce score and can hold rewards for review.'],
-    ['verified', 'Digital rewards', 'Top-three rewards publish only when the winner is clean or approved.']
+    ['verified', 'Digital rewards', 'Top-three rewards publish only when the winner is clean or approved.'],
+    ['calendar_month', 'Consistent claims', 'Members claim rewards through clean monthly contribution, not one-day bursts.']
   ];
 
   return (
