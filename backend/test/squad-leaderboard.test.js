@@ -104,7 +104,7 @@ describe('Squad leaderboard scoring', () => {
   it('defines the top-three digital rewards', () => {
     assert.equal(REWARD_BY_RANK[1].stickerId, 'event_squad_monthly_gold');
     assert.equal(REWARD_BY_RANK[2].xpBonus, 200);
-    assert.equal(REWARD_BY_RANK[3].title, 'Monthly Squad Bronze');
+    assert.equal(REWARD_BY_RANK[3].title, 'Bronze Spark Squad');
   });
 
   it('adds rank deltas and reward-rank markers', () => {

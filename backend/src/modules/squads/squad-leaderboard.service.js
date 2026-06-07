@@ -11,9 +11,9 @@ import {
 } from '../../db/schema.js';
 
 export const REWARD_BY_RANK = {
-  1: { stickerId: 'event_squad_monthly_gold', title: 'Monthly Squad Gold', xpBonus: 300 },
-  2: { stickerId: 'event_squad_monthly_silver', title: 'Monthly Squad Silver', xpBonus: 200 },
-  3: { stickerId: 'event_squad_monthly_bronze', title: 'Monthly Squad Bronze', xpBonus: 100 }
+  1: { stickerId: 'event_squad_monthly_gold', title: 'Apex Crown Squad', xpBonus: 300 },
+  2: { stickerId: 'event_squad_monthly_silver', title: 'Silver Surge Squad', xpBonus: 200 },
+  3: { stickerId: 'event_squad_monthly_bronze', title: 'Bronze Spark Squad', xpBonus: 100 }
 };
 
 const AUTO_APPROVAL_GUARD = {

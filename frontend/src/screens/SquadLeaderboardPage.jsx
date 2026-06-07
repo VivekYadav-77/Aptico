@@ -5,6 +5,7 @@ import { getSquadLeaderboard } from '../api/squadApi.js';
 const REWARD_PREVIEW = {
   1: {
     label: 'Gold',
+    title: 'Apex Crown',
     icon: 'workspace_premium',
     xp: 300,
     tone: 'text-amber-300',
@@ -14,6 +15,7 @@ const REWARD_PREVIEW = {
   },
   2: {
     label: 'Silver',
+    title: 'Silver Surge',
     icon: 'military_tech',
     xp: 200,
     tone: 'text-slate-200',
@@ -23,6 +25,7 @@ const REWARD_PREVIEW = {
   },
   3: {
     label: 'Bronze',
+    title: 'Bronze Spark',
     icon: 'emoji_events',
     xp: 100,
     tone: 'text-orange-300',
@@ -64,6 +67,14 @@ const STATUS_LABELS = {
 
 function getCurrentPeriod() {
   return new Date().toISOString().slice(0, 7);
+}
+
+function getPreviousPeriod(period) {
+  const safePeriod = period || getCurrentPeriod();
+  const date = new Date(`${safePeriod}-01T00:00:00Z`);
+  if (Number.isNaN(date.getTime())) return '';
+  date.setUTCMonth(date.getUTCMonth() - 1);
+  return date.toISOString().slice(0, 7);
 }
 
 function clampPeriod(value) {
@@ -255,7 +266,7 @@ function PodiumCard({ entry, rank, maxScore }) {
           <span className={`inline-flex h-12 w-12 items-center justify-center rounded-xl border ${reward.border} bg-[var(--panel)]`}>
             <span className={`material-symbols-outlined text-3xl ${reward.tone}`}>{reward.icon}</span>
           </span>
-          <p className={`mt-4 text-xs font-black uppercase tracking-[0.18em] ${reward.tone}`}>{reward.label} squad</p>
+          <p className={`mt-4 text-xs font-black uppercase tracking-[0.18em] ${reward.tone}`}>{reward.title}</p>
           <h3 className="mt-2 text-xl font-black text-[var(--text)]">{entry?.squadName || 'Awaiting contender'}</h3>
         </div>
         <RewardStatus entry={entry} />
@@ -297,6 +308,49 @@ function PodiumStage({ podium, maxScore }) {
         {displayOrder.map((rank) => (
           <PodiumCard key={rank} entry={byRank.get(rank)} rank={rank} maxScore={maxScore} />
         ))}
+      </div>
+    </section>
+  );
+}
+
+function PreviousWinnersPanel({ leaderboard, period }) {
+  const winners = (leaderboard?.podium || []).filter((entry) => entry?.reward && entry.rank <= 3);
+
+  return (
+    <section className="app-panel animate-fade-in-up-delay-1">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <p className="app-kicker">Earned history</p>
+          <h2 className="mt-3 text-2xl font-black text-[var(--text)]">Previous winners</h2>
+          <p className="mt-2 text-sm leading-7 text-[var(--muted-strong)]">
+            Past winners keep their sticker, title, and XP. The new month starts fresh, so current ranks are live contenders until month end.
+          </p>
+        </div>
+        <span className="inline-flex w-fit items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--panel-soft)] px-3 py-1.5 text-xs font-black uppercase tracking-[0.14em] text-[var(--muted-strong)]">
+          <span className="material-symbols-outlined text-[15px] text-[var(--accent-strong)]">history</span>
+          {period ? formatPeriod(period) : 'Previous month'}
+        </span>
+      </div>
+
+      <div className="mt-6 grid gap-3 lg:grid-cols-3">
+        {[1, 2, 3].map((rank) => {
+          const reward = REWARD_PREVIEW[rank];
+          const winner = winners.find((entry) => entry.rank === rank);
+          return (
+            <article key={rank} className={`rounded-xl border ${reward.border} ${reward.soft} p-4`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className={`text-xs font-black uppercase tracking-[0.14em] ${reward.tone}`}>{reward.title}</p>
+                  <h3 className="mt-2 truncate text-lg font-black text-[var(--text)]">{winner?.squadName || 'No published winner'}</h3>
+                  <p className="mt-1 text-xs text-[var(--muted-strong)]">
+                    {winner ? `Rank #${rank} - ${winner.qualityScore} score` : 'Rewards appear after month-end approval.'}
+                  </p>
+                </div>
+                <span className={`material-symbols-outlined text-3xl ${reward.tone}`}>{reward.icon}</span>
+              </div>
+            </article>
+          );
+        })}
       </div>
     </section>
   );
@@ -452,7 +506,7 @@ function RewardPreviewPanel() {
               <div className="flex items-center gap-3">
                 <span className={`material-symbols-outlined text-2xl ${reward.tone}`}>{reward.icon}</span>
                 <div>
-                  <p className="font-black text-[var(--text)]">Rank {rank} - {reward.label}</p>
+                  <p className="font-black text-[var(--text)]">{reward.title}</p>
                   <p className="text-xs text-[var(--muted-strong)]">Sticker, title, +{reward.xp} XP</p>
                 </div>
               </div>
@@ -515,6 +569,7 @@ function PinnedMyRank({ myRank }) {
 export default function SquadLeaderboardPage() {
   const [period, setPeriod] = useState(getCurrentPeriod());
   const [leaderboard, setLeaderboard] = useState(null);
+  const [previousLeaderboard, setPreviousLeaderboard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const currentPeriod = getCurrentPeriod();
@@ -523,8 +578,13 @@ export default function SquadLeaderboardPage() {
     setLoading(true);
     setError('');
     try {
-      const leaderboardResponse = await getSquadLeaderboard({ period, limit: 50 });
+      const previousPeriod = getPreviousPeriod(period);
+      const [leaderboardResponse, previousResponse] = await Promise.all([
+        getSquadLeaderboard({ period, limit: 50 }),
+        previousPeriod ? getSquadLeaderboard({ period: previousPeriod, limit: 3 }).catch(() => ({ data: null })) : Promise.resolve({ data: null })
+      ]);
       setLeaderboard(leaderboardResponse.data || null);
+      setPreviousLeaderboard(previousResponse.data || null);
     } catch (apiError) {
       setError(apiError.response?.data?.error || 'Could not load the squad leaderboard.');
     } finally {
@@ -539,9 +599,14 @@ export default function SquadLeaderboardPage() {
       setLoading(true);
       setError('');
       try {
-        const leaderboardResponse = await getSquadLeaderboard({ period, limit: 50 });
+        const previousPeriod = getPreviousPeriod(period);
+        const [leaderboardResponse, previousResponse] = await Promise.all([
+          getSquadLeaderboard({ period, limit: 50 }),
+          previousPeriod ? getSquadLeaderboard({ period: previousPeriod, limit: 3 }).catch(() => ({ data: null })) : Promise.resolve({ data: null })
+        ]);
         if (!isActive) return;
         setLeaderboard(leaderboardResponse.data || null);
+        setPreviousLeaderboard(previousResponse.data || null);
       } catch (apiError) {
         if (isActive) {
           setError(apiError.response?.data?.error || 'Could not load the squad leaderboard.');
@@ -570,6 +635,7 @@ export default function SquadLeaderboardPage() {
     >
       <div className="space-y-6">
         <LeaderboardHero leaderboard={leaderboard} myRank={myRank} period={period} currentPeriod={currentPeriod} onPeriodChange={setPeriod} />
+        <PreviousWinnersPanel leaderboard={previousLeaderboard} period={getPreviousPeriod(period)} />
 
         {error ? (
           <div className="rounded-xl border border-[var(--danger-border)] bg-[var(--danger-soft)] px-4 py-3">

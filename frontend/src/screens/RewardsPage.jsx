@@ -46,6 +46,7 @@ function reqLabel(req) {
     ghost_jobs_found: `Find ${req.value} ghost jobs`, hours_active: `${req.value}h active time`, squad_contribution: '50% squad goal contribution',
     hired_silent: 'Hired without posting', squad_connections: 'Connect 2 squads', join_order: 'Early adopter status',
     xp_rank: 'Top 1% XP rank', bug_report: 'Report a bug', repo_contribution: 'Code contribution', test_phase: `${req.value} tester`,
+    monthly_squad_reward: `Monthly squad rank #${req.value}`,
   };
   return labels[req.type] || 'Special requirement';
 }
@@ -108,6 +109,7 @@ function formatRequirementCopy(req, isUnlocked = false) {
     bug_report: `${isUnlocked ? 'Reported' : 'Report'} a product bug.`,
     repo_contribution: `${isUnlocked ? 'Contributed' : 'Contribute'} code to Aptico.`,
     test_phase: `${isUnlocked ? 'Participated' : 'Participate'} as a ${req.value} tester.`,
+    monthly_squad_reward: `${isUnlocked ? 'Earned' : 'Earn'} monthly squad rank #${req.value}.`,
   };
 
   return labels[req.type] || (isUnlocked ? 'Completed a special Aptico achievement.' : 'Complete a special Aptico achievement.');
@@ -147,6 +149,7 @@ function getStickerMeaning(sticker) {
     bug_report: 'Product care and practical help improving Aptico for everyone.',
     repo_contribution: 'Direct technical contribution to the product itself.',
     test_phase: 'Early product feedback and participation before full release.',
+    monthly_squad_reward: 'A verified monthly squad leaderboard finish, backed by quality-weighted activity and reward review.',
   };
 
   return meanings[sticker.requirement.type] || `${STICKER_CATEGORIES.find((c) => c.id === sticker.category)?.name || 'Aptico'} progress represented as a collectible reward.`;
@@ -166,6 +169,7 @@ function reqProgress(req, stats) {
     squad_contribution: [stats.squadGoalReached, 1], hired_silent: [stats.totalApplications >= 10 && stats.posts === 0 ? 1 : 0, 1],
     squad_connections: [stats.connections >= 20 ? 1 : 0, 1], join_order: [1, 1],
     xp_rank: [stats.xp >= 10000 ? 1 : 0, 1], bug_report: [1, 1], repo_contribution: [1, 1], test_phase: [1, 1],
+    monthly_squad_reward: [(stats.monthlySquadRewards || []).includes(req.value) ? 1 : 0, 1],
   };
   if (req.type === 'skill') return (stats.skills || []).includes(req.value) ? [1, 1] : [0, 1];
   if (req.type === 'join_before') return stats.joinDate < new Date(req.value) ? [1, 1] : [0, 1];

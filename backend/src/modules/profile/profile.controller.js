@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { analyses, applicationLogs, connections, follows, generatedContent, profileSettings, rejectionLogs, savedJobs, squads, squadMembers, userExperiences, userProfiles, users } from '../../db/schema.js';
+import { analyses, applicationLogs, connections, follows, generatedContent, profileSettings, rejectionLogs, savedJobs, squads, squadMembers, squadMonthlyRewards, userExperiences, userProfiles, users } from '../../db/schema.js';
 import { env } from '../../config/env.js';
 import { generatePortfolioReadme } from '../analysis/gemini.service.js';
 import { ensureUserProfile } from './profile.service.js';
@@ -790,6 +790,12 @@ const STICKER_REQUIREMENTS = {
 
 const MAX_EQUIPPED = 4;
 
+const MONTHLY_SQUAD_STICKER_XP = {
+  event_squad_monthly_gold: 300,
+  event_squad_monthly_silver: 200,
+  event_squad_monthly_bronze: 100
+};
+
 async function getUserStats(db, userId) {
   const stats = {};
 
@@ -853,6 +859,16 @@ async function getUserStats(db, userId) {
       stats.squadGoalReached = 0;
     }
   } catch { stats.squadGoalReached = 0; }
+
+  // Published monthly squad rewards available for claiming.
+  try {
+    const rewardRows = await db
+      .select({ rank: squadMonthlyRewards.rank })
+      .from(squadMonthlyRewards)
+      .innerJoin(squadMembers, eq(squadMembers.squadId, squadMonthlyRewards.squadId))
+      .where(eq(squadMembers.userId, userId));
+    stats.monthlySquadRewards = rewardRows.map((row) => Number(row.rank));
+  } catch { stats.monthlySquadRewards = []; }
 
   // Night owl / Early bird (check if any app was logged between midnight–4am or 4am–6am)
   try {
@@ -945,7 +961,7 @@ function meetsRequirement(req, stats) {
     case 'bug_report':          return true;
     case 'repo_contribution':   return true;
     case 'test_phase':          return true;
-    case 'monthly_squad_reward': return false;
+    case 'monthly_squad_reward': return Array.isArray(stats.monthlySquadRewards) && stats.monthlySquadRewards.includes(req.value);
     
     case 'beta_tester':        return (stats.betaTester || 0) >= req.value;
     default:                   return false;
@@ -982,6 +998,15 @@ export async function unlockStickerController(request, reply) {
     const updatedSettings = { ...settings, unlockedStickers: unlocked };
 
     const existingRow = await request.server.db.select({ id: profileSettings.id }).from(profileSettings).where(eq(profileSettings.userId, request.auth.userId)).limit(1);
+
+    const xpBonus = MONTHLY_SQUAD_STICKER_XP[stickerId] || 0;
+    if (xpBonus) {
+      await request.server.db
+        .update(users)
+        .set({ resilienceXp: sql`${users.resilienceXp} + ${xpBonus}` })
+        .where(eq(users.id, request.auth.userId));
+      updatedSettings.monthlySquadReward = stickerId;
+    }
 
     if (existingRow[0]) {
       await request.server.db.update(profileSettings).set({ settingsJson: updatedSettings, updatedAt: new Date() }).where(eq(profileSettings.id, existingRow[0].id));
