@@ -5,6 +5,7 @@ import { searchJobs } from './job-search.service.js';
 import { saveJob } from './job-scraper.service.js';
 import { addJobsToPublicCache } from '../social/social.service.js';
 import { generateFollowUpScripts } from './follow-up-scripts.js';
+import { recordAnalyticsEvent } from '../analytics/analytics.service.js';
 
 const searchQuerySchema = z.object({
   query: z.string().trim().min(1),
@@ -102,6 +103,18 @@ export async function saveJobController(request, reply) {
       db: request.server.db,
       userId: request.auth?.userId || null,
       job
+    });
+
+    await recordAnalyticsEvent({
+      db: request.server.db,
+      request,
+      eventType: 'job_saved',
+      userId: request.auth?.userId || null,
+      metadata: {
+        source: job.source,
+        savedJobId: saved?.id || null,
+        matchPercent: job.matchPercent || null
+      }
     });
 
     return reply.code(201).send({

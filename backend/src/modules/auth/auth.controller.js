@@ -21,6 +21,7 @@ import {
   createCsrfToken,
   verifyCsrfRequest
 } from '../../shared/security/csrf.js';
+import { recordAnalyticsEvent } from '../analytics/analytics.service.js';
 
 const googleSchema = z.object({
   credential: z.string().trim().min(1)
@@ -111,6 +112,15 @@ export async function registerController(request, reply) {
       name: body.name
     });
 
+    await recordAnalyticsEvent({
+      db: request.server.db,
+      request,
+      eventType: 'signup',
+      userId: result.user?.id || null,
+      metadata: { method: 'password' },
+      force: true
+    });
+
     reply.code(201).send({
       success: true,
       data: result
@@ -130,6 +140,15 @@ export async function loginController(request, reply) {
       request
     });
 
+    await recordAnalyticsEvent({
+      db: request.server.db,
+      request,
+      eventType: 'login',
+      userId: session.user.id,
+      metadata: { method: 'password' },
+      force: true
+    });
+
     await sendSessionReply(request, reply, session);
   } catch (error) {
     sendError(reply, error);
@@ -143,6 +162,15 @@ export async function googleAuthController(request, reply) {
       db: request.server.db,
       credential: body.credential,
       request
+    });
+
+    await recordAnalyticsEvent({
+      db: request.server.db,
+      request,
+      eventType: 'login',
+      userId: session.user.id,
+      metadata: { method: 'google' },
+      force: true
     });
 
     await sendSessionReply(request, reply, session);
@@ -175,6 +203,15 @@ export async function verifyEmailController(request, reply) {
       db: request.server.db,
       token: body.token,
       request
+    });
+
+    await recordAnalyticsEvent({
+      db: request.server.db,
+      request,
+      eventType: 'login',
+      userId: session.user.id,
+      metadata: { method: 'email_verification' },
+      force: true
     });
 
     await sendSessionReply(request, reply, session);
@@ -262,6 +299,15 @@ export async function logoutController(request, reply) {
         15 * 60
       );
     }
+
+    await recordAnalyticsEvent({
+      db: request.server.db,
+      request,
+      eventType: 'logout',
+      userId: result.revoked?.userId || null,
+      metadata: { method: 'session' },
+      force: true
+    });
 
     reply.header('Set-Cookie', [
       buildClearedRefreshCookie(),

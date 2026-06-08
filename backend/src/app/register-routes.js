@@ -2,6 +2,7 @@ import { createRequire } from 'node:module';
 import { schema as graphqlSchema } from '../graphql/schema.js';
 import { resolvers as graphqlResolvers } from '../graphql/resolvers.js';
 import adminRoutes from '../modules/admin/admin.routes.js';
+import analyticsRoutes from '../modules/analytics/analytics.routes.js';
 import analyzeRoutes from '../modules/analysis/analysis.routes.js';
 import activityRoutes from '../modules/activity/activity.routes.js';
 import authRoutes from '../modules/auth/auth.routes.js';
@@ -21,6 +22,7 @@ const mercurius = require('mercurius');
 // Route registration lives here so URL prefixes remain auditable during refactors.
 export function registerRoutes(app) {
   app.register(authRoutes, { prefix: '/api/auth' });
+  app.register(analyticsRoutes, { prefix: '/api/analytics' });
   app.register(healthRoutes, { prefix: '/api/health' });
   app.register(analyzeRoutes, { prefix: '/api/analyze' });
   app.register(jobRoutes, { prefix: '/api/jobs' });

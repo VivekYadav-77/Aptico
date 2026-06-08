@@ -37,6 +37,7 @@ import {
 } from './post.service.js';
 import { deleteWin, getMyWins, getPublicJobsFeed, getWinById, getWinsFeed, likeWin, getWinLikers, postWin, updateWin } from './social.service.js';
 import { getUnreadCount } from '../../shared/utils/notification-helper.js';
+import { recordAnalyticsEvent } from '../analytics/analytics.service.js';
 
 const USERNAME_PATTERN = /^[a-z0-9_-]{3,30}$/;
 
@@ -512,6 +513,17 @@ export default async function socialRoutes(app) {
     try {
       const body = postBodySchema.parse(request.body || {});
       const post = await createPost(request.server.db, request.auth.userId, body);
+      await recordAnalyticsEvent({
+        db: request.server.db,
+        request,
+        eventType: 'post_created',
+        userId: request.auth.userId,
+        metadata: {
+          postId: post?.id || null,
+          postType: body.post_type,
+          scheduled: Boolean(body.scheduled_at)
+        }
+      });
       return reply.code(201).send(post);
     } catch (error) {
       return sendError(reply, error, 'Could not create post.');
@@ -602,6 +614,17 @@ export default async function socialRoutes(app) {
     try {
       const body = commentBodySchema.parse(request.body || {});
       const comment = await addComment(request.server.db, request.auth.userId, request.params.postId, body.content, body.parent_id || null);
+      await recordAnalyticsEvent({
+        db: request.server.db,
+        request,
+        eventType: 'comment_created',
+        userId: request.auth.userId,
+        metadata: {
+          postId: request.params.postId,
+          commentId: comment?.id || null,
+          reply: Boolean(body.parent_id)
+        }
+      });
       return reply.code(201).send(comment);
     } catch (error) {
       return sendError(reply, error, 'Could not add comment.');

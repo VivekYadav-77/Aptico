@@ -218,6 +218,99 @@ export const apiUsage = pgTable(
   })
 );
 
+export const visitorSessions = pgTable(
+  'visitor_sessions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    visitorId: varchar('visitor_id', { length: 80 }).notNull(),
+    sessionKey: varchar('session_key', { length: 80 }).notNull(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).defaultNow().notNull(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow().notNull(),
+    ipHash: text('ip_hash'),
+    userAgentHash: text('user_agent_hash'),
+    deviceCategory: varchar('device_category', { length: 30 }),
+    browserName: varchar('browser_name', { length: 60 }),
+    country: varchar('country', { length: 80 }),
+    region: varchar('region', { length: 120 }),
+    city: varchar('city', { length: 120 }),
+    analyticsOptOut: boolean('analytics_opt_out').notNull().default(false)
+  },
+  (table) => ({
+    visitorIdIdx: index('visitor_sessions_visitor_id_idx').on(table.visitorId),
+    sessionKeyIdx: uniqueIndex('visitor_sessions_session_key_idx').on(table.sessionKey),
+    userIdIdx: index('visitor_sessions_user_id_idx').on(table.userId),
+    lastSeenIdx: index('visitor_sessions_last_seen_at_idx').on(table.lastSeenAt)
+  })
+);
+
+export const analyticsEvents = pgTable(
+  'analytics_events',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    eventType: varchar('event_type', { length: 60 }).notNull(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    visitorId: varchar('visitor_id', { length: 80 }),
+    sessionKey: varchar('session_key', { length: 80 }),
+    path: text('path'),
+    referrer: text('referrer'),
+    source: varchar('source', { length: 120 }),
+    deviceCategory: varchar('device_category', { length: 30 }),
+    browserName: varchar('browser_name', { length: 60 }),
+    country: varchar('country', { length: 80 }),
+    region: varchar('region', { length: 120 }),
+    city: varchar('city', { length: 120 }),
+    metadata: jsonb('metadata').notNull().default({}),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    eventTypeCreatedAtIdx: index('analytics_events_event_type_created_at_idx').on(table.eventType, table.createdAt),
+    userCreatedAtIdx: index('analytics_events_user_id_created_at_idx').on(table.userId, table.createdAt),
+    visitorCreatedAtIdx: index('analytics_events_visitor_id_created_at_idx').on(table.visitorId, table.createdAt),
+    createdAtIdx: index('analytics_events_created_at_idx').on(table.createdAt)
+  })
+);
+
+export const analyticsDailyAggregates = pgTable(
+  'analytics_daily_aggregates',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    date: date('date').notNull(),
+    eventType: varchar('event_type', { length: 60 }).notNull(),
+    path: text('path').notNull().default(''),
+    country: varchar('country', { length: 80 }).notNull().default('Unknown'),
+    eventCount: integer('event_count').notNull().default(0),
+    uniqueVisitors: integer('unique_visitors').notNull().default(0),
+    uniqueUsers: integer('unique_users').notNull().default(0),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    dateEventPathCountryIdx: uniqueIndex('analytics_daily_aggregates_unique_idx').on(
+      table.date,
+      table.eventType,
+      table.path,
+      table.country
+    )
+  })
+);
+
+export const adminAuditLogs = pgTable(
+  'admin_audit_logs',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    adminUserId: uuid('admin_user_id').references(() => users.id, { onDelete: 'set null' }),
+    action: varchar('action', { length: 80 }).notNull(),
+    targetType: varchar('target_type', { length: 80 }),
+    targetId: text('target_id'),
+    metadata: jsonb('metadata').notNull().default({}),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    adminCreatedAtIdx: index('admin_audit_logs_admin_user_id_created_at_idx').on(table.adminUserId, table.createdAt),
+    actionCreatedAtIdx: index('admin_audit_logs_action_created_at_idx').on(table.action, table.createdAt)
+  })
+);
+
 export const userProfiles = pgTable(
   'user_profiles',
   {

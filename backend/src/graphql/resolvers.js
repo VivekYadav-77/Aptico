@@ -1,5 +1,15 @@
-import { and, desc, eq, isNull, sql } from 'drizzle-orm';
-import { analyses, apiUsage, generatedContent, refreshTokens, savedJobs, users } from '../db/schema.js';
+import { and, desc, eq, gte, isNull, sql } from 'drizzle-orm';
+import {
+  adminAuditLogs,
+  analyses,
+  analyticsEvents,
+  apiUsage,
+  generatedContent,
+  refreshTokens,
+  savedJobs,
+  users,
+  visitorSessions
+} from '../db/schema.js';
 
 async function getCount(db, table, whereClause) {
   const query = db
@@ -22,6 +32,19 @@ function serializeDate(value) {
   return value instanceof Date ? value.toISOString() : String(value);
 }
 
+function serializeMetadata(value) {
+  try {
+    return JSON.stringify(value || {});
+  } catch {
+    return '{}';
+  }
+}
+
+function normalizeLimit(value, fallback = 30, max = 100) {
+  const number = Number(value);
+  return Number.isInteger(number) ? Math.min(Math.max(number, 1), max) : fallback;
+}
+
 async function requireDb(context) {
   if (!context.db) {
     const error = new Error('Database is not configured yet.');
@@ -37,14 +60,37 @@ export const resolvers = {
     adminOverview: async (_source, _args, context) => {
       const db = await requireDb(context);
 
-      const [totalUsers, totalAnalyses, totalGeneratedContent, totalSavedJobs, activeRefreshTokens, revokedRefreshTokens] =
+      const [
+        totalUsers,
+        totalAnalyses,
+        totalGeneratedContent,
+        totalSavedJobs,
+        activeRefreshTokens,
+        revokedRefreshTokens,
+        totalVisits,
+        uniqueVisitors,
+        totalEvents,
+        apiErrors,
+        adminActions
+      ] =
         await Promise.all([
           getCount(db, users),
           getCount(db, analyses),
           getCount(db, generatedContent),
           getCount(db, savedJobs),
           getCount(db, refreshTokens, isNull(refreshTokens.revokedAt)),
-          getCount(db, refreshTokens, sql`${refreshTokens.revokedAt} is not null`)
+          getCount(db, refreshTokens, sql`${refreshTokens.revokedAt} is not null`),
+          getCount(db, analyticsEvents, eq(analyticsEvents.eventType, 'page_view')),
+          (async () => {
+            const [row] = await db
+              .select({ count: sql`cast(count(distinct ${analyticsEvents.visitorId}) as integer)` })
+              .from(analyticsEvents)
+              .where(eq(analyticsEvents.eventType, 'page_view'));
+            return Number(row?.count || 0);
+          })(),
+          getCount(db, analyticsEvents),
+          getCount(db, analyticsEvents, eq(analyticsEvents.eventType, 'api_error')),
+          getCount(db, adminAuditLogs)
         ]);
 
       const [apiUsageRow] = await db
@@ -60,7 +106,17 @@ export const resolvers = {
         totalSavedJobs,
         totalApiRequests: Number(apiUsageRow?.totalApiRequests || 0),
         activeRefreshTokens,
-        revokedRefreshTokens
+        revokedRefreshTokens,
+        totalVisits,
+        uniqueVisitors,
+        activeVisitors: await getCount(
+          db,
+          visitorSessions,
+          gte(visitorSessions.lastSeenAt, new Date(Date.now() - 15 * 60 * 1000))
+        ),
+        totalEvents,
+        apiErrors,
+        adminActions
       };
     },
     apiUsageMetrics: async (_source, _args, context) => {
@@ -85,6 +141,13 @@ export const resolvers = {
             getCount(db, analyses, eq(analyses.userId, user.id)),
             getCount(db, savedJobs, eq(savedJobs.userId, user.id))
           ]);
+          const [eventCount, lastSeenRow] = await Promise.all([
+            getCount(db, analyticsEvents, eq(analyticsEvents.userId, user.id)),
+            db
+              .select({ lastSeenAt: sql`max(${visitorSessions.lastSeenAt})` })
+              .from(visitorSessions)
+              .where(eq(visitorSessions.userId, user.id))
+          ]);
 
           return {
             id: user.id,
@@ -96,10 +159,233 @@ export const resolvers = {
             lastLogin: serializeDate(user.lastLogin),
             activeSessionCount,
             analysesCount,
-            savedJobsCount
+            savedJobsCount,
+            eventCount,
+            lastSeenAt: serializeDate(lastSeenRow[0]?.lastSeenAt)
           };
         })
       );
+    },
+    visitorTrends: async (_source, args, context) => {
+      const db = await requireDb(context);
+      const days = normalizeLimit(args.days, 14, 90);
+      const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      const rows = await db
+        .select({
+          date: sql`to_char(date(${analyticsEvents.createdAt}), 'YYYY-MM-DD')`,
+          visits: sql`cast(count(*) filter (where ${analyticsEvents.eventType} = 'page_view') as integer)`,
+          uniqueVisitors: sql`cast(count(distinct ${analyticsEvents.visitorId}) as integer)`,
+          events: sql`cast(count(*) as integer)`
+        })
+        .from(analyticsEvents)
+        .where(gte(analyticsEvents.createdAt, since))
+        .groupBy(sql`date(${analyticsEvents.createdAt})`)
+        .orderBy(sql`date(${analyticsEvents.createdAt})`);
+
+      return rows.map((row) => ({
+        date: String(row.date),
+        visits: Number(row.visits || 0),
+        uniqueVisitors: Number(row.uniqueVisitors || 0),
+        events: Number(row.events || 0)
+      }));
+    },
+    topPages: async (_source, args, context) => {
+      const db = await requireDb(context);
+      const rows = await db
+        .select({
+          label: sql`coalesce(${analyticsEvents.path}, 'Unknown')`,
+          value: sql`cast(count(*) as integer)`
+        })
+        .from(analyticsEvents)
+        .where(eq(analyticsEvents.eventType, 'page_view'))
+        .groupBy(analyticsEvents.path)
+        .orderBy(desc(sql`count(*)`))
+        .limit(normalizeLimit(args.limit, 10, 50));
+
+      return rows.map((row) => ({ label: String(row.label), value: Number(row.value || 0) }));
+    },
+    trafficSources: async (_source, args, context) => {
+      const db = await requireDb(context);
+      const rows = await db
+        .select({
+          label: sql`coalesce(${analyticsEvents.source}, 'Direct')`,
+          value: sql`cast(count(*) as integer)`
+        })
+        .from(analyticsEvents)
+        .where(eq(analyticsEvents.eventType, 'page_view'))
+        .groupBy(analyticsEvents.source)
+        .orderBy(desc(sql`count(*)`))
+        .limit(normalizeLimit(args.limit, 10, 50));
+
+      return rows.map((row) => ({ label: String(row.label), value: Number(row.value || 0) }));
+    },
+    geoBreakdown: async (_source, args, context) => {
+      const db = await requireDb(context);
+      const rows = await db
+        .select({
+          label: sql`coalesce(nullif(concat_ws(', ', ${analyticsEvents.city}, ${analyticsEvents.region}, ${analyticsEvents.country}), ''), 'Unknown')`,
+          value: sql`cast(count(*) as integer)`
+        })
+        .from(analyticsEvents)
+        .where(eq(analyticsEvents.eventType, 'page_view'))
+        .groupBy(analyticsEvents.city, analyticsEvents.region, analyticsEvents.country)
+        .orderBy(desc(sql`count(*)`))
+        .limit(normalizeLimit(args.limit, 10, 50));
+
+      return rows.map((row) => ({ label: String(row.label), value: Number(row.value || 0) }));
+    },
+    deviceBreakdown: async (_source, _args, context) => {
+      const db = await requireDb(context);
+      const rows = await db
+        .select({
+          label: sql`coalesce(${analyticsEvents.deviceCategory}, 'Unknown')`,
+          value: sql`cast(count(*) as integer)`
+        })
+        .from(analyticsEvents)
+        .where(eq(analyticsEvents.eventType, 'page_view'))
+        .groupBy(analyticsEvents.deviceCategory)
+        .orderBy(desc(sql`count(*)`));
+
+      return rows.map((row) => ({ label: String(row.label), value: Number(row.value || 0) }));
+    },
+    recentEvents: async (_source, args, context) => {
+      const db = await requireDb(context);
+      const conditions = [];
+      if (args.eventType) conditions.push(eq(analyticsEvents.eventType, args.eventType));
+      if (args.userId) conditions.push(eq(analyticsEvents.userId, args.userId));
+
+      const baseQuery = db
+        .select({
+          id: analyticsEvents.id,
+          eventType: analyticsEvents.eventType,
+          userId: analyticsEvents.userId,
+          userEmail: users.email,
+          visitorId: analyticsEvents.visitorId,
+          path: analyticsEvents.path,
+          referrer: analyticsEvents.referrer,
+          source: analyticsEvents.source,
+          deviceCategory: analyticsEvents.deviceCategory,
+          browserName: analyticsEvents.browserName,
+          country: analyticsEvents.country,
+          region: analyticsEvents.region,
+          city: analyticsEvents.city,
+          metadata: analyticsEvents.metadata,
+          createdAt: analyticsEvents.createdAt
+        })
+        .from(analyticsEvents)
+        .leftJoin(users, eq(analyticsEvents.userId, users.id));
+      const filteredQuery = conditions.length ? baseQuery.where(and(...conditions)) : baseQuery;
+      const rows = await filteredQuery
+        .orderBy(desc(analyticsEvents.createdAt))
+        .limit(normalizeLimit(args.limit, 30, 100));
+
+      return rows.map((row) => ({
+        ...row,
+        metadata: serializeMetadata(row.metadata),
+        createdAt: serializeDate(row.createdAt)
+      }));
+    },
+    userActivity: async (_source, args, context) => {
+      const db = await requireDb(context);
+      const rows = await db
+        .select({
+          id: analyticsEvents.id,
+          eventType: analyticsEvents.eventType,
+          userId: analyticsEvents.userId,
+          userEmail: users.email,
+          visitorId: analyticsEvents.visitorId,
+          path: analyticsEvents.path,
+          referrer: analyticsEvents.referrer,
+          source: analyticsEvents.source,
+          deviceCategory: analyticsEvents.deviceCategory,
+          browserName: analyticsEvents.browserName,
+          country: analyticsEvents.country,
+          region: analyticsEvents.region,
+          city: analyticsEvents.city,
+          metadata: analyticsEvents.metadata,
+          createdAt: analyticsEvents.createdAt
+        })
+        .from(analyticsEvents)
+        .leftJoin(users, eq(analyticsEvents.userId, users.id))
+        .where(eq(analyticsEvents.userId, args.userId))
+        .orderBy(desc(analyticsEvents.createdAt))
+        .limit(normalizeLimit(args.limit, 30, 100));
+
+      return rows.map((row) => ({
+        ...row,
+        metadata: serializeMetadata(row.metadata),
+        createdAt: serializeDate(row.createdAt)
+      }));
+    },
+    adminAuditLogs: async (_source, args, context) => {
+      const db = await requireDb(context);
+      const rows = await db
+        .select({
+          id: adminAuditLogs.id,
+          adminUserId: adminAuditLogs.adminUserId,
+          adminEmail: users.email,
+          action: adminAuditLogs.action,
+          targetType: adminAuditLogs.targetType,
+          targetId: adminAuditLogs.targetId,
+          metadata: adminAuditLogs.metadata,
+          createdAt: adminAuditLogs.createdAt
+        })
+        .from(adminAuditLogs)
+        .leftJoin(users, eq(adminAuditLogs.adminUserId, users.id))
+        .orderBy(desc(adminAuditLogs.createdAt))
+        .limit(normalizeLimit(args.limit, 30, 100));
+
+      return rows.map((row) => ({
+        ...row,
+        metadata: serializeMetadata(row.metadata),
+        createdAt: serializeDate(row.createdAt)
+      }));
+    },
+    suspiciousSignals: async (_source, _args, context) => {
+      const db = await requireDb(context);
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      const [apiErrorRow] = await db
+        .select({
+          count: sql`cast(count(*) as integer)`,
+          lastSeenAt: sql`max(${analyticsEvents.createdAt})`
+        })
+        .from(analyticsEvents)
+        .where(and(eq(analyticsEvents.eventType, 'api_error'), gte(analyticsEvents.createdAt, oneDayAgo)));
+      const burstRows = await db
+        .select({
+          visitorId: analyticsEvents.visitorId,
+          count: sql`cast(count(*) as integer)`,
+          lastSeenAt: sql`max(${analyticsEvents.createdAt})`
+        })
+        .from(analyticsEvents)
+        .where(gte(analyticsEvents.createdAt, oneHourAgo))
+        .groupBy(analyticsEvents.visitorId)
+        .having(sql`count(*) > 100`)
+        .limit(5);
+
+      const signals = [];
+      if (Number(apiErrorRow?.count || 0) > 0) {
+        signals.push({
+          label: 'API errors in last 24h',
+          severity: Number(apiErrorRow.count) > 20 ? 'high' : 'medium',
+          detail: 'Client or server flows are reporting failed API activity.',
+          count: Number(apiErrorRow.count || 0),
+          lastSeenAt: serializeDate(apiErrorRow.lastSeenAt)
+        });
+      }
+
+      for (const row of burstRows) {
+        signals.push({
+          label: 'High event burst',
+          severity: Number(row.count) > 250 ? 'high' : 'medium',
+          detail: `Visitor ${String(row.visitorId || 'unknown').slice(0, 12)} generated unusual activity in one hour.`,
+          count: Number(row.count || 0),
+          lastSeenAt: serializeDate(row.lastSeenAt)
+        });
+      }
+
+      return signals;
     }
   }
 };

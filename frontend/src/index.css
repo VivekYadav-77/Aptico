@@ -265,6 +265,28 @@ span {
     background: transparent;
     color: var(--text);
   }
+
+  .app-tab {
+    display: inline-flex;
+    min-height: 2.5rem;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    background: var(--panel-soft);
+    color: var(--muted-strong);
+    padding: 0.65rem 0.9rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    transition: 180ms ease;
+  }
+
+  .app-tab:hover,
+  .app-tab.active {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent-strong);
+  }
 }
 
 /* ─── TYPOGRAPHY UTILITIES ───────────────────────────────────── */

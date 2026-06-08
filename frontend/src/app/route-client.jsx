@@ -31,6 +31,7 @@ import SquadDashboard from '../screens/SquadDashboard.jsx';
 import SquadLeaderboardPage from '../screens/SquadLeaderboardPage.jsx';
 import LegalPage from '../screens/LegalPage.jsx';
 import { selectAuth } from '../store/authSlice.js';
+import { trackEvent } from '../api/analyticsApi.js';
 
 const routes = {
   analysis: AnalysisWorkspace,
@@ -80,9 +81,34 @@ function RootRoute() {
   return auth.isAuthenticated ? <Navigate replace to="/squads" /> : <GuestDashboard />;
 }
 
+function AnalyticsRouteTracker() {
+  const location = useLocation();
+  const auth = useSelector(selectAuth);
+
+  useEffect(() => {
+    if (!auth.authReady) {
+      return;
+    }
+
+    void trackEvent('page_view', {
+      authenticated: auth.isAuthenticated,
+      route: location.pathname
+    }, {
+      path: `${location.pathname}${location.search}`
+    });
+  }, [auth.authReady, auth.isAuthenticated, location.pathname, location.search]);
+
+  return null;
+}
+
 export default function RouteClient({ name, guard = 'public' }) {
   if (name === 'root') {
-    return <RootRoute />;
+    return (
+      <>
+        <AnalyticsRouteTracker />
+        <RootRoute />
+      </>
+    );
   }
 
   const Component = routes[name];
@@ -94,6 +120,7 @@ export default function RouteClient({ name, guard = 'public' }) {
   if (guard === 'admin') {
     return (
       <AdminRoute>
+        <AnalyticsRouteTracker />
         <Component />
       </AdminRoute>
     );
@@ -102,10 +129,16 @@ export default function RouteClient({ name, guard = 'public' }) {
   if (guard === 'protected') {
     return (
       <ProtectedRoute>
+        <AnalyticsRouteTracker />
         <Component />
       </ProtectedRoute>
     );
   }
 
-  return <Component />;
+  return (
+    <>
+      <AnalyticsRouteTracker />
+      <Component />
+    </>
+  );
 }

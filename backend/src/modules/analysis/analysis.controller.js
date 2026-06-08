@@ -4,6 +4,7 @@ import { runStage1, runStage2, runStage3 } from './gemini.service.js';
 import { runPrecheck } from './precheck.service.js';
 import { decodePdfFile, parsePdfBuffer } from './pdf.service.js';
 import { env } from '../../config/env.js';
+import { recordAnalyticsEvent } from '../analytics/analytics.service.js';
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_JD_LENGTH = 10_000;
@@ -151,6 +152,17 @@ export async function analyzeController(request, reply) {
           .returning({ id: analyses.id });
 
         const savedId = insertedRows[0]?.id || null;
+        await recordAnalyticsEvent({
+          db: request.server.db,
+          request,
+          eventType: 'analysis_created',
+          userId: request.auth?.userId || null,
+          metadata: {
+            analysisId: savedId,
+            confidenceScore: stage1.confidenceScore,
+            companyName: sharedContext.companyName || null
+          }
+        });
         writeSSE(raw, 'analysisId', { id: savedId });
       } catch (dbError) {
         request.log?.error?.('DB insert failed:', dbError?.message);

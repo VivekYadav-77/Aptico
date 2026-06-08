@@ -29,6 +29,13 @@
       "when": 1780680000000,
       "tag": "0003_monthly_squad_leaderboard",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1780926000000,
+      "tag": "0004_privacy_safe_admin_analytics",
+      "breakpoints": true
     }
   ]
 }
