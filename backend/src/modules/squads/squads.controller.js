@@ -998,20 +998,60 @@ export async function pingSquadController(request, reply) {
 export async function getSquadLeaderboardController(request, reply) {
   try {
     requireDatabase(request.server.db);
+    const userId = request.auth?.userId || null;
     const leaderboard = await getLeaderboard(request.server.db, {
       period: request.query?.period,
       limit: Number(request.query?.limit || 50),
-      userId: request.auth.userId,
-      includeMyRank: true
+      userId,
+      includeMyRank: Boolean(userId)
     });
+    const payload = userId ? leaderboard : sanitizePublicLeaderboard(leaderboard);
 
     return reply.send({
       success: true,
-      data: leaderboard
+      data: payload
     });
   } catch (error) {
     return sendError(reply, error, 'Could not load squad leaderboard.');
   }
+}
+
+function sanitizePublicLeaderboardEntry(entry) {
+  if (!entry) return null;
+  return {
+    squadId: entry.squadId,
+    squadName: entry.squadName,
+    period: entry.period,
+    rank: entry.rank,
+    qualityScore: entry.qualityScore,
+    activeMemberCount: entry.activeMemberCount,
+    nextRankDelta: entry.nextRankDelta,
+    previousRankDelta: entry.previousRankDelta,
+    isRewardRank: entry.isRewardRank,
+    reward: entry.reward,
+    rewardStatus: entry.rewardStatus,
+    breakdown: entry.breakdown
+  };
+}
+
+function sanitizePublicLeaderboard(leaderboard) {
+  const entries = (leaderboard.entries || []).map(sanitizePublicLeaderboardEntry).filter(Boolean);
+  return {
+    period: leaderboard.period,
+    reviewStatus: leaderboard.reviewStatus,
+    entries,
+    podium: (leaderboard.podium || []).map(sanitizePublicLeaderboardEntry).filter(Boolean),
+    myRank: null,
+    hasMore: leaderboard.hasMore,
+    totalSquads: leaderboard.totalSquads,
+    autoFinalize: {
+      enabled: Boolean(leaderboard.autoFinalize?.enabled),
+      closedPeriod: Boolean(leaderboard.autoFinalize?.closedPeriod),
+      needsReviewCount: Number(leaderboard.autoFinalize?.needsReviewCount || 0),
+      publishedCount: Number(leaderboard.autoFinalize?.publishedCount || 0)
+    },
+    publicView: true
+  };
 }
 
 export async function getMySquadLeaderboardRankController(request, reply) {
@@ -1074,6 +1114,7 @@ export async function getSquadRewardHistoryController(request, reply) {
             period: history.latest.period,
             rank: history.latest.rank,
             qualityScore: history.latest.qualityScore,
+            activeMemberCount: history.latest.activeMemberCount,
             reviewStatus: history.latest.reviewStatus,
             publishedAt: history.latest.publishedAt,
             finalizedAt: history.latest.finalizedAt,
@@ -1086,6 +1127,7 @@ export async function getSquadRewardHistoryController(request, reply) {
         period: entry.period,
         rank: entry.rank,
         qualityScore: entry.qualityScore,
+        activeMemberCount: entry.activeMemberCount,
         reviewStatus: entry.reviewStatus,
         publishedAt: entry.publishedAt,
         finalizedAt: entry.finalizedAt,

@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import AppShell from '../components/AppShell.jsx';
+import { Link } from '@/lib/router-compat.jsx';
+import { useSelector } from 'react-redux';
 import { getSquadLeaderboard, getSquadRewardHistory } from '../api/squadApi.js';
+import { selectAuth } from '../store/authSlice.js';
 
 const REWARD_PREVIEW = {
   1: {
@@ -192,7 +195,7 @@ function BreakdownChips({ breakdown = {}, maxScore = 1 }) {
   );
 }
 
-function LeaderboardHero({ leaderboard, myRank, period, currentPeriod, onPeriodChange }) {
+function LeaderboardHero({ leaderboard, myRank, period, currentPeriod, onPeriodChange, isGuest = false }) {
   const totalSquads = toNumber(leaderboard?.totalSquads || leaderboard?.entries?.length);
   const visibleSquads = toNumber(leaderboard?.entries?.length);
   const publishedCount = toNumber(leaderboard?.autoFinalize?.publishedCount);
@@ -201,7 +204,7 @@ function LeaderboardHero({ leaderboard, myRank, period, currentPeriod, onPeriodC
   const stats = [
     { label: 'Ranked squads', value: totalSquads || visibleSquads || '0', icon: 'groups' },
     { label: 'Visible table', value: visibleSquads || '0', icon: 'leaderboard' },
-    { label: 'Your rank', value: myRank ? `#${myRank.rank}` : '-', icon: 'person_pin_circle' },
+    { label: isGuest ? 'Public view' : 'Your rank', value: isGuest ? 'Recruiter safe' : myRank ? `#${myRank.rank}` : '-', icon: isGuest ? 'public' : 'person_pin_circle' },
     { label: 'Reward state', value: needsReviewCount ? `${needsReviewCount} review` : publishedCount ? `${publishedCount} published` : 'Live', icon: 'verified' }
   ];
 
@@ -356,8 +359,9 @@ function PreviousWinnersPanel({ leaderboard, period }) {
   );
 }
 
-function RankRow({ entry, maxScore, index, onHistory }) {
-  const integrityTone = entry.suspiciousEventCount ? 'text-amber-300' : 'text-emerald-300';
+function RankRow({ entry, maxScore, index, onHistory, isGuest = false }) {
+  const integrityCount = toNumber(entry.suspiciousEventCount);
+  const integrityTone = integrityCount ? 'text-amber-300' : 'text-emerald-300';
 
   return (
     <article
@@ -385,11 +389,20 @@ function RankRow({ entry, maxScore, index, onHistory }) {
                   <span className="material-symbols-outlined text-[14px]">groups</span>
                   {entry.activeMemberCount} active members
                 </span>
-                <span className={`inline-flex items-center gap-1 ${integrityTone}`}>
-                  <span className="material-symbols-outlined text-[14px]">{entry.suspiciousEventCount ? 'policy' : 'verified_user'}</span>
-                  {entry.suspiciousEventCount} integrity flags
-                </span>
-                {entry.reviewReason ? <span className="text-amber-300">{entry.reviewReason.replace(/_/g, ' ')}</span> : null}
+                {isGuest ? (
+                  <span className="inline-flex items-center gap-1 text-emerald-300">
+                    <span className="material-symbols-outlined text-[14px]">verified_user</span>
+                    public proof view
+                  </span>
+                ) : (
+                  <>
+                    <span className={`inline-flex items-center gap-1 ${integrityTone}`}>
+                      <span className="material-symbols-outlined text-[14px]">{integrityCount ? 'policy' : 'verified_user'}</span>
+                      {integrityCount} integrity flags
+                    </span>
+                    {entry.reviewReason ? <span className="text-amber-300">{entry.reviewReason.replace(/_/g, ' ')}</span> : null}
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -400,15 +413,17 @@ function RankRow({ entry, maxScore, index, onHistory }) {
 
         <div className="space-y-3">
           <ScoreBar value={entry.qualityScore} max={maxScore} label="Quality score" delay={index * 30} />
-          <div className="grid grid-cols-3 gap-2 text-center">
+          <div className={`grid gap-2 text-center ${isGuest ? 'grid-cols-2' : 'grid-cols-3'}`}>
             <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3">
-              <p className="text-lg font-black text-[var(--text)]">{entry.eligiblePoints}</p>
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--muted-strong)]">eligible</p>
+              <p className="text-lg font-black text-[var(--text)]">{entry.activeMemberCount}</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--muted-strong)]">active</p>
             </div>
-            <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3">
-              <p className="text-lg font-black text-rose-300">-{entry.spamPenalty}</p>
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--muted-strong)]">penalty</p>
-            </div>
+            {!isGuest ? (
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3">
+                <p className="text-lg font-black text-rose-300">-{entry.spamPenalty}</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--muted-strong)]">penalty</p>
+              </div>
+            ) : null}
             <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)] p-3">
               <p className="text-lg font-black text-[var(--accent-strong)]">{entry.qualityScore}</p>
               <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--muted-strong)]">score</p>
@@ -460,7 +475,23 @@ function EmptyState() {
   );
 }
 
-function MySquadPanel({ myRank }) {
+function MySquadPanel({ myRank, isGuest = false }) {
+  if (isGuest) {
+    return (
+      <article className="app-panel">
+        <p className="app-kicker">Public leaderboard</p>
+        <h2 className="mt-3 text-xl font-black text-[var(--text)]">Recruiter-safe proof view</h2>
+        <p className="mt-4 text-sm leading-7 text-[var(--muted-strong)]">
+          Anyone can verify squad ranks, podium finishes, and reward history. Sign in to see your own squad position and member context.
+        </p>
+        <Link to="/auth" className="app-button-secondary mt-5 w-full justify-center">
+          <span className="material-symbols-outlined text-[18px]">login</span>
+          Sign in for your squad
+        </Link>
+      </article>
+    );
+  }
+
   return (
     <article className="app-panel">
       <p className="app-kicker">Your squad</p>
@@ -639,7 +670,7 @@ function SquadHistoryModal({ history, loading, error, onClose }) {
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="font-black text-[var(--text)]">{formatPeriod(entry.period)} · Rank #{entry.rank || '-'}</p>
-                      <p className="mt-1 text-xs font-bold text-[var(--muted-strong)]">{entry.qualityScore} score · {entry.activeMemberCount} active members · {entry.suspiciousEventCount} integrity flags</p>
+                      <p className="mt-1 text-xs font-bold text-[var(--muted-strong)]">{entry.qualityScore} score - {entry.activeMemberCount || 0} active members</p>
                       <p className="mt-1 text-xs font-semibold text-[var(--muted-strong)]">Reward status: {entry.reward ? 'Published' : (entry.reviewStatus || 'No reward').replace(/_/g, ' ')}</p>
                     </div>
                     {entry.reward ? (
@@ -666,6 +697,7 @@ function SquadHistoryModal({ history, loading, error, onClose }) {
 }
 
 export default function SquadLeaderboardPage() {
+  const auth = useSelector(selectAuth);
   const [period, setPeriod] = useState(getCurrentPeriod());
   const [leaderboard, setLeaderboard] = useState(null);
   const [previousLeaderboard, setPreviousLeaderboard] = useState(null);
@@ -673,13 +705,14 @@ export default function SquadLeaderboardPage() {
   const [error, setError] = useState('');
   const [historyState, setHistoryState] = useState({ loading: false, error: '', data: null });
   const currentPeriod = getCurrentPeriod();
+  const isGuest = !auth.isAuthenticated;
 
   async function openSquadHistory(entry) {
     if (!entry?.squadId) return;
     setHistoryState({ loading: true, error: '', data: { squadName: entry.squadName, entries: [] } });
     try {
       const response = await getSquadRewardHistory(entry.squadId, { limit: 12 });
-      setHistoryState({ loading: false, error: '', data: response.data || null });
+      setHistoryState({ loading: false, error: '', data: response?.data || response || null });
     } catch (apiError) {
       setHistoryState({
         loading: false,
@@ -701,7 +734,7 @@ export default function SquadLeaderboardPage() {
       setLeaderboard(leaderboardResponse.data || null);
       setPreviousLeaderboard(previousResponse.data || null);
     } catch (apiError) {
-      setError(apiError.response?.data?.error || 'Could not load the squad leaderboard.');
+      setError(apiError.response?.data?.error || apiError.response?.data?.message || 'The public squad leaderboard is temporarily unavailable.');
     } finally {
       setLoading(false);
     }
@@ -724,7 +757,7 @@ export default function SquadLeaderboardPage() {
         setPreviousLeaderboard(previousResponse.data || null);
       } catch (apiError) {
         if (isActive) {
-          setError(apiError.response?.data?.error || 'Could not load the squad leaderboard.');
+          setError(apiError.response?.data?.error || apiError.response?.data?.message || 'The public squad leaderboard is temporarily unavailable.');
         }
       } finally {
         if (isActive) setLoading(false);
@@ -735,7 +768,7 @@ export default function SquadLeaderboardPage() {
     return () => {
       isActive = false;
     };
-  }, [period]);
+  }, [period, auth.isAuthenticated]);
 
   const entries = leaderboard?.entries || [];
   const podium = useMemo(() => (leaderboard?.podium?.length ? leaderboard.podium : [entries[0], entries[1], entries[2]].filter(Boolean)), [entries, leaderboard?.podium]);
@@ -749,7 +782,7 @@ export default function SquadLeaderboardPage() {
       description="Monthly squad rankings use quality-weighted points, caps, and integrity-aware rewards."
     >
       <div className="space-y-6">
-        <LeaderboardHero leaderboard={leaderboard} myRank={myRank} period={period} currentPeriod={currentPeriod} onPeriodChange={setPeriod} />
+        <LeaderboardHero leaderboard={leaderboard} myRank={myRank} period={period} currentPeriod={currentPeriod} onPeriodChange={setPeriod} isGuest={isGuest} />
         <PreviousWinnersPanel leaderboard={previousLeaderboard} period={getPreviousPeriod(period)} />
 
         {error ? (
@@ -767,7 +800,7 @@ export default function SquadLeaderboardPage() {
         <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
           <main className="space-y-6">
             <div className="xl:hidden">
-              <MySquadPanel myRank={myRank} />
+              <MySquadPanel myRank={myRank} isGuest={isGuest} />
             </div>
 
             <PodiumStage podium={podium} maxScore={maxScore} />
@@ -791,7 +824,7 @@ export default function SquadLeaderboardPage() {
                 ) : entries.length ? (
                   <div className="space-y-3">
                     {entries.map((entry, index) => (
-                      <RankRow key={entry.squadId} entry={entry} maxScore={maxScore} index={index} onHistory={openSquadHistory} />
+                      <RankRow key={entry.squadId} entry={entry} maxScore={maxScore} index={index} onHistory={openSquadHistory} isGuest={isGuest} />
                     ))}
                   </div>
                 ) : (
@@ -803,7 +836,7 @@ export default function SquadLeaderboardPage() {
 
           <aside className="space-y-6 xl:sticky xl:top-24 xl:self-start">
             <div className="hidden xl:block">
-              <MySquadPanel myRank={myRank} />
+              <MySquadPanel myRank={myRank} isGuest={isGuest} />
             </div>
             <RewardPreviewPanel />
             <TrustPanel />

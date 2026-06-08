@@ -13,7 +13,7 @@ import {
   postMessageController,
   setArchetypeController
 } from './squad-comms.controller.js';
-import { authenticateRequest } from '../../shared/middleware/auth.middleware.js';
+import { authenticateRequest, optionalAuthenticateRequest } from '../../shared/middleware/auth.middleware.js';
 
 const strictSquadRateLimit = {
   rateLimit: {
@@ -26,7 +26,7 @@ export default async function squadRoutes(app) {
   app.post('/join', { preHandler: authenticateRequest }, joinSquadController);
   app.post('/log-app', { preHandler: authenticateRequest, config: strictSquadRateLimit }, logSquadAppController);
   app.get('/my-squad', { preHandler: authenticateRequest }, getMySquadController);
-  app.get('/leaderboard', { preHandler: authenticateRequest }, getSquadLeaderboardController);
+  app.get('/leaderboard', { preHandler: optionalAuthenticateRequest }, getSquadLeaderboardController);
   app.get('/leaderboard/my-rank', { preHandler: authenticateRequest }, getMySquadLeaderboardRankController);
   app.get('/rewards/my-history', { preHandler: authenticateRequest }, getMySquadRewardHistoryController);
   app.get('/:squadId/reward-history', getSquadRewardHistoryController);
