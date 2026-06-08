@@ -568,9 +568,11 @@ function TrustPanel() {
       <h2 className="mt-3 text-xl font-black text-[var(--text)]">Credible signals for recruiters</h2>
       <div className="mt-5 space-y-4">
         {points.map(([icon, title, copy]) => (
-          <div key={title} className="flex gap-3">
-            <span className="material-symbols-outlined mt-0.5 text-[20px] text-[var(--accent-strong)]">{icon}</span>
-            <div>
+          <div key={title} className="grid grid-cols-[32px_minmax(0,1fr)] gap-3">
+            <span className="flex h-8 w-8 shrink-0 items-start justify-center pt-0.5">
+              <span className="material-symbols-outlined text-[20px] leading-none text-[var(--accent-strong)]">{icon}</span>
+            </span>
+            <div className="min-w-0">
               <p className="font-black text-[var(--text)]">{title}</p>
               <p className="mt-1 text-sm leading-6 text-[var(--muted-strong)]">{copy}</p>
             </div>
