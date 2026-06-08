@@ -27,6 +27,22 @@ export default function SquadProofCard({ summary = null, history = [] }) {
   const currentSquad = summary?.currentSquad || latest?.squadName || 'No active squad yet';
   const squadId = summary?.currentSquadId || latest?.squadId || null;
   const currentRank = summary?.currentSquadRank || null;
+  const statusTitle = latest
+    ? `${latest.title} earned`
+    : currentRank
+      ? `Live at ${formatRank(currentRank)}`
+      : 'Building monthly proof';
+  const statusCopy = latest
+    ? `Rank #${latest.rank} monthly squad. Earned ${latest.periodLabel || latest.period} with ${latest.squadName}.`
+    : currentRank
+      ? `${currentSquad} is currently placed ${formatRank(currentRank)} on the monthly leaderboard. Claimable rewards appear here after verified month-end results.`
+      : 'This squad has not claimed a monthly reward yet. Live rank and proof history update from leaderboard activity.';
+  const metrics = [
+    { label: 'Current squad', value: currentSquad, icon: 'groups' },
+    { label: 'Current rank', value: formatRank(currentRank), icon: 'leaderboard' },
+    { label: 'Best finish', value: formatRank(bestRank), icon: 'military_tech' },
+    { label: 'Claimed rewards', value: String(totalClaimed), icon: 'verified' }
+  ];
 
   if (!totalClaimed && !summary?.currentSquad) {
     return null;
@@ -53,60 +69,50 @@ export default function SquadProofCard({ summary = null, history = [] }) {
   return (
     <>
       <section className="overflow-hidden rounded-2xl border border-[var(--accent)]/20 bg-[var(--accent)]/10 p-4 backdrop-blur-sm sm:p-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-3">
           <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--accent-strong)]">Squad Performance</p>
-            <h3 className="mt-2 text-lg font-black leading-tight text-[var(--text)]">Verified monthly squad contribution</h3>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[var(--accent-strong)]">Squad Performance</p>
+              <span className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-emerald-400">
+                <span className="material-symbols-outlined text-[13px]">verified</span>
+                Verified
+              </span>
+            </div>
+            <h3 className="mt-2 text-base font-black leading-snug text-[var(--text)]">Verified squad contribution</h3>
             <p className="mt-1 max-w-xl text-sm leading-6 text-[var(--muted-strong)]">
               Verified squad participation, leaderboard position, and monthly reward history.
             </p>
           </div>
-          <span className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-emerald-400">
-            <span className="material-symbols-outlined text-[14px]">verified</span>
-            Recruiter-safe proof
-          </span>
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="min-w-0 rounded-xl border border-[var(--border)] bg-[var(--panel)]/65 p-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[var(--muted)]">Current squad</p>
-            <p className="mt-1 break-words text-base font-black leading-6 text-[var(--text)]">{currentSquad}</p>
-          </div>
-          <div className="min-w-0 rounded-xl border border-[var(--border)] bg-[var(--panel)]/65 p-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[var(--muted)]">Current rank</p>
-            <p className="mt-1 text-base font-black text-[var(--text)]">{formatRank(currentRank)}</p>
-          </div>
-          <div className="min-w-0 rounded-xl border border-[var(--border)] bg-[var(--panel)]/65 p-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[var(--muted)]">Best finish</p>
-            <p className="mt-1 text-base font-black text-[var(--text)]">{formatRank(bestRank)}</p>
-          </div>
-          <div className="min-w-0 rounded-xl border border-[var(--border)] bg-[var(--panel)]/65 p-4">
-            <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[var(--muted)]">Claimed rewards</p>
-            <p className="mt-1 text-base font-black text-[var(--text)]">{totalClaimed}</p>
-          </div>
+        <div className="mt-5 space-y-2">
+          {metrics.map((metric) => (
+            <div key={metric.label} className="flex min-w-0 items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--panel)]/65 p-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="material-symbols-outlined flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)]/10 text-[17px] text-[var(--accent-strong)]">
+                  {metric.icon}
+                </span>
+                <p className="min-w-0 text-[10px] font-black uppercase tracking-[0.08em] text-[var(--muted)]">{metric.label}</p>
+              </div>
+              <p className="min-w-0 max-w-[58%] truncate text-right text-sm font-black leading-5 text-[var(--text)]" title={metric.value}>
+                {metric.value}
+              </p>
+            </div>
+          ))}
         </div>
 
-        <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-stretch">
-          {latest ? (
-            <div className="rounded-xl border border-[var(--border)] bg-[var(--panel)]/75 p-4">
-              <p className="text-sm font-black text-[var(--text)]">{latest.title}</p>
-              <p className="mt-1 text-xs leading-5 text-[var(--muted-strong)]">
-                Rank #{latest.rank} monthly squad. Earned {latest.periodLabel || latest.period} with {latest.squadName}. Verified through clean monthly contribution.
-              </p>
-            </div>
-          ) : (
-            <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--panel)]/55 p-4">
-              <p className="text-sm font-black text-[var(--text)]">No claimed squad reward yet</p>
-              <p className="mt-1 text-xs leading-5 text-[var(--muted-strong)]">
-                Squad reward proof appears here after a monthly squad reward is claimed.
-              </p>
-            </div>
-          )}
+        <div className="mt-4 space-y-3">
+          <div className={`rounded-xl border p-4 ${latest ? 'border-emerald-400/20 bg-emerald-400/10' : 'border-[var(--border)] bg-[var(--panel)]/55'}`}>
+            <p className="text-sm font-black leading-5 text-[var(--text)]">{statusTitle}</p>
+            <p className="mt-1 text-xs leading-5 text-[var(--muted-strong)]">
+              {statusCopy} Verified through clean monthly contribution.
+            </p>
+          </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row lg:flex-col">
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
             <Link
               to="/squad-leaderboard"
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)] px-4 py-3 text-sm font-black text-[var(--accent-contrast)] shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--accent)]/30 bg-[var(--accent)] px-4 py-3 text-sm font-black text-[var(--accent-contrast)] shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md"
             >
               <span className="material-symbols-outlined text-[18px]">leaderboard</span>
               View Leaderboard
@@ -115,7 +121,7 @@ export default function SquadProofCard({ summary = null, history = [] }) {
               type="button"
               onClick={openHistory}
               disabled={!squadId}
-              className="inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-sm font-black text-[var(--text)] shadow-sm transition-all hover:border-[var(--accent)]/30 hover:bg-[var(--panel-soft)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-sm font-black text-[var(--text)] shadow-sm transition-all hover:border-[var(--accent)]/30 hover:bg-[var(--panel-soft)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               <span className="material-symbols-outlined text-[18px]">history</span>
               View History
