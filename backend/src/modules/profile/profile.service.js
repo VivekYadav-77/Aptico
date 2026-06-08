@@ -726,6 +726,7 @@ export async function getPublicProfile(db, username, viewerId = null) {
       follower_count: userProfiles.followerCount,
       following_count: userProfiles.followingCount,
       name: users.name,
+      status: users.status,
       avatar_url: users.avatarUrl,
       created_at: userProfiles.createdAt
     })
@@ -739,6 +740,11 @@ export async function getPublicProfile(db, username, viewerId = null) {
   }
 
   const profileOwnerId = rows[0].user_id;
+  const isSelf = viewerId && viewerId === profileOwnerId;
+
+  if (['blocked', 'deactivated'].includes(rows[0].status) && !isSelf) {
+    throw serviceError('Profile not found', 404);
+  }
 
   // Fetch profile_settings for enriched sections
   const settingsRows = await db
@@ -750,7 +756,6 @@ export async function getPublicProfile(db, username, viewerId = null) {
   const rawSettings = settingsRows[0]?.settingsJson || {};
 
   // Determine viewer relationship
-  const isSelf = viewerId && viewerId === profileOwnerId;
   let isConnected = false;
   const effectiveIsPublic = typeof rawSettings.publicProfile === 'boolean'
     ? rawSettings.publicProfile

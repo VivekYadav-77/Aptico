@@ -23,12 +23,54 @@ export const users = pgTable('users', {
   passwordHash: text('password_hash'),
   googleSubject: text('google_subject'),
   role: text('role').notNull().default('user'),
+  status: varchar('status', { length: 30 }).notNull().default('active'),
   resilienceXp: integer('resilience_xp').notNull().default(0),
   lastXpDecayAt: timestamp('last_xp_decay_at', { withTimezone: true }),
   emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   lastLogin: timestamp('last_login', { withTimezone: true })
 });
+
+export const adminRestrictions = pgTable(
+  'admin_restrictions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    feature: varchar('feature', { length: 50 }).notNull(),
+    isRestricted: boolean('is_restricted').notNull().default(true),
+    reason: text('reason'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    userFeatureIdx: uniqueIndex('admin_restrictions_user_feature_idx').on(table.userId, table.feature),
+    userActiveIdx: index('admin_restrictions_user_active_idx').on(table.userId, table.isRestricted),
+    featureIdx: index('admin_restrictions_feature_idx').on(table.feature)
+  })
+);
+
+export const adminModerationActions = pgTable(
+  'admin_moderation_actions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    adminUserId: uuid('admin_user_id').references(() => users.id, { onDelete: 'set null' }),
+    action: varchar('action', { length: 80 }).notNull(),
+    targetType: varchar('target_type', { length: 80 }).notNull(),
+    targetId: text('target_id').notNull(),
+    reason: text('reason').notNull(),
+    metadata: jsonb('metadata').notNull().default({}),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    targetIdx: index('admin_moderation_actions_target_idx').on(table.targetType, table.targetId),
+    adminCreatedAtIdx: index('admin_moderation_actions_admin_created_at_idx').on(table.adminUserId, table.createdAt),
+    actionCreatedAtIdx: index('admin_moderation_actions_action_created_at_idx').on(table.action, table.createdAt)
+  })
+);
 
 export const refreshTokens = pgTable(
   'refresh_tokens',

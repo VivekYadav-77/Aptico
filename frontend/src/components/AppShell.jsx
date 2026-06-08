@@ -72,10 +72,11 @@ function Navigation({ mobile = false, onNavigate, showAdmin }) {
 }
 
 // ── Search Dropdown ──────────────────────────────────────────
-function SearchDropdown({ query, onClose, navigate }) {
+function SearchDropdown({ query, onClose, navigate, showAdmin = false }) {
   const trimmed = query.trim().toLowerCase();
+  const navItems = showAdmin ? [...NAV_ITEMS, ADMIN_NAV_ITEM] : NAV_ITEMS;
 
-  const navResults = NAV_ITEMS.filter(
+  const navResults = navItems.filter(
     (item) =>
       item.label.toLowerCase().includes(trimmed) ||
       item.description.toLowerCase().includes(trimmed)
@@ -188,6 +189,8 @@ export default function AppShell({ title, description, actions, children, banner
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const profileDropdownRef = useRef(null);
   const [hubDropdownOpen, setHubDropdownOpen] = useState(false);
+  const isAdmin = auth.user?.role === 'admin';
+  const navItems = isAdmin ? [...NAV_ITEMS, ADMIN_NAV_ITEM] : NAV_ITEMS;
 
   const userLabel = useMemo(() => {
     if (auth.user?.name) return auth.user.name;
@@ -297,6 +300,20 @@ export default function AppShell({ title, description, actions, children, banner
                 );
               })}
 
+              {isAdmin ? (
+                <Link
+                  to="/admin"
+                  className={`group relative flex items-center gap-2 px-3.5 py-1.5 text-[13px] font-medium rounded-lg transition-all duration-200 ${
+                    location.pathname === '/admin'
+                      ? 'bg-[var(--accent)]/15 text-[var(--accent-strong)] shadow-sm'
+                      : 'text-[var(--muted-strong)] hover:text-[var(--text)] hover:bg-white/[0.04]'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">admin_panel_settings</span>
+                  <span className="relative z-10 tracking-wide">Admin</span>
+                </Link>
+              ) : null}
+
               {/* Apps Dropdown containing the remaining page routes */}
               <div 
                 className="relative"
@@ -375,6 +392,7 @@ export default function AppShell({ title, description, actions, children, banner
                     query={searchQuery}
                     onClose={() => { setSearchOpen(false); setSearchQuery(''); }}
                     navigate={navigate}
+                    showAdmin={isAdmin}
                   />
                 )}
               </div>
@@ -410,6 +428,7 @@ export default function AppShell({ title, description, actions, children, banner
                       <div className="min-w-0">
                         <p className="truncate text-sm font-black text-[var(--text)]">{userLabel}</p>
                         <p className="truncate text-xs text-[var(--muted-strong)]">{auth.user?.email || 'authenticated user'}</p>
+                        {isAdmin ? <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-[var(--accent-strong)]">Admin access</p> : null}
                       </div>
                     </div>
 
@@ -448,6 +467,14 @@ export default function AppShell({ title, description, actions, children, banner
                       >
                         <span className="material-symbols-outlined text-[16px] text-[var(--accent-strong)] transition-transform duration-200 group-hover:scale-110 drop-shadow-[0_0_4px_rgba(78,222,163,0.3)]">person</span>
                         <span className="transition-transform duration-200 group-hover:translate-x-1">View Profile</span>
+                      </Link>
+                      <Link
+                        to="/admin"
+                        onClick={() => setProfileDropdownOpen(false)}
+                        className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-[var(--muted-strong)] hover:bg-white/[0.06] hover:text-[var(--text)] transition-all duration-200 ${isAdmin ? '' : 'hidden'}`}
+                      >
+                        <span className="material-symbols-outlined text-[16px] text-[var(--accent-strong)] transition-transform duration-200 group-hover:scale-110">admin_panel_settings</span>
+                        <span className="transition-transform duration-200 group-hover:translate-x-1">Admin Control</span>
                       </Link>
                       <Link
                         to="/settings"
@@ -539,7 +566,7 @@ export default function AppShell({ title, description, actions, children, banner
             <div className="mt-2 rounded-xl border border-[var(--border)] bg-[var(--panel)] py-2">
               {(() => {
                 const trimmed = searchQuery.trim().toLowerCase();
-                const navRes = NAV_ITEMS.filter(i => i.label.toLowerCase().includes(trimmed) || i.description.toLowerCase().includes(trimmed));
+                const navRes = navItems.filter(i => i.label.toLowerCase().includes(trimmed) || i.description.toLowerCase().includes(trimmed));
                 const insRes = SEARCHABLE_INSIGHTS.filter(i => i.label.toLowerCase().includes(trimmed) || i.category.toLowerCase().includes(trimmed));
                 const hasAny = navRes.length > 0 || insRes.length > 0;
                 if (!hasAny) {

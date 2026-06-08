@@ -1,5 +1,5 @@
 import { analyzeController } from './analysis.controller.js';
-import { optionalAuthenticateRequest } from '../../shared/middleware/auth.middleware.js';
+import { optionalAuthenticateRequest, requireFeatureAccess } from '../../shared/middleware/auth.middleware.js';
 import { env } from '../../config/env.js';
 import { createQuotaHook } from '../../shared/security/ai-quota.js';
 
@@ -15,7 +15,7 @@ export default async function analyzeRoutes(app) {
   app.post(
     '/',
     {
-      preHandler: [optionalAuthenticateRequest, analysisQuota],
+      preHandler: [optionalAuthenticateRequest, requireFeatureAccess('analysis'), analysisQuota],
       config: {
         rateLimit: {
           max: isDev ? 10 : 3,

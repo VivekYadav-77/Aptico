@@ -36,6 +36,13 @@
       "when": 1780926000000,
       "tag": "0004_privacy_safe_admin_analytics",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1780929600000,
+      "tag": "0005_admin_control_center_expansion",
+      "breakpoints": true
     }
   ]
 }

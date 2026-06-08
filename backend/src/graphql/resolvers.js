@@ -1,15 +1,23 @@
 import { and, desc, eq, gte, isNull, sql } from 'drizzle-orm';
 import {
   adminAuditLogs,
+  adminRestrictions,
   analyses,
   analyticsEvents,
   apiUsage,
+  communityWins,
   generatedContent,
+  posts,
   refreshTokens,
   savedJobs,
   users,
   visitorSessions
 } from '../db/schema.js';
+import {
+  listModerationActions,
+  listModerationQueue,
+  listRestrictionsForUser
+} from '../modules/admin/admin-controls.service.js';
 
 async function getCount(db, table, whereClause) {
   const query = db
@@ -71,7 +79,13 @@ export const resolvers = {
         uniqueVisitors,
         totalEvents,
         apiErrors,
-        adminActions
+        adminActions,
+        restrictedUsers,
+        blockedUsers,
+        deactivatedUsers,
+        hiddenPosts,
+        hiddenWins,
+        pendingModeration
       ] =
         await Promise.all([
           getCount(db, users),
@@ -90,7 +104,13 @@ export const resolvers = {
           })(),
           getCount(db, analyticsEvents),
           getCount(db, analyticsEvents, eq(analyticsEvents.eventType, 'api_error')),
-          getCount(db, adminAuditLogs)
+          getCount(db, adminAuditLogs),
+          getCount(db, users, eq(users.status, 'restricted')),
+          getCount(db, users, eq(users.status, 'blocked')),
+          getCount(db, users, eq(users.status, 'deactivated')),
+          getCount(db, posts, eq(posts.isVisible, false)),
+          getCount(db, communityWins, eq(communityWins.isVisible, false)),
+          getCount(db, adminRestrictions, eq(adminRestrictions.isRestricted, true))
         ]);
 
       const [apiUsageRow] = await db
@@ -116,7 +136,13 @@ export const resolvers = {
         ),
         totalEvents,
         apiErrors,
-        adminActions
+        adminActions,
+        restrictedUsers,
+        blockedUsers,
+        deactivatedUsers,
+        hiddenPosts,
+        hiddenWins,
+        pendingModeration
       };
     },
     apiUsageMetrics: async (_source, _args, context) => {
@@ -136,10 +162,19 @@ export const resolvers = {
 
       return Promise.all(
         rows.map(async (user) => {
-          const [activeSessionCount, analysesCount, savedJobsCount] = await Promise.all([
+          const [activeSessionCount, analysesCount, savedJobsCount, restrictionCount] = await Promise.all([
             getCount(db, refreshTokens, and(eq(refreshTokens.userId, user.id), isNull(refreshTokens.revokedAt))),
             getCount(db, analyses, eq(analyses.userId, user.id)),
-            getCount(db, savedJobs, eq(savedJobs.userId, user.id))
+            getCount(db, savedJobs, eq(savedJobs.userId, user.id)),
+            getCount(
+              db,
+              adminRestrictions,
+              and(
+                eq(adminRestrictions.userId, user.id),
+                eq(adminRestrictions.isRestricted, true),
+                sql`(${adminRestrictions.expiresAt} is null or ${adminRestrictions.expiresAt} > now())`
+              )
+            )
           ]);
           const [eventCount, lastSeenRow] = await Promise.all([
             getCount(db, analyticsEvents, eq(analyticsEvents.userId, user.id)),
@@ -155,12 +190,14 @@ export const resolvers = {
             name: user.name,
             avatarUrl: user.avatarUrl,
             role: user.role,
+            status: user.status || 'active',
             createdAt: serializeDate(user.createdAt),
             lastLogin: serializeDate(user.lastLogin),
             activeSessionCount,
             analysesCount,
             savedJobsCount,
             eventCount,
+            restrictionCount,
             lastSeenAt: serializeDate(lastSeenRow[0]?.lastSeenAt)
           };
         })
@@ -340,6 +377,45 @@ export const resolvers = {
         metadata: serializeMetadata(row.metadata),
         createdAt: serializeDate(row.createdAt)
       }));
+    },
+    adminRestrictions: async (_source, args, context) => {
+      const db = await requireDb(context);
+
+      if (args.userId) {
+        return listRestrictionsForUser(db, args.userId);
+      }
+
+      const rows = await db
+        .select()
+        .from(adminRestrictions)
+        .orderBy(desc(adminRestrictions.updatedAt))
+        .limit(100);
+
+      return rows.map((row) => ({
+        id: row.id,
+        userId: row.userId,
+        feature: row.feature,
+        isRestricted: row.isRestricted,
+        reason: row.reason,
+        expiresAt: serializeDate(row.expiresAt),
+        createdBy: row.createdBy,
+        createdAt: serializeDate(row.createdAt),
+        updatedAt: serializeDate(row.updatedAt)
+      }));
+    },
+    adminModerationQueue: async (_source, args, context) => {
+      const db = await requireDb(context);
+      return listModerationQueue(db, {
+        contentType: args.contentType,
+        limit: args.limit,
+        search: args.search
+      });
+    },
+    adminModerationActions: async (_source, args, context) => {
+      const db = await requireDb(context);
+      return listModerationActions(db, {
+        limit: args.limit
+      });
     },
     suspiciousSignals: async (_source, _args, context) => {
       const db = await requireDb(context);

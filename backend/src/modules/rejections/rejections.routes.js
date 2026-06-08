@@ -1,5 +1,5 @@
 import { createRejectionController } from './rejections.controller.js';
-import { authenticateRequest } from '../../shared/middleware/auth.middleware.js';
+import { authenticateRequest, requireFeatureAccess } from '../../shared/middleware/auth.middleware.js';
 
 const strictRejectionRateLimit = {
   rateLimit: {
@@ -9,5 +9,5 @@ const strictRejectionRateLimit = {
 };
 
 export default async function rejectionRoutes(app) {
-  app.post('/rejections', { preHandler: authenticateRequest, config: strictRejectionRateLimit }, createRejectionController);
+  app.post('/rejections', { preHandler: [authenticateRequest, requireFeatureAccess('activity_logging')], config: strictRejectionRateLimit }, createRejectionController);
 }

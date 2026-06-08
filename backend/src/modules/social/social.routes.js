@@ -1,7 +1,7 @@
 import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { analyses, communityWins, connections, notifications, publicJobCache, userProfiles, users } from '../../db/schema.js';
-import { authenticateRequest, optionalAuthenticateRequest } from '../../shared/middleware/auth.middleware.js';
+import { authenticateRequest, optionalAuthenticateRequest, requireFeatureAccess } from '../../shared/middleware/auth.middleware.js';
 import {
   createOrUpdateProfile,
   followUser,
@@ -297,7 +297,7 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.put('/profile', { preHandler: authenticateRequest }, async (request, reply) => {
+  app.put('/profile', { preHandler: [authenticateRequest, requireFeatureAccess('profile_visibility')] }, async (request, reply) => {
     try {
       const body = profileBodySchema.parse(request.body || {});
       const oldProfileRows = await request.server.db
@@ -321,7 +321,7 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.post('/follow/:username', { preHandler: authenticateRequest, config: socialStrictRateLimit }, async (request, reply) => {
+  app.post('/follow/:username', { preHandler: [authenticateRequest, requireFeatureAccess('squad_actions')], config: socialStrictRateLimit }, async (request, reply) => {
     try {
       const result = await followUser(request.server.db, request.auth.userId, request.params.username);
       return reply.send(result);
@@ -339,7 +339,7 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.post('/wins', { preHandler: authenticateRequest, config: socialStrictRateLimit }, async (request, reply) => {
+  app.post('/wins', { preHandler: [authenticateRequest, requireFeatureAccess('posting')], config: socialStrictRateLimit }, async (request, reply) => {
     try {
       const body = winBodySchema.parse(request.body || {});
       const win = await postWin(request.server.db, request.auth.userId, body);
@@ -369,7 +369,7 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.put('/wins/:winId', { preHandler: authenticateRequest, config: socialWriteRateLimit }, async (request, reply) => {
+  app.put('/wins/:winId', { preHandler: [authenticateRequest, requireFeatureAccess('posting')], config: socialWriteRateLimit }, async (request, reply) => {
     try {
       const body = winBodySchema.parse(request.body || {});
       const win = await updateWin(request.server.db, request.auth.userId, request.params.winId, body);
@@ -440,7 +440,7 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.post('/wins/:winId/like', { preHandler: authenticateRequest, config: socialWriteRateLimit }, async (request, reply) => {
+  app.post('/wins/:winId/like', { preHandler: [authenticateRequest, requireFeatureAccess('squad_actions')], config: socialWriteRateLimit }, async (request, reply) => {
     try {
       const result = await likeWin(request.server.db, request.auth.userId, request.params.winId);
       return reply.send(result);
@@ -509,7 +509,7 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.post('/posts', { preHandler: authenticateRequest, config: socialStrictRateLimit }, async (request, reply) => {
+  app.post('/posts', { preHandler: [authenticateRequest, requireFeatureAccess('posting')], config: socialStrictRateLimit }, async (request, reply) => {
     try {
       const body = postBodySchema.parse(request.body || {});
       const post = await createPost(request.server.db, request.auth.userId, body);
@@ -540,7 +540,7 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.put('/posts/:postId', { preHandler: authenticateRequest, config: socialWriteRateLimit }, async (request, reply) => {
+  app.put('/posts/:postId', { preHandler: [authenticateRequest, requireFeatureAccess('posting')], config: socialWriteRateLimit }, async (request, reply) => {
     try {
       const body = postBodySchema.parse(request.body || {});
       const post = await updatePost(request.server.db, request.auth.userId, request.params.postId, body);
@@ -591,7 +591,7 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.post('/posts/:postId/like', { preHandler: authenticateRequest, config: socialWriteRateLimit }, async (request, reply) => {
+  app.post('/posts/:postId/like', { preHandler: [authenticateRequest, requireFeatureAccess('squad_actions')], config: socialWriteRateLimit }, async (request, reply) => {
     try {
       const result = await likePost(request.server.db, request.auth.userId, request.params.postId);
       return reply.send(result);
@@ -610,7 +610,7 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.post('/posts/:postId/comments', { preHandler: authenticateRequest, config: socialStrictRateLimit }, async (request, reply) => {
+  app.post('/posts/:postId/comments', { preHandler: [authenticateRequest, requireFeatureAccess('commenting')], config: socialStrictRateLimit }, async (request, reply) => {
     try {
       const body = commentBodySchema.parse(request.body || {});
       const comment = await addComment(request.server.db, request.auth.userId, request.params.postId, body.content, body.parent_id || null);
@@ -631,7 +631,7 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.post('/comments/:commentId/like', { preHandler: authenticateRequest, config: socialStrictRateLimit }, async (request, reply) => {
+  app.post('/comments/:commentId/like', { preHandler: [authenticateRequest, requireFeatureAccess('commenting')], config: socialStrictRateLimit }, async (request, reply) => {
     try {
       const result = await toggleCommentLike(request.server.db, request.auth.userId, request.params.commentId);
       return reply.send(result);
@@ -669,7 +669,7 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.post('/connections/request/:username', { preHandler: authenticateRequest, config: socialStrictRateLimit }, async (request, reply) => {
+  app.post('/connections/request/:username', { preHandler: [authenticateRequest, requireFeatureAccess('squad_actions')], config: socialStrictRateLimit }, async (request, reply) => {
     try {
       const body = connectionRequestSchema.parse(request.body || {});
       const connection = await sendConnectionRequest(request.server.db, request.auth.userId, request.params.username, body.note);
@@ -679,7 +679,7 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.put('/connections/:connectionId', { preHandler: authenticateRequest, config: socialWriteRateLimit }, async (request, reply) => {
+  app.put('/connections/:connectionId', { preHandler: [authenticateRequest, requireFeatureAccess('squad_actions')], config: socialWriteRateLimit }, async (request, reply) => {
     try {
       const body = connectionResponseSchema.parse(request.body || {});
       const result = await respondToRequest(request.server.db, request.auth.userId, request.params.connectionId, body.action);

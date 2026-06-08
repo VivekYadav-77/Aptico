@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
-import { Navigate } from '@/lib/router-compat.jsx';
+import { Navigate, useLocation } from '@/lib/router-compat.jsx';
 import { AdminRoute, ProtectedRoute } from '../components/ProtectedRoute.jsx';
 import AnalysisHistoryPage from '../screens/AnalysisHistoryPage.jsx';
 import AnalysisWorkspace from '../screens/AnalysisWorkspace.jsx';
@@ -78,7 +78,11 @@ function RootRoute() {
     return <LoadingShell />;
   }
 
-  return auth.isAuthenticated ? <Navigate replace to="/squads" /> : <GuestDashboard />;
+  if (auth.isAuthenticated) {
+    return <Navigate replace to={auth.user?.role === 'admin' ? '/admin' : '/squads'} />;
+  }
+
+  return <GuestDashboard />;
 }
 
 function AnalyticsRouteTracker() {

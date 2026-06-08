@@ -5,6 +5,10 @@ import { loginWithGoogleRequest, sendMagicLinkRequest, verifyMagicLinkRequest } 
 import ThemeToggle from '../components/ThemeToggle.jsx';
 import { enterGuestMode, exitGuestMode, selectAuth } from '../store/authSlice.js';
 
+function getPostAuthPath(user) {
+  return user?.role === 'admin' ? '/admin' : '/dashboard';
+}
+
 function GoogleButton({ onError, onSuccess }) {
   const buttonRef = useRef(null);
 
@@ -121,13 +125,13 @@ export default function Auth() {
 
   useEffect(() => {
     if (auth.isAuthenticated) {
-      navigate('/dashboard', { replace: true });
+      navigate(getPostAuthPath(auth.user), { replace: true });
     }
 
     if (auth.guestMode) {
       navigate('/guest', { replace: true });
     }
-  }, [auth.guestMode, auth.isAuthenticated, navigate]);
+  }, [auth.guestMode, auth.isAuthenticated, auth.user, navigate]);
 
   useEffect(() => {
     const magicToken = searchParams.get('magicToken');
@@ -143,13 +147,13 @@ export default function Auth() {
       setStatusMessage('Verifying your secure sign-in link...');
 
       try {
-        await verifyMagicLinkRequest(magicToken, store);
+        const session = await verifyMagicLinkRequest(magicToken, store);
         if (!isActive) {
           return;
         }
 
         setSearchParams({}, { replace: true });
-        navigate('/dashboard', { replace: true });
+        navigate(getPostAuthPath(session.user), { replace: true });
       } catch (error) {
         if (isActive) {
           setErrorMessage(error.response?.data?.message || 'Magic link verification failed.');
@@ -212,8 +216,8 @@ export default function Auth() {
     dispatch(exitGuestMode());
 
     try {
-      await loginWithGoogleRequest(credential, store);
-      navigate('/dashboard', { replace: true });
+      const session = await loginWithGoogleRequest(credential, store);
+      navigate(getPostAuthPath(session.user), { replace: true });
     } catch (error) {
       setErrorMessage(error.response?.data?.message || error.message || 'Google login failed.');
     } finally {

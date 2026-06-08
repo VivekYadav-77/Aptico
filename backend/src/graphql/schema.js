@@ -13,6 +13,12 @@ export const schema = /* GraphQL */ `
     totalEvents: Int!
     apiErrors: Int!
     adminActions: Int!
+    restrictedUsers: Int!
+    blockedUsers: Int!
+    deactivatedUsers: Int!
+    hiddenPosts: Int!
+    hiddenWins: Int!
+    pendingModeration: Int!
   }
 
   type ApiUsageMetric {
@@ -28,13 +34,50 @@ export const schema = /* GraphQL */ `
     name: String
     avatarUrl: String
     role: String!
+    status: String!
     createdAt: String!
     lastLogin: String
     activeSessionCount: Int!
     analysesCount: Int!
     savedJobsCount: Int!
     eventCount: Int!
+    restrictionCount: Int!
     lastSeenAt: String
+  }
+
+  type AdminRestriction {
+    id: ID!
+    userId: ID!
+    feature: String!
+    isRestricted: Boolean!
+    reason: String
+    expiresAt: String
+    createdBy: ID
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  type AdminModerationItem {
+    id: ID!
+    ownerId: ID
+    ownerEmail: String
+    type: String!
+    title: String
+    body: String
+    status: String!
+    createdAt: String
+  }
+
+  type AdminModerationAction {
+    id: ID!
+    adminUserId: ID
+    adminEmail: String
+    action: String!
+    targetType: String!
+    targetId: String!
+    reason: String!
+    metadata: String!
+    createdAt: String!
   }
 
   type AdminTrendPoint {
@@ -98,6 +141,9 @@ export const schema = /* GraphQL */ `
     recentEvents(limit: Int = 30, eventType: String, userId: ID): [AdminEvent!]!
     userActivity(userId: ID!, limit: Int = 30): [AdminEvent!]!
     adminAuditLogs(limit: Int = 30): [AdminAuditLog!]!
+    adminRestrictions(userId: ID): [AdminRestriction!]!
+    adminModerationQueue(contentType: String = "post", limit: Int = 40, search: String): [AdminModerationItem!]!
+    adminModerationActions(limit: Int = 40): [AdminModerationAction!]!
     suspiciousSignals: [AdminSuspiciousSignal!]!
   }
 `;

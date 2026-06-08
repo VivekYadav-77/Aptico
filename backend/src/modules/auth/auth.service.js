@@ -30,6 +30,7 @@ const AUTH_USER_FIELDS = {
   passwordHash: users.passwordHash,
   googleSubject: users.googleSubject,
   role: users.role,
+  status: users.status,
   emailVerifiedAt: users.emailVerifiedAt,
   createdAt: users.createdAt,
   lastLogin: users.lastLogin,
@@ -197,6 +198,7 @@ async function upsertGoogleUser(db, payload) {
       googleSubject: payload.googleSubject || null,
       authProvider: 'google',
       role: 'user',
+      status: 'active',
       emailVerifiedAt: now,
       lastLogin: now
     })
@@ -214,7 +216,8 @@ async function createPasswordUser(db, { email, password, name }) {
       name: name || null,
       authProvider: 'password',
       passwordHash,
-      role: 'user'
+      role: 'user',
+      status: 'active'
     })
     .returning(AUTH_USER_FIELDS);
 
@@ -301,6 +304,7 @@ function normalizeUser(user) {
     avatarUrl: user.avatarUrl,
     authProvider: user.authProvider,
     role: user.role,
+    status: user.status || 'active',
     resilienceXp: user.resilienceXp || 0,
     emailVerified: Boolean(user.emailVerifiedAt)
   };
@@ -436,6 +440,16 @@ function requireVerifiedEmail(user) {
   }
 }
 
+function ensureUserCanAuthenticate(user) {
+  if (user?.status === 'blocked') {
+    throw createAuthError('This account has been blocked by an administrator.', 403, 'ACCOUNT_BLOCKED');
+  }
+
+  if (user?.status === 'deactivated') {
+    throw createAuthError('This account has been deactivated by an administrator.', 403, 'ACCOUNT_DEACTIVATED');
+  }
+}
+
 export async function registerWithPassword({ db, email, password, name }) {
   requireDatabase(db);
 
@@ -476,6 +490,7 @@ export async function loginWithPassword({ db, email, password, request }) {
   }
 
   requireVerifiedEmail(user);
+  ensureUserCanAuthenticate(user);
   return issueSession(db, user, request);
 }
 
@@ -511,6 +526,7 @@ export async function loginWithGoogle({ db, credential, request }) {
     googleSubject: payload.sub || null
   });
 
+  ensureUserCanAuthenticate(user);
   return issueSession(db, user, request);
 }
 
@@ -570,6 +586,7 @@ export async function verifyEmailToken({ db, token, request }) {
     throw createAuthError('User for verification token was not found.', 404, 'USER_NOT_FOUND');
   }
 
+  ensureUserCanAuthenticate(user);
   return issueSession(db, user, request);
 }
 
@@ -697,6 +714,7 @@ export async function refreshSession({ db, refreshToken, request }) {
     throw createAuthError('User for refresh token was not found.', 401, 'USER_NOT_FOUND');
   }
 
+  ensureUserCanAuthenticate(user);
   await revokeRefreshTokenRecord(db, refreshToken);
   return issueSession(db, user, request);
 }
