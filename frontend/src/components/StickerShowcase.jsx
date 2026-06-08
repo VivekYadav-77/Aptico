@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { getStickerById, RARITY_CONFIG, STICKER_CATEGORIES } from '../utils/stickerRegistry.js';
 import { formatStickerRequirement, getRecruiterStickerSignal, getStickerMeaning } from '../utils/stickerCopy.js';
 import StickerVisual from './StickerVisual.jsx';
@@ -15,6 +16,7 @@ function StickerIcon({ sticker, size = 32 }) {
  */
 export default function StickerShowcase({ equippedStickers = [], unlockedStickers = [], squadRewardHistory = [], userName = 'User', onSeeAll }) {
   const [activeTooltip, setActiveTooltip] = useState(null);
+  const [tooltipAnchor, setTooltipAnchor] = useState(null);
 
   const stickers = useMemo(() => {
     if (!Array.isArray(equippedStickers)) return [];
@@ -38,26 +40,33 @@ export default function StickerShowcase({ equippedStickers = [], unlockedSticker
         .sticker-showcase-item { transition: transform 0.2s ease, box-shadow 0.2s ease; }
         .sticker-showcase-item:hover { transform: translateY(-4px) scale(1.08); z-index: 40; }
         .sticker-tooltip-fade-in { animation: tooltip-fade-in 0.2s ease-out forwards; }
+        .sticker-tooltip-layer { z-index: 9999; }
         @keyframes tooltip-fade-in {
-          0% { opacity: 0; transform: translateY(10px) scale(0.95); }
-          100% { opacity: 1; transform: translateY(0) scale(1); }
+          0% { opacity: 0; }
+          100% { opacity: 1; }
         }
       `}</style>
       
-      <div className="flex flex-wrap items-center gap-2.5 relative">
+      <div className="flex flex-wrap items-center gap-2.5 relative z-[80] overflow-visible">
         {stickers.map((s) => {
           const rc = RARITY_CONFIG[s.rarity];
           const isHovered = activeTooltip === s.id;
-          const category = STICKER_CATEGORIES?.find(c => c.id === s.category)?.name || 'Achievement';
-          const squadProof = (squadRewardHistory || []).find((item) => item.stickerId === s.id);
 
           return (
             <div
               key={s.id}
               className="relative group"
-              onMouseEnter={() => setActiveTooltip(s.id)}
+              onMouseEnter={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect();
+                setTooltipAnchor({ left: rect.left + rect.width / 2, top: rect.bottom + 12 });
+                setActiveTooltip(s.id);
+              }}
               onMouseLeave={() => setActiveTooltip(null)}
-              onClick={() => setActiveTooltip(isHovered ? null : s.id)}
+              onClick={(event) => {
+                const rect = event.currentTarget.getBoundingClientRect();
+                setTooltipAnchor({ left: rect.left + rect.width / 2, top: rect.bottom + 12 });
+                setActiveTooltip(isHovered ? null : s.id);
+              }}
             >
               <div
                 className={`sticker-showcase-item flex items-center justify-center h-10 w-10 rounded-xl border ${rc.border} ${rc.bg} ${rc.glow} cursor-pointer ${s.rarity === 'legendary' ? 'sticker-showcase-holo' : ''} ${isHovered ? 'ring-2 ring-[var(--text)]/20' : ''}`}
@@ -65,34 +74,6 @@ export default function StickerShowcase({ equippedStickers = [], unlockedSticker
                 <StickerIcon sticker={s} size={40} />
               </div>
 
-              {/* Custom Tooltip */}
-              {isHovered && (
-                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-72 p-4 rounded-2xl bg-[var(--panel)] border border-[var(--border)] shadow-xl z-50 sticker-tooltip-fade-in pointer-events-none">
-                  {/* Triangle pointer */}
-                  <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[var(--panel)] border-l border-t border-[var(--border)] rotate-45" />
-                  
-                  <div className="relative z-10">
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider ${rc.badgeColor}`}>{rc.label}</span>
-                      <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--muted-strong)]">{category}</span>
-                    </div>
-                    <p className={`text-sm font-black leading-tight ${rc.textColor}`}>{s.name}</p>
-                    <p className="mt-1.5 text-xs text-[var(--text)] leading-relaxed opacity-90">{s.description}</p>
-                    <div className="mt-3 space-y-2 text-left">
-                      {[
-                        ['Earned for', formatStickerRequirement(s, { isUnlocked: true, squadProof })],
-                        ['Represents', getStickerMeaning(s, squadProof)],
-                        ['Recruiter signal', getRecruiterStickerSignal(s, squadProof)]
-                      ].map(([label, copy]) => (
-                        <div key={label} className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-3">
-                          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[var(--muted)]">{label}</p>
-                          <p className="mt-1 text-xs font-bold leading-5 text-[var(--text)]">{copy}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           );
         })}
@@ -111,6 +92,46 @@ export default function StickerShowcase({ equippedStickers = [], unlockedSticker
           </button>
         )}
       </div>
+      {activeTooltip && tooltipAnchor ? (() => {
+        const sticker = stickers.find((item) => item.id === activeTooltip);
+        if (!sticker) return null;
+        const rc = RARITY_CONFIG[sticker.rarity];
+        const category = STICKER_CATEGORIES?.find(c => c.id === sticker.category)?.name || 'Achievement';
+        const squadProof = (squadRewardHistory || []).find((item) => item.stickerId === sticker.id);
+        const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200;
+        const tooltipWidth = Math.min(320, Math.max(260, viewportWidth - 32));
+        const safeLeft = Math.min(Math.max(tooltipAnchor.left, tooltipWidth / 2 + 12), viewportWidth - tooltipWidth / 2 - 12);
+        const tooltip = (
+          <div
+            className="sticker-tooltip-layer fixed pointer-events-none rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-4 shadow-2xl sticker-tooltip-fade-in"
+            style={{ left: safeLeft - tooltipWidth / 2, top: tooltipAnchor.top, width: tooltipWidth }}
+          >
+            <div className="absolute -top-1.5 left-1/2 h-3 w-3 -translate-x-1/2 rotate-45 border-l border-t border-[var(--border)] bg-[var(--panel)]" />
+            <div className="relative z-10">
+              <div className="mb-2 flex items-center gap-2">
+                <span className={`rounded-md px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${rc.badgeColor}`}>{rc.label}</span>
+                <span className="text-[9px] font-bold uppercase tracking-wider text-[var(--muted-strong)]">{category}</span>
+              </div>
+              <p className={`text-sm font-black leading-tight ${rc.textColor}`}>{sticker.name}</p>
+              <p className="mt-1.5 text-xs leading-relaxed text-[var(--text)] opacity-90">{sticker.description}</p>
+              <div className="mt-3 space-y-2 text-left">
+                {[
+                  ['Earned for', formatStickerRequirement(sticker, { isUnlocked: true, squadProof })],
+                  ['Represents', getStickerMeaning(sticker, squadProof)],
+                  ['Recruiter signal', getRecruiterStickerSignal(sticker, squadProof)]
+                ].map(([label, copy]) => (
+                  <div key={label} className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-3">
+                    <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[var(--muted)]">{label}</p>
+                    <p className="mt-1 text-xs font-bold leading-5 text-[var(--text)]">{copy}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+
+        return typeof document === 'undefined' ? tooltip : createPortal(tooltip, document.body);
+      })() : null}
     </>
   );
 }
