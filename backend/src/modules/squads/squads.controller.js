@@ -1061,10 +1061,41 @@ export async function getSquadRewardHistoryController(request, reply) {
     const history = await getSquadRewardHistory(request.server.db, squadId, {
       limit: Number(request.query?.limit || 12)
     });
+    const safeHistory = {
+      squadId: history.squadId,
+      squadName: history.squadName,
+      bestRank: history.bestRank,
+      podiumFinishes: history.podiumFinishes,
+      rewardWins: history.rewardWins,
+      latest: history.latest
+        ? {
+            squadId: history.latest.squadId,
+            squadName: history.latest.squadName,
+            period: history.latest.period,
+            rank: history.latest.rank,
+            qualityScore: history.latest.qualityScore,
+            reviewStatus: history.latest.reviewStatus,
+            publishedAt: history.latest.publishedAt,
+            finalizedAt: history.latest.finalizedAt,
+            reward: history.latest.reward
+          }
+        : null,
+      entries: (history.entries || []).map((entry) => ({
+        squadId: entry.squadId,
+        squadName: entry.squadName,
+        period: entry.period,
+        rank: entry.rank,
+        qualityScore: entry.qualityScore,
+        reviewStatus: entry.reviewStatus,
+        publishedAt: entry.publishedAt,
+        finalizedAt: entry.finalizedAt,
+        reward: entry.reward
+      }))
+    };
 
     return reply.send({
       success: true,
-      data: history
+      data: safeHistory
     });
   } catch (error) {
     return sendError(reply, error, 'Could not load squad history.');

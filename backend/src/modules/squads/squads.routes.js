@@ -29,7 +29,7 @@ export default async function squadRoutes(app) {
   app.get('/leaderboard', { preHandler: authenticateRequest }, getSquadLeaderboardController);
   app.get('/leaderboard/my-rank', { preHandler: authenticateRequest }, getMySquadLeaderboardRankController);
   app.get('/rewards/my-history', { preHandler: authenticateRequest }, getMySquadRewardHistoryController);
-  app.get('/:squadId/reward-history', { preHandler: authenticateRequest }, getSquadRewardHistoryController);
+  app.get('/:squadId/reward-history', getSquadRewardHistoryController);
   app.post('/ping', { preHandler: authenticateRequest, config: strictSquadRateLimit }, pingSquadController);
   app.get('/comms', {
     preHandler: authenticateRequest,

@@ -18,6 +18,55 @@ function formatPeriod(value) {
   return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 }
 
+function getCurrentPeriod() {
+  const now = new Date();
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+function buildClaimedHistoryFallback(history = [], { currentSquad = 'Winning squad', squadId = '', currentRank = null } = {}) {
+  const entries = (history || [])
+    .filter((item) => item?.period && item?.rank)
+    .map((item) => ({
+      squadId: item.squadId || '',
+      squadName: item.squadName || currentSquad,
+      period: item.period,
+      rank: Number(item.rank || 0),
+      qualityScore: null,
+      reviewStatus: 'verified',
+      reward: {
+        rank: Number(item.rank || 0),
+        stickerId: item.stickerId || '',
+        title: item.title || 'Monthly Squad Reward',
+        xpBonus: Number(item.xpBonus || 0),
+        approvedAt: item.claimedAt || '',
+        mode: 'claimed'
+      }
+    }));
+  const hasCurrentPeriod = entries.some((entry) => entry.period === getCurrentPeriod());
+
+  if (currentRank && !hasCurrentPeriod) {
+    entries.unshift({
+      squadId,
+      squadName: currentSquad,
+      period: getCurrentPeriod(),
+      rank: Number(currentRank),
+      qualityScore: null,
+      reviewStatus: 'live',
+      reward: null
+    });
+  }
+
+  return {
+    squadId: entries[0]?.squadId || squadId,
+    squadName: entries[0]?.squadName || currentSquad,
+    bestRank: entries.length ? Math.min(...entries.map((entry) => entry.rank || 999)) : null,
+    podiumFinishes: entries.filter((entry) => entry.rank > 0 && entry.rank <= 3).length,
+    rewardWins: entries.filter((entry) => entry.reward).length,
+    latest: entries[0] || null,
+    entries
+  };
+}
+
 export default function SquadProofCard({ summary = null, history = [] }) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyState, setHistoryState] = useState({ loading: false, error: '', data: null });
@@ -50,17 +99,28 @@ export default function SquadProofCard({ summary = null, history = [] }) {
 
   async function openHistory() {
     setHistoryOpen(true);
-    if (!squadId || historyState.data || historyState.loading) return;
+    const fallback = buildClaimedHistoryFallback(history, { currentSquad, squadId, currentRank });
+    if (!squadId) {
+      setHistoryState({ loading: false, error: '', data: fallback });
+      return;
+    }
+    if (historyState.data || historyState.loading) return;
     setHistoryState({ loading: true, error: '', data: null });
     try {
-      const data = await getSquadRewardHistory(squadId, { limit: 12 });
-      setHistoryState({ loading: false, error: '', data });
+      const response = await getSquadRewardHistory(squadId, { limit: 12 });
+      const apiHistory = response?.data || response || null;
+      const mergedHistory = apiHistory?.entries?.length ? apiHistory : fallback;
+      setHistoryState({ loading: false, error: '', data: mergedHistory });
     } catch (error) {
-      setHistoryState({
-        loading: false,
-        error: error?.response?.data?.message || error?.message || 'Could not load squad history.',
-        data: null
-      });
+      if (fallback.entries.length) {
+        setHistoryState({ loading: false, error: '', data: fallback });
+      } else {
+        setHistoryState({
+          loading: false,
+          error: error?.response?.data?.message || error?.message || 'Could not load squad history.',
+          data: null
+        });
+      }
     }
   }
 
@@ -120,8 +180,7 @@ export default function SquadProofCard({ summary = null, history = [] }) {
             <button
               type="button"
               onClick={openHistory}
-              disabled={!squadId}
-              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-sm font-black text-[var(--text)] shadow-sm transition-all hover:border-[var(--accent)]/30 hover:bg-[var(--panel-soft)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--panel)] px-4 py-3 text-sm font-black text-[var(--text)] shadow-sm transition-all hover:border-[var(--accent)]/30 hover:bg-[var(--panel-soft)]"
             >
               <span className="material-symbols-outlined text-[18px]">history</span>
               View History
@@ -187,11 +246,16 @@ export default function SquadProofCard({ summary = null, history = [] }) {
                         <div>
                           <p className="text-sm font-black text-[var(--text)]">{formatPeriod(entry.period)}</p>
                           <p className="mt-1 text-xs font-bold text-[var(--muted-strong)]">
-                            Rank {formatRank(entry.rank)} - {formatScore(entry.qualityScore)} quality score
+                            Rank {formatRank(entry.rank)}
+                            {entry.reviewStatus === 'live'
+                              ? ' - live monthly placement'
+                              : entry.qualityScore == null
+                                ? ' - verified monthly proof'
+                                : ` - ${formatScore(entry.qualityScore)} quality score`}
                           </p>
                         </div>
                         <span className={`inline-flex w-fit items-center rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${entry.reward ? 'border-emerald-400/25 bg-emerald-400/10 text-emerald-400' : 'border-[var(--border)] bg-[var(--panel)] text-[var(--muted-strong)]'}`}>
-                          {entry.reward ? 'Rewarded' : entry.reviewStatus || 'No reward'}
+                          {entry.reward ? 'Rewarded' : entry.reviewStatus === 'live' ? 'Live' : entry.reviewStatus || 'No reward'}
                         </span>
                       </div>
                     </div>

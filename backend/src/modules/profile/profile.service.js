@@ -190,6 +190,7 @@ function normalizePublicSquadRewardHistory(history = []) {
       rank: Number(item.rank || 0),
       period: String(item.period || ''),
       periodLabel: String(item.periodLabel || formatSquadRewardPeriod(item.period)),
+      squadId: item.squadId ? String(item.squadId) : '',
       squadName: String(item.squadName || 'Winning squad'),
       claimedAt: item.claimedAt ? String(item.claimedAt) : '',
       verificationLabel: String(item.verificationLabel || 'Aptico verified clean monthly contribution'),
