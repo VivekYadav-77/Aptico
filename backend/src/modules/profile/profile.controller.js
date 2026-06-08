@@ -1,6 +1,6 @@
 import { and, desc, eq, gte, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { analyses, applicationLogs, connections, follows, generatedContent, profileSettings, rejectionLogs, savedJobs, squads, squadMembers, squadMonthlyRewards, squadScoreEvents, userExperiences, userProfiles, users } from '../../db/schema.js';
+import { analyses, applicationLogs, connections, follows, generatedContent, profileSettings, rejectionLogs, savedJobs, squads, squadMembers, squadMonthlyRewards, squadMonthlyScores, squadScoreEvents, userExperiences, userProfiles, users } from '../../db/schema.js';
 import { env } from '../../config/env.js';
 import { generatePortfolioReadme } from '../analysis/gemini.service.js';
 import { ensureUserProfile } from './profile.service.js';
@@ -254,8 +254,15 @@ async function getStoredProfilePayload(db, userId) {
   }
 
   const squadRewardHistory = normalizeSquadRewardHistory(settings?.squadRewardHistory);
+  const currentSquadRank = await getCurrentSquadMonthlyRank(db, currentSquad?.squadId);
+  const rankedCurrentSquad = currentSquad
+    ? {
+        ...currentSquad,
+        currentRank: currentSquadRank
+      }
+    : null;
   mergedSettings.squadRewardHistory = squadRewardHistory;
-  mergedSettings.squadProofSummary = buildSquadProofSummary(squadRewardHistory, currentSquad);
+  mergedSettings.squadProofSummary = buildSquadProofSummary(squadRewardHistory, rankedCurrentSquad);
 
   return mergedSettings;
 }
@@ -293,8 +300,32 @@ function buildSquadProofSummary(history = [], currentSquad = null) {
     bestRank,
     latest,
     currentSquad: currentSquad?.squadName || latest?.squadName || null,
-    currentSquadId: currentSquad?.squadId || null
+    currentSquadId: currentSquad?.squadId || null,
+    currentSquadRank: currentSquad?.currentRank || null
   };
+}
+
+function getCurrentUtcPeriod(date = new Date()) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+async function getCurrentSquadMonthlyRank(db, squadId) {
+  if (!squadId) return null;
+  try {
+    const rows = await db
+      .select({ rank: squadMonthlyScores.rank })
+      .from(squadMonthlyScores)
+      .where(and(eq(squadMonthlyScores.squadId, squadId), eq(squadMonthlyScores.period, getCurrentUtcPeriod())))
+      .limit(1);
+
+    return rows[0]?.rank ? Number(rows[0].rank) : null;
+  } catch (error) {
+    if (isMissingRelationError(error, 'squad_monthly_scores')) {
+      return null;
+    }
+
+    throw error;
+  }
 }
 
 async function getPortfolioReadmePayload(db, userId) {

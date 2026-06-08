@@ -562,12 +562,6 @@ export default function ProfilePage() {
                           </div>
                         )}
 
-                        {(profile.squadProofSummary?.currentSquad || profile.squadRewardHistory?.length > 0) && (
-                          <div className="mt-5">
-                            <SquadProofCard summary={profile.squadProofSummary} history={profile.squadRewardHistory || []} />
-                          </div>
-                        )}
-
                         {socialProfile ? (
                           <div className="mt-8 flex gap-6 border-t border-[var(--border)] pt-5 sm:gap-8">
                             <button 
@@ -1132,6 +1126,12 @@ export default function ProfilePage() {
                 })() : null}
               </SectionCard>
             </AnimatedSection>
+
+            {(profile.squadProofSummary?.currentSquad || profile.squadRewardHistory?.length > 0) && (
+              <AnimatedSection delay={340}>
+                <SquadProofCard summary={profile.squadProofSummary} history={profile.squadRewardHistory || []} />
+              </AnimatedSection>
+            )}
           </div>
         </div>
 

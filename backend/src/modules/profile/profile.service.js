@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { and, asc, desc, eq, gte, inArray, ne, or, sql } from 'drizzle-orm';
-import { analyses, applicationLogs, connections, follows, profileSettings, rejectionLogs, squadMembers, squads, userProfiles, users } from '../../db/schema.js';
+import { analyses, applicationLogs, connections, follows, profileSettings, rejectionLogs, squadMembers, squadMonthlyScores, squads, userProfiles, users } from '../../db/schema.js';
 import { createNotification } from '../../shared/utils/notification-helper.js';
 
 const USERNAME_PATTERN = /^[a-z0-9_-]{3,30}$/;
@@ -205,6 +205,10 @@ function normalizePublicSquadRewardHistory(history = []) {
     .sort((a, b) => String(b.period).localeCompare(String(a.period)) || Number(a.rank) - Number(b.rank));
 }
 
+function getCurrentUtcPeriod(date = new Date()) {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
 async function getCurrentSquadSummary(db, userId) {
   try {
     const rows = await db
@@ -230,6 +234,25 @@ async function getCurrentSquadSummary(db, userId) {
   }
 }
 
+async function getCurrentSquadMonthlyRank(db, squadId) {
+  if (!squadId) return null;
+  try {
+    const rows = await db
+      .select({ rank: squadMonthlyScores.rank })
+      .from(squadMonthlyScores)
+      .where(and(eq(squadMonthlyScores.squadId, squadId), eq(squadMonthlyScores.period, getCurrentUtcPeriod())))
+      .limit(1);
+
+    return rows[0]?.rank ? Number(rows[0].rank) : null;
+  } catch (error) {
+    if (isMissingRelationError(error, 'squad_monthly_scores')) {
+      return null;
+    }
+
+    throw error;
+  }
+}
+
 function buildSquadProofSummary(history = [], currentSquad = null) {
   const latest = history[0] || null;
   const bestRank = history.length ? Math.min(...history.map((item) => Number(item.rank || 99))) : null;
@@ -238,7 +261,8 @@ function buildSquadProofSummary(history = [], currentSquad = null) {
     bestRank,
     latest,
     currentSquad: currentSquad?.squadName || latest?.squadName || null,
-    currentSquadId: currentSquad?.squadId || null
+    currentSquadId: currentSquad?.squadId || null,
+    currentSquadRank: currentSquad?.currentRank || null
   };
 }
 
@@ -764,6 +788,13 @@ export async function getPublicProfile(db, username, viewerId = null) {
 
   const squadRewardHistory = normalizePublicSquadRewardHistory(rawSettings.squadRewardHistory);
   const currentSquad = await getCurrentSquadSummary(db, profileOwnerId);
+  const currentSquadRank = await getCurrentSquadMonthlyRank(db, currentSquad?.squadId);
+  const rankedCurrentSquad = currentSquad
+    ? {
+        ...currentSquad,
+        currentRank: currentSquadRank
+      }
+    : null;
 
   // Build enriched settings - only include sections the viewer can see
   const enrichedSettings = {
@@ -774,7 +805,7 @@ export async function getPublicProfile(db, username, viewerId = null) {
     equippedStickers: Array.isArray(rawSettings.equippedStickers) ? rawSettings.equippedStickers : [],
     unlockedStickers: Array.isArray(rawSettings.unlockedStickers) ? rawSettings.unlockedStickers : [],
     squadRewardHistory,
-    squadProofSummary: buildSquadProofSummary(squadRewardHistory, currentSquad)
+    squadProofSummary: buildSquadProofSummary(squadRewardHistory, rankedCurrentSquad)
   };
 
   // About section

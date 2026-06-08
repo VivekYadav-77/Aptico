@@ -670,20 +670,6 @@ export default function PublicProfile() {
                               </div>
                             )}
 
-                            {(profile.enriched_settings?.squadProofSummary?.currentSquad || profile.enriched_settings?.squadProofSummary?.totalClaimed > 0) && (
-                              <div className="mt-5">
-                                <SquadProofCard summary={profile.enriched_settings.squadProofSummary} history={profile.enriched_settings.squadRewardHistory || []} />
-                                <div className="hidden">
-                                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--accent-strong)]">Squad Proof</p>
-                                <p className="mt-2 text-sm font-bold leading-6 text-[var(--text)]">
-                                  Best monthly finish #{profile.enriched_settings.squadProofSummary.bestRank} · {profile.enriched_settings.squadProofSummary.totalClaimed} verified squad reward{profile.enriched_settings.squadProofSummary.totalClaimed === 1 ? '' : 's'}
-                                </p>
-                                <p className="mt-1 text-xs leading-5 text-[var(--muted-strong)]">
-                                  Latest: {profile.enriched_settings.squadProofSummary.latest?.title} earned {profile.enriched_settings.squadProofSummary.latest?.periodLabel || profile.enriched_settings.squadProofSummary.latest?.period} with {profile.enriched_settings.squadProofSummary.latest?.squadName}.
-                                </p>
-                                </div>
-                              </div>
-                            )}
                           </div>
                         </div>
 
@@ -1266,6 +1252,15 @@ export default function PublicProfile() {
                 </AnimatedSection>
 
                 {/* ════ CURRENTLY WORKING TOWARDS ════ */}
+                {(profile.enriched_settings?.squadProofSummary?.currentSquad || profile.enriched_settings?.squadProofSummary?.totalClaimed > 0) && (
+                  <AnimatedSection delay={365}>
+                    <SquadProofCard
+                      summary={profile.enriched_settings.squadProofSummary}
+                      history={profile.enriched_settings.squadRewardHistory || []}
+                    />
+                  </AnimatedSection>
+                )}
+
                 {profile.latest_analysis && (
                   <AnimatedSection delay={380}>
                     <section className="relative overflow-hidden rounded-2xl border border-[var(--border)] dark:border-white/5 bg-[var(--panel)]/70 backdrop-blur-xl p-6 shadow-sm hover:shadow-md hover:border-[var(--accent)]/50 transition-all duration-300 group">
