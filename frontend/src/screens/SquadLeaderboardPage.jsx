@@ -573,6 +573,7 @@ function PinnedMyRank({ myRank }) {
 
 function SquadHistoryModal({ history, loading, error, onClose }) {
   if (!history && !loading && !error) return null;
+  const latest = history?.latest || history?.entries?.[0] || null;
 
   return (
     <div className="fixed inset-0 z-[220] flex items-center justify-center bg-black/60 p-4 backdrop-blur-md" onClick={onClose}>
@@ -610,6 +611,28 @@ function SquadHistoryModal({ history, loading, error, onClose }) {
               </div>
             </div>
 
+            {latest ? (
+              <div className="mt-4 rounded-xl border border-[var(--accent)]/25 bg-[var(--accent)]/10 p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[var(--accent-strong)]">Latest monthly performance</p>
+                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-lg font-black text-[var(--text)]">{formatPeriod(latest.period)} - Rank #{latest.rank || '-'}</p>
+                    <p className="mt-1 text-sm font-bold text-[var(--muted-strong)]">
+                      {latest.qualityScore} quality score - {latest.activeMemberCount} active members
+                    </p>
+                  </div>
+                  {latest.reward ? (
+                    <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-black text-emerald-300">
+                      <span className="material-symbols-outlined text-[15px]">verified</span>
+                      Reward published
+                    </span>
+                  ) : (
+                    <span className="app-chip">{latest.reviewStatus ? latest.reviewStatus.replace(/_/g, ' ') : 'No reward'}</span>
+                  )}
+                </div>
+              </div>
+            ) : null}
+
             <div className="mt-6 space-y-3">
               {(history?.entries || []).length ? history.entries.map((entry) => (
                 <div key={`${entry.period}-${entry.rank}`} className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-4">
@@ -617,6 +640,7 @@ function SquadHistoryModal({ history, loading, error, onClose }) {
                     <div>
                       <p className="font-black text-[var(--text)]">{formatPeriod(entry.period)} · Rank #{entry.rank || '-'}</p>
                       <p className="mt-1 text-xs font-bold text-[var(--muted-strong)]">{entry.qualityScore} score · {entry.activeMemberCount} active members · {entry.suspiciousEventCount} integrity flags</p>
+                      <p className="mt-1 text-xs font-semibold text-[var(--muted-strong)]">Reward status: {entry.reward ? 'Published' : (entry.reviewStatus || 'No reward').replace(/_/g, ' ')}</p>
                     </div>
                     {entry.reward ? (
                       <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-black text-emerald-300">

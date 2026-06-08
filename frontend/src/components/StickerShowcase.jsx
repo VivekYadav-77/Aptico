@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { getStickerById, RARITY_CONFIG, STICKER_CATEGORIES } from '../utils/stickerRegistry.js';
+import { formatStickerRequirement, getRecruiterStickerSignal, getStickerMeaning } from '../utils/stickerCopy.js';
 import StickerVisual from './StickerVisual.jsx';
 
 function StickerIcon({ sticker, size = 32 }) {
@@ -66,7 +67,7 @@ export default function StickerShowcase({ equippedStickers = [], unlockedSticker
 
               {/* Custom Tooltip */}
               {isHovered && (
-                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-56 p-4 rounded-2xl bg-[var(--panel)] border border-[var(--border)] shadow-xl z-50 sticker-tooltip-fade-in pointer-events-none">
+                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-72 p-4 rounded-2xl bg-[var(--panel)] border border-[var(--border)] shadow-xl z-50 sticker-tooltip-fade-in pointer-events-none">
                   {/* Triangle pointer */}
                   <div className="absolute -top-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[var(--panel)] border-l border-t border-[var(--border)] rotate-45" />
                   
@@ -77,14 +78,18 @@ export default function StickerShowcase({ equippedStickers = [], unlockedSticker
                     </div>
                     <p className={`text-sm font-black leading-tight ${rc.textColor}`}>{s.name}</p>
                     <p className="mt-1.5 text-xs text-[var(--text)] leading-relaxed opacity-90">{s.description}</p>
-                    {squadProof ? (
-                      <div className="mt-3 rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-3 text-left">
-                        <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[var(--muted)]">Verified squad proof</p>
-                        <p className="mt-1 text-xs font-bold leading-5 text-[var(--text)]">
-                          Rank #{squadProof.rank} in {squadProof.periodLabel || squadProof.period} with {squadProof.squadName}.
-                        </p>
-                      </div>
-                    ) : null}
+                    <div className="mt-3 space-y-2 text-left">
+                      {[
+                        ['Earned for', formatStickerRequirement(s, { isUnlocked: true, squadProof })],
+                        ['Represents', getStickerMeaning(s, squadProof)],
+                        ['Recruiter signal', getRecruiterStickerSignal(s, squadProof)]
+                      ].map(([label, copy]) => (
+                        <div key={label} className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-3">
+                          <p className="text-[9px] font-black uppercase tracking-[0.16em] text-[var(--muted)]">{label}</p>
+                          <p className="mt-1 text-xs font-bold leading-5 text-[var(--text)]">{copy}</p>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}

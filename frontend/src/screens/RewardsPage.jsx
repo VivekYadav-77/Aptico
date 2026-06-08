@@ -55,12 +55,25 @@ function getMonthlySquadRewardReadiness(req, stats) {
   return (stats.monthlySquadRewardReadiness || []).find((item) => Number(item.rank) === Number(req.value)) || null;
 }
 
+function getMonthlySquadRewardOption(req, stats) {
+  return (stats.monthlySquadRewardOptions || []).find((item) => Number(item.rank) === Number(req.value)) || null;
+}
+
 function isMonthlySquadSticker(sticker) {
   return sticker?.requirement?.type === 'monthly_squad_reward';
 }
 
 function getSquadProofForSticker(history = [], stickerId) {
   return (history || []).filter((item) => item.stickerId === stickerId);
+}
+
+function rewardStateLabel({ readiness, latestProof, isUnlocked }) {
+  if (readiness?.claimable) return latestProof ? 'New month ready' : 'Ready to claim';
+  if (latestProof || isUnlocked) return 'Claimed';
+  if (readiness?.status === 'needs_review') return 'Needs review';
+  if (readiness?.status === 'almost_ready') return 'Almost ready';
+  if (readiness?.status === 'building') return 'Building';
+  return 'Unclaimed';
 }
 
 function SquadRewardsSection({ stats, unlockedIds, equippedIds, squadRewardHistory, onUnlock, onToggleEquip, unlocking }) {
@@ -84,12 +97,15 @@ function SquadRewardsSection({ stats, unlockedIds, equippedIds, squadRewardHisto
       <div className="mt-5 grid gap-4 lg:grid-cols-3">
         {monthlyStickers.map((sticker) => {
           const readiness = getMonthlySquadRewardReadiness(sticker.requirement, stats || {});
+          const rewardOption = getMonthlySquadRewardOption(sticker.requirement, stats || {});
           const proofs = getSquadProofForSticker(squadRewardHistory, sticker.id);
           const latestProof = proofs[0] || null;
           const isUnlocked = unlockedIds.includes(sticker.id);
           const isEquipped = equippedIds.includes(sticker.id);
           const rc = RARITY_CONFIG[sticker.rarity];
           const pct = Number(readiness?.progress || (isUnlocked ? 100 : 0));
+          const stateLabel = rewardStateLabel({ readiness, latestProof, isUnlocked });
+          const monthLabel = rewardOption?.periodLabel || latestProof?.periodLabel || latestProof?.period || 'Month-end reward';
 
           return (
             <article key={sticker.id} className={`rounded-2xl border ${rc.border} ${isUnlocked ? rc.bg : 'bg-[var(--panel-soft)]/45'} p-5`}>
@@ -101,9 +117,22 @@ function SquadRewardsSection({ stats, unlockedIds, equippedIds, squadRewardHisto
                   <p className={`text-base font-black ${rc.textColor}`}>{sticker.name}</p>
                   <p className="mt-1 text-xs font-bold uppercase tracking-[0.12em] text-[var(--muted-strong)]">Rank #{sticker.requirement.value} reward</p>
                 </div>
+                <span className="rounded-full border border-[var(--border)] bg-[var(--panel)] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[var(--text)]">
+                  {stateLabel}
+                </span>
               </div>
 
               <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--panel)]/70 p-4">
+                <div className="mb-3 grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <p className="font-black uppercase tracking-[0.14em] text-[var(--muted)]">Month</p>
+                    <p className="mt-1 font-bold text-[var(--text)]">{monthLabel}</p>
+                  </div>
+                  <div>
+                    <p className="font-black uppercase tracking-[0.14em] text-[var(--muted)]">Readiness</p>
+                    <p className="mt-1 font-bold text-[var(--text)]">{readiness?.status ? readiness.status.replace(/_/g, ' ') : stateLabel}</p>
+                  </div>
+                </div>
                 {latestProof ? (
                   <>
                     <p className="text-sm font-black text-[var(--text)]">{latestProof.title}</p>
@@ -117,6 +146,9 @@ function SquadRewardsSection({ stats, unlockedIds, equippedIds, squadRewardHisto
                     <p className="mt-1 text-xs leading-5 text-[var(--muted-strong)]">{readiness?.copy || 'Build clean contribution across multiple days.'}</p>
                   </>
                 )}
+                <p className="mt-3 text-xs font-bold leading-5 text-[var(--muted-strong)]">
+                  Awarded for consistent, clean contribution to a top monthly squad.
+                </p>
                 <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--border)]">
                   <div className="h-full rounded-full transition-all duration-700" style={{ width: `${Math.max(0, Math.min(100, pct))}%`, background: sticker.color }} />
                 </div>

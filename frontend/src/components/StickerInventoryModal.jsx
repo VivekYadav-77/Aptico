@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { STICKER_REGISTRY, STICKER_CATEGORIES, RARITY_CONFIG } from '../utils/stickerRegistry.js';
+import { formatStickerRequirement, getRecruiterStickerSignal, getStickerMeaning } from '../utils/stickerCopy.js';
 import StickerVisual from './StickerVisual.jsx';
 
 /**
@@ -136,7 +137,7 @@ export default function StickerInventoryModal({ isOpen, onClose, unlockedSticker
             </button>
 
             {hoveredSticker ? (
-              <div className="flex-1 flex flex-col p-12 items-center justify-center text-center animate-fade-in" key={hoveredSticker.id}>
+              <div className="flex-1 flex flex-col p-12 items-center justify-start overflow-y-auto text-center animate-fade-in custom-scrollbar" key={hoveredSticker.id}>
                 {(() => {
                   const squadProofs = (squadRewardHistory || []).filter((item) => item.stickerId === hoveredSticker.id);
                   const latestProof = squadProofs[0] || null;
@@ -173,20 +174,34 @@ export default function StickerInventoryModal({ isOpen, onClose, unlockedSticker
                   {hoveredSticker.name}
                 </h3>
                 
-                <p className="text-lg text-white/50 leading-relaxed max-w-sm mb-12 font-medium">
+                <p className="text-lg text-white/50 leading-relaxed max-w-sm mb-8 font-medium">
                   {hoveredSticker.description}
                 </p>
 
+                <div className="w-full max-w-sm space-y-3 text-left mb-6">
+                  {[
+                    ['Earned for', formatStickerRequirement(hoveredSticker, { isUnlocked: true, squadProof: latestProof })],
+                    ['Represents', getStickerMeaning(hoveredSticker, latestProof)],
+                    ['Recruiter signal', getRecruiterStickerSignal(hoveredSticker, latestProof)]
+                  ].map(([label, copy]) => (
+                    <div key={label} className="rounded-[1.5rem] border border-white/[0.06] bg-white/[0.025] p-5">
+                      <p className="text-[9px] font-black text-white/30 uppercase tracking-[0.35em] mb-2">{label}</p>
+                      <p className="text-sm font-semibold leading-6 text-white/65">{copy}</p>
+                    </div>
+                  ))}
+                  {latestProof && squadProofs.length > 1 ? (
+                    <div className="rounded-[1.5rem] border border-emerald-400/15 bg-emerald-500/[0.06] p-5">
+                      <p className="text-[9px] font-black text-emerald-300 uppercase tracking-[0.35em] mb-2">Reward history</p>
+                      <p className="text-sm font-semibold leading-6 text-white/65">{squadProofs.length} verified squad reward months for this sticker.</p>
+                    </div>
+                  ) : null}
+                </div>
+
                 {latestProof ? (
-                  <div className="w-full max-w-sm p-6 rounded-[2rem] bg-emerald-500/[0.06] border border-emerald-400/15 text-left mb-6">
-                    <p className="text-[9px] font-black text-emerald-300 uppercase tracking-[0.35em] mb-3">Verified squad proof</p>
+                  <div className="w-full max-w-sm p-5 rounded-[1.5rem] bg-emerald-500/[0.06] border border-emerald-400/15 text-left mb-6">
+                    <p className="text-[9px] font-black text-emerald-300 uppercase tracking-[0.35em] mb-2">Verified squad proof</p>
                     <p className="text-base font-black text-white">{latestProof.title}</p>
-                    <p className="mt-2 text-sm leading-6 text-white/55">
-                      Rank #{latestProof.rank} in {latestProof.periodLabel || latestProof.period} with {latestProof.squadName}. {latestProof.verificationLabel}.
-                    </p>
-                    {squadProofs.length > 1 ? (
-                      <p className="mt-3 text-xs font-bold uppercase tracking-[0.18em] text-white/30">{squadProofs.length} verified months</p>
-                    ) : null}
+                    <p className="mt-2 text-sm leading-6 text-white/55">Rank #{latestProof.rank} monthly squad - {latestProof.periodLabel || latestProof.period} - {latestProof.squadName}</p>
                   </div>
                 ) : null}
 

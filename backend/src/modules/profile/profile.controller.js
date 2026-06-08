@@ -235,9 +235,10 @@ async function getStoredExperiences(db, userId) {
 }
 
 async function getStoredProfilePayload(db, userId) {
-  const [settings, experiences] = await Promise.all([
+  const [settings, experiences, currentSquad] = await Promise.all([
     getStoredProfileSettings(db, userId),
-    getStoredExperiences(db, userId)
+    getStoredExperiences(db, userId),
+    getCurrentSquadSummary(db, userId)
   ]);
 
   const mergedSettings = {
@@ -252,7 +253,48 @@ async function getStoredProfilePayload(db, userId) {
     mergedSettings.experiences = [];
   }
 
+  const squadRewardHistory = normalizeSquadRewardHistory(settings?.squadRewardHistory);
+  mergedSettings.squadRewardHistory = squadRewardHistory;
+  mergedSettings.squadProofSummary = buildSquadProofSummary(squadRewardHistory, currentSquad);
+
   return mergedSettings;
+}
+
+async function getCurrentSquadSummary(db, userId) {
+  try {
+    const rows = await db
+      .select({
+        squadId: squads.id,
+        squadName: squads.squadName,
+        joinedAt: squadMembers.createdAt
+      })
+      .from(squadMembers)
+      .innerJoin(squads, eq(squadMembers.squadId, squads.id))
+      .where(eq(squadMembers.userId, userId))
+      .limit(1);
+
+    return rows[0]
+      ? {
+          squadId: rows[0].squadId,
+          squadName: rows[0].squadName,
+          joinedAt: rows[0].joinedAt
+        }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function buildSquadProofSummary(history = [], currentSquad = null) {
+  const latest = history[0] || null;
+  const bestRank = history.length ? Math.min(...history.map((item) => Number(item.rank || 99))) : null;
+  return {
+    totalClaimed: history.length,
+    bestRank,
+    latest,
+    currentSquad: currentSquad?.squadName || latest?.squadName || null,
+    currentSquadId: currentSquad?.squadId || null
+  };
 }
 
 async function getPortfolioReadmePayload(db, userId) {

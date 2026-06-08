@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { and, asc, desc, eq, gte, inArray, ne, or, sql } from 'drizzle-orm';
-import { analyses, applicationLogs, connections, follows, profileSettings, rejectionLogs, userProfiles, users } from '../../db/schema.js';
+import { analyses, applicationLogs, connections, follows, profileSettings, rejectionLogs, squadMembers, squads, userProfiles, users } from '../../db/schema.js';
 import { createNotification } from '../../shared/utils/notification-helper.js';
 
 const USERNAME_PATTERN = /^[a-z0-9_-]{3,30}$/;
@@ -203,6 +203,43 @@ function normalizePublicSquadRewardHistory(history = []) {
       return true;
     })
     .sort((a, b) => String(b.period).localeCompare(String(a.period)) || Number(a.rank) - Number(b.rank));
+}
+
+async function getCurrentSquadSummary(db, userId) {
+  try {
+    const rows = await db
+      .select({
+        squadId: squads.id,
+        squadName: squads.squadName,
+        joinedAt: squadMembers.createdAt
+      })
+      .from(squadMembers)
+      .innerJoin(squads, eq(squadMembers.squadId, squads.id))
+      .where(eq(squadMembers.userId, userId))
+      .limit(1);
+
+    return rows[0]
+      ? {
+          squadId: rows[0].squadId,
+          squadName: rows[0].squadName,
+          joinedAt: rows[0].joinedAt
+        }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function buildSquadProofSummary(history = [], currentSquad = null) {
+  const latest = history[0] || null;
+  const bestRank = history.length ? Math.min(...history.map((item) => Number(item.rank || 99))) : null;
+  return {
+    totalClaimed: history.length,
+    bestRank,
+    latest,
+    currentSquad: currentSquad?.squadName || latest?.squadName || null,
+    currentSquadId: currentSquad?.squadId || null
+  };
 }
 
 function calculateLongestStreak(dateKeys) {
@@ -725,6 +762,9 @@ export async function getPublicProfile(db, username, viewerId = null) {
     return false;
   }
 
+  const squadRewardHistory = normalizePublicSquadRewardHistory(rawSettings.squadRewardHistory);
+  const currentSquad = await getCurrentSquadSummary(db, profileOwnerId);
+
   // Build enriched settings - only include sections the viewer can see
   const enrichedSettings = {
     sectionVisibility: sectionVis,
@@ -733,18 +773,8 @@ export async function getPublicProfile(db, username, viewerId = null) {
     banner_preference: rawSettings.banner_preference || 'badge',
     equippedStickers: Array.isArray(rawSettings.equippedStickers) ? rawSettings.equippedStickers : [],
     unlockedStickers: Array.isArray(rawSettings.unlockedStickers) ? rawSettings.unlockedStickers : [],
-    squadRewardHistory: normalizePublicSquadRewardHistory(rawSettings.squadRewardHistory),
-    squadProofSummary: (() => {
-      const history = normalizePublicSquadRewardHistory(rawSettings.squadRewardHistory);
-      const latest = history[0] || null;
-      const bestRank = history.length ? Math.min(...history.map((item) => Number(item.rank || 99))) : null;
-      return {
-        totalClaimed: history.length,
-        bestRank,
-        latest,
-        currentSquad: latest?.squadName || null
-      };
-    })()
+    squadRewardHistory,
+    squadProofSummary: buildSquadProofSummary(squadRewardHistory, currentSquad)
   };
 
   // About section

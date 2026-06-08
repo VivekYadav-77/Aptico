@@ -25,6 +25,7 @@ import StickerShowcase from '../components/StickerShowcase.jsx';
 import StickerInventoryModal from '../components/StickerInventoryModal.jsx';
 import ResumeBuilderModal from '../components/ResumeBuilderModal.jsx';
 import TopProjectDetailsModal from '../components/TopProjectDetailsModal.jsx';
+import SquadProofCard from '../components/SquadProofCard.jsx';
 
 function initials(name) {
   return String(name || 'A').trim().charAt(0).toUpperCase() || 'A';
@@ -669,8 +670,10 @@ export default function PublicProfile() {
                               </div>
                             )}
 
-                            {profile.enriched_settings?.squadProofSummary?.totalClaimed > 0 && (
-                              <div className="mt-5 rounded-2xl border border-[var(--accent)]/20 bg-[var(--accent)]/10 p-4 backdrop-blur-sm">
+                            {(profile.enriched_settings?.squadProofSummary?.currentSquad || profile.enriched_settings?.squadProofSummary?.totalClaimed > 0) && (
+                              <div className="mt-5">
+                                <SquadProofCard summary={profile.enriched_settings.squadProofSummary} history={profile.enriched_settings.squadRewardHistory || []} />
+                                <div className="hidden">
                                 <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[var(--accent-strong)]">Squad Proof</p>
                                 <p className="mt-2 text-sm font-bold leading-6 text-[var(--text)]">
                                   Best monthly finish #{profile.enriched_settings.squadProofSummary.bestRank} · {profile.enriched_settings.squadProofSummary.totalClaimed} verified squad reward{profile.enriched_settings.squadProofSummary.totalClaimed === 1 ? '' : 's'}
@@ -678,6 +681,7 @@ export default function PublicProfile() {
                                 <p className="mt-1 text-xs leading-5 text-[var(--muted-strong)]">
                                   Latest: {profile.enriched_settings.squadProofSummary.latest?.title} earned {profile.enriched_settings.squadProofSummary.latest?.periodLabel || profile.enriched_settings.squadProofSummary.latest?.period} with {profile.enriched_settings.squadProofSummary.latest?.squadName}.
                                 </p>
+                                </div>
                               </div>
                             )}
                           </div>
