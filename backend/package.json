@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node --watch src/server.js",
     "start": "node src/server.js",
-    "test": "node test/security.test.js",
+    "test": "node --test test/*.test.js",
     "check": "node --check src/server.js",
     "db:push": "drizzle-kit push --config=src/config/drizzle.config.js",
     "db:migrate:comms": "node scripts/migrations/apply-squad-comms-migration.js",

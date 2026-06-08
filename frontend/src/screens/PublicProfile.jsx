@@ -25,6 +25,7 @@ import StickerShowcase from '../components/StickerShowcase.jsx';
 import StickerInventoryModal from '../components/StickerInventoryModal.jsx';
 import ResumeBuilderModal from '../components/ResumeBuilderModal.jsx';
 import TopProjectDetailsModal from '../components/TopProjectDetailsModal.jsx';
+import SquadProofCard from '../components/SquadProofCard.jsx';
 
 function initials(name) {
   return String(name || 'A').trim().charAt(0).toUpperCase() || 'A';
@@ -662,11 +663,13 @@ export default function PublicProfile() {
                                   <StickerShowcase 
                                     equippedStickers={profile.enriched_settings.equippedStickers || []} 
                                     unlockedStickers={profile.enriched_settings.unlockedStickers || []}
+                                    squadRewardHistory={profile.enriched_settings.squadRewardHistory || []}
                                     userName={profile.name || username}
                                     onSeeAll={() => setStickerGalleryOpen(true)}
                                   />
                               </div>
                             )}
+
                           </div>
                         </div>
 
@@ -1249,6 +1252,15 @@ export default function PublicProfile() {
                 </AnimatedSection>
 
                 {/* ════ CURRENTLY WORKING TOWARDS ════ */}
+                {(profile.enriched_settings?.squadProofSummary?.currentSquad || profile.enriched_settings?.squadProofSummary?.totalClaimed > 0) && (
+                  <AnimatedSection delay={365}>
+                    <SquadProofCard
+                      summary={profile.enriched_settings.squadProofSummary}
+                      history={profile.enriched_settings.squadRewardHistory || []}
+                    />
+                  </AnimatedSection>
+                )}
+
                 {profile.latest_analysis && (
                   <AnimatedSection delay={380}>
                     <section className="relative overflow-hidden rounded-2xl border border-[var(--border)] dark:border-white/5 bg-[var(--panel)]/70 backdrop-blur-xl p-6 shadow-sm hover:shadow-md hover:border-[var(--accent)]/50 transition-all duration-300 group">
@@ -1422,6 +1434,7 @@ export default function PublicProfile() {
           isOpen={stickerGalleryOpen} 
           onClose={() => setStickerGalleryOpen(false)} 
           unlockedStickers={profile?.enriched_settings?.unlockedStickers || []} 
+          squadRewardHistory={profile?.enriched_settings?.squadRewardHistory || []}
           userName={profile?.name || username}
         />
       )}

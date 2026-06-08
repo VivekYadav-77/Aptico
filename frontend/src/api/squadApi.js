@@ -10,6 +10,26 @@ export async function getMySquad() {
   return response.data;
 }
 
+export async function getSquadLeaderboard(params = {}) {
+  const response = await api.get('/api/squads/leaderboard', { params });
+  return response.data;
+}
+
+export async function getMySquadLeaderboardRank(params = {}) {
+  const response = await api.get('/api/squads/leaderboard/my-rank', { params });
+  return response.data;
+}
+
+export async function getMySquadRewardHistory() {
+  const response = await api.get('/api/squads/rewards/my-history');
+  return response.data;
+}
+
+export async function getSquadRewardHistory(squadId, params = {}) {
+  const response = await api.get(`/api/squads/${squadId}/reward-history`, { params });
+  return response.data;
+}
+
 export async function logSquadApplications(payload) {
   const response = await api.post('/api/squads/log-app', payload);
   return response.data;

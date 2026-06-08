@@ -11,7 +11,9 @@ import { useProfileSettings } from '../hooks/useProfileSettings.js';
 import { selectAuth } from '../store/authSlice.js';
 import { selectCurrentAnalysis } from '../store/historySlice.js';
 import StickerShowcase from '../components/StickerShowcase.jsx';
+import StickerInventoryModal from '../components/StickerInventoryModal.jsx';
 import TopProjectDetailsModal from '../components/TopProjectDetailsModal.jsx';
+import SquadProofCard from '../components/SquadProofCard.jsx';
 
 function initials(name) {
   return String(name || 'A').trim().charAt(0).toUpperCase() || 'A';
@@ -269,6 +271,7 @@ export default function ProfilePage() {
   const [bannerPrefTemp, setBannerPrefTemp] = useState('badge');
   const [listModalState, setListModalState] = useState({ isOpen: false, type: null, title: '', fetchFn: null });
   const [resumeModalOpen, setResumeModalOpen] = useState(false);
+  const [stickerGalleryOpen, setStickerGalleryOpen] = useState(false);
   const [selectedTopProject, setSelectedTopProject] = useState(null);
 
   const fullName = `${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'Aptico User';
@@ -547,9 +550,15 @@ export default function ProfilePage() {
                           ) : null}
                         </div>
 
-                        {profile.equippedStickers?.length > 0 && (
+                        {(profile.equippedStickers?.length > 0 || profile.unlockedStickers?.length > 0) && (
                           <div className="mt-5">
-                            <StickerShowcase equippedStickers={profile.equippedStickers} />
+                            <StickerShowcase
+                              equippedStickers={profile.equippedStickers}
+                              unlockedStickers={profile.unlockedStickers || []}
+                              squadRewardHistory={profile.squadRewardHistory || []}
+                              userName={fullName}
+                              onSeeAll={() => setStickerGalleryOpen(true)}
+                            />
                           </div>
                         )}
 
@@ -1117,6 +1126,12 @@ export default function ProfilePage() {
                 })() : null}
               </SectionCard>
             </AnimatedSection>
+
+            {(profile.squadProofSummary?.currentSquad || profile.squadRewardHistory?.length > 0) && (
+              <AnimatedSection delay={340}>
+                <SquadProofCard summary={profile.squadProofSummary} history={profile.squadRewardHistory || []} />
+              </AnimatedSection>
+            )}
           </div>
         </div>
 
@@ -1236,6 +1251,14 @@ export default function ProfilePage() {
         title={listModalState.title}
         fetchData={listModalState.fetchFn}
         emptyMessage={`No ${listModalState.title.toLowerCase()} found.`}
+      />
+
+      <StickerInventoryModal
+        isOpen={stickerGalleryOpen}
+        onClose={() => setStickerGalleryOpen(false)}
+        unlockedStickers={profile.unlockedStickers || []}
+        squadRewardHistory={profile.squadRewardHistory || []}
+        userName={fullName}
       />
     </AppShell>
   );

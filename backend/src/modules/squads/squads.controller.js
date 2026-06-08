@@ -1,7 +1,8 @@
 import { and, asc, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { applicationLogs, notifications, squadActivities, squadMembers, squads, users } from '../../db/schema.js';
+import { applicationLogs, notifications, profileSettings, squadActivities, squadMembers, squads, users } from '../../db/schema.js';
 import { applyXpDecayIfNeeded, calculateApplicationXp, getTodayIntegrityCounts, grantXp, shouldShadowban } from '../../shared/services/xp-engine.service.js';
+import { getLeaderboard, getMyLeaderboardRank, getSquadRewardHistory, recordSquadScoreEvent } from './squad-leaderboard.service.js';
 import {
   injectAppLoggedCommsEvent,
   injectDailyBriefingController,
@@ -24,6 +25,38 @@ const logAppSchema = z.object({
 const pingSchema = z.object({
   message: z.string().trim().max(140).optional().nullable()
 });
+
+const squadIdParamSchema = z.object({
+  squadId: z.string().uuid()
+});
+
+function normalizeSquadRewardHistory(history = []) {
+  if (!Array.isArray(history)) return [];
+  const seen = new Set();
+  return history
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => ({
+      rewardId: item.rewardId ? String(item.rewardId) : '',
+      stickerId: String(item.stickerId || ''),
+      title: String(item.title || 'Monthly Squad Reward'),
+      rank: Number(item.rank || 0),
+      period: String(item.period || ''),
+      periodLabel: String(item.periodLabel || item.period || ''),
+      squadId: item.squadId ? String(item.squadId) : '',
+      squadName: String(item.squadName || 'Winning squad'),
+      claimedAt: item.claimedAt ? String(item.claimedAt) : '',
+      verificationLabel: String(item.verificationLabel || 'Aptico verified clean monthly contribution'),
+      xpBonus: Number(item.xpBonus || 0)
+    }))
+    .filter((item) => {
+      if (!item.stickerId || !item.rank || !item.period) return false;
+      const key = item.rewardId || `${item.squadId}:${item.period}:${item.rank}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .sort((a, b) => String(b.period).localeCompare(String(a.period)) || Number(a.rank) - Number(b.rank));
+}
 
 const SQUAD_SIZE = 4;
 const DEFAULT_WEEKLY_GOAL = 40;
@@ -218,26 +251,30 @@ function getContributionState(memberApps) {
 }
 
 async function createSquadActivity(db, values) {
-  await db.insert(squadActivities).values({
+  const inserted = await db.insert(squadActivities).values({
     squadId: values.squadId,
     userId: values.userId || null,
     activityType: values.activityType,
     eventDate: values.eventDate || getCurrentDateKey(),
     quantity: values.quantity || 0,
     metadata: values.metadata || {}
-  });
+  }).returning({ id: squadActivities.id });
+
+  return inserted[0] || null;
 }
 
 async function insertApplicationLog(db, values) {
   try {
-    await db.insert(applicationLogs).values(values);
+    const inserted = await db.insert(applicationLogs).values(values).returning({ id: applicationLogs.id });
+    return inserted[0] || null;
   } catch (error) {
     if (!isMissingJobUrlColumnError(error)) {
       throw error;
     }
 
     const { jobUrl: _jobUrl, ...fallbackValues } = values;
-    await db.insert(applicationLogs).values(fallbackValues);
+    const inserted = await db.insert(applicationLogs).values(fallbackValues).returning({ id: applicationLogs.id });
+    return inserted[0] || null;
   }
 }
 
@@ -651,6 +688,18 @@ async function grantGoalRewardIfNeeded(db, squadId, actorUserId) {
     )
   ]);
 
+  await recordSquadScoreEvent(db, {
+    squadId,
+    userId: actorUserId,
+    eventType: 'weekly_goal',
+    sourceType: 'weekly_goal',
+    sourceId: `${squadId}:${currentWeek}`,
+    metadata: {
+      weeklyGoal: Number(squad.weeklyGoal || DEFAULT_WEEKLY_GOAL),
+      totalApps
+    }
+  });
+
   return true;
 }
 
@@ -769,7 +818,7 @@ export async function logSquadAppController(request, reply) {
       body.roleTitle
     );
 
-    await insertApplicationLog(request.server.db, {
+    const appLog = await insertApplicationLog(request.server.db, {
       userId: request.auth.userId,
       squadId: membership.squadId,
       companyName: body.companyName,
@@ -794,7 +843,7 @@ export async function logSquadAppController(request, reply) {
         })
         .where(eq(squadMembers.userId, request.auth.userId));
 
-      await createSquadActivity(request.server.db, {
+      const activity = await createSquadActivity(request.server.db, {
         squadId: membership.squadId,
         userId: request.auth.userId,
         activityType: 'apps_logged',
@@ -804,6 +853,21 @@ export async function logSquadAppController(request, reply) {
           companyName: body.companyName,
           roleTitle: body.roleTitle,
           jobUrl: body.jobUrl || null,
+          xpEarned
+        }
+      });
+
+      await recordSquadScoreEvent(request.server.db, {
+        squadId: membership.squadId,
+        userId: request.auth.userId,
+        eventType: 'application',
+        sourceType: 'application_log',
+        sourceId: appLog?.id || activity?.id || `${request.auth.userId}:${Date.now()}`,
+        metadata: {
+          companyName: body.companyName,
+          roleTitle: body.roleTitle,
+          jobUrl: body.jobUrl || null,
+          activityId: activity?.id || null,
           xpEarned
         }
       });
@@ -900,12 +964,23 @@ export async function pingSquadController(request, reply) {
       )
     );
 
-    await createSquadActivity(request.server.db, {
+    const activity = await createSquadActivity(request.server.db, {
       squadId: membership.squadId,
       userId: request.auth.userId,
       activityType: 'squad_ping',
       eventDate: getCurrentDateKey(),
       quantity: targetRows.length,
+      metadata: {
+        targetCount: targetRows.length
+      }
+    });
+
+    await recordSquadScoreEvent(request.server.db, {
+      squadId: membership.squadId,
+      userId: request.auth.userId,
+      eventType: 'ping',
+      sourceType: 'squad_ping',
+      sourceId: activity?.id || `${membership.squadId}:${request.auth.userId}:${Date.now()}`,
       metadata: {
         targetCount: targetRows.length
       }
@@ -917,5 +992,154 @@ export async function pingSquadController(request, reply) {
     });
   } catch (error) {
     return sendError(reply, error, 'Could not send squad ping.');
+  }
+}
+
+export async function getSquadLeaderboardController(request, reply) {
+  try {
+    requireDatabase(request.server.db);
+    const userId = request.auth?.userId || null;
+    const leaderboard = await getLeaderboard(request.server.db, {
+      period: request.query?.period,
+      limit: Number(request.query?.limit || 50),
+      userId,
+      includeMyRank: Boolean(userId)
+    });
+    const payload = userId ? leaderboard : sanitizePublicLeaderboard(leaderboard);
+
+    return reply.send({
+      success: true,
+      data: payload
+    });
+  } catch (error) {
+    return sendError(reply, error, 'Could not load squad leaderboard.');
+  }
+}
+
+function sanitizePublicLeaderboardEntry(entry) {
+  if (!entry) return null;
+  return {
+    squadId: entry.squadId,
+    squadName: entry.squadName,
+    period: entry.period,
+    rank: entry.rank,
+    qualityScore: entry.qualityScore,
+    activeMemberCount: entry.activeMemberCount,
+    nextRankDelta: entry.nextRankDelta,
+    previousRankDelta: entry.previousRankDelta,
+    isRewardRank: entry.isRewardRank,
+    reward: entry.reward,
+    rewardStatus: entry.rewardStatus,
+    breakdown: entry.breakdown
+  };
+}
+
+function sanitizePublicLeaderboard(leaderboard) {
+  const entries = (leaderboard.entries || []).map(sanitizePublicLeaderboardEntry).filter(Boolean);
+  return {
+    period: leaderboard.period,
+    reviewStatus: leaderboard.reviewStatus,
+    entries,
+    podium: (leaderboard.podium || []).map(sanitizePublicLeaderboardEntry).filter(Boolean),
+    myRank: null,
+    hasMore: leaderboard.hasMore,
+    totalSquads: leaderboard.totalSquads,
+    autoFinalize: {
+      enabled: Boolean(leaderboard.autoFinalize?.enabled),
+      closedPeriod: Boolean(leaderboard.autoFinalize?.closedPeriod),
+      needsReviewCount: Number(leaderboard.autoFinalize?.needsReviewCount || 0),
+      publishedCount: Number(leaderboard.autoFinalize?.publishedCount || 0)
+    },
+    publicView: true
+  };
+}
+
+export async function getMySquadLeaderboardRankController(request, reply) {
+  try {
+    requireDatabase(request.server.db);
+    const rank = await getMyLeaderboardRank(request.server.db, request.auth.userId, request.query?.period);
+
+    return reply.send({
+      success: true,
+      data: rank
+    });
+  } catch (error) {
+    return sendError(reply, error, 'Could not load your squad rank.');
+  }
+}
+
+export async function getMySquadRewardHistoryController(request, reply) {
+  try {
+    requireDatabase(request.server.db);
+    const rows = await request.server.db
+      .select({ settingsJson: profileSettings.settingsJson })
+      .from(profileSettings)
+      .where(eq(profileSettings.userId, request.auth.userId))
+      .limit(1);
+    const history = normalizeSquadRewardHistory(rows[0]?.settingsJson?.squadRewardHistory);
+
+    return reply.send({
+      success: true,
+      data: {
+        history,
+        summary: {
+          totalClaimed: history.length,
+          bestRank: history.length ? Math.min(...history.map((item) => Number(item.rank || 99))) : null,
+          latest: history[0] || null
+        }
+      }
+    });
+  } catch (error) {
+    return sendError(reply, error, 'Could not load squad reward history.');
+  }
+}
+
+export async function getSquadRewardHistoryController(request, reply) {
+  try {
+    requireDatabase(request.server.db);
+    const { squadId } = squadIdParamSchema.parse(request.params || {});
+    const history = await getSquadRewardHistory(request.server.db, squadId, {
+      limit: Number(request.query?.limit || 12)
+    });
+    const safeHistory = {
+      squadId: history.squadId,
+      squadName: history.squadName,
+      bestRank: history.bestRank,
+      podiumFinishes: history.podiumFinishes,
+      rewardWins: history.rewardWins,
+      latest: history.latest
+        ? {
+            squadId: history.latest.squadId,
+            squadName: history.latest.squadName,
+            period: history.latest.period,
+            rank: history.latest.rank,
+            qualityScore: history.latest.qualityScore,
+            activeMemberCount: history.latest.activeMemberCount,
+            reviewStatus: history.latest.reviewStatus,
+            publishedAt: history.latest.publishedAt,
+            finalizedAt: history.latest.finalizedAt,
+            reward: history.latest.reward
+          }
+        : null,
+      entries: (history.entries || []).map((entry) => ({
+        squadId: entry.squadId,
+        squadName: entry.squadName,
+        period: entry.period,
+        rank: entry.rank,
+        qualityScore: entry.qualityScore,
+        activeMemberCount: entry.activeMemberCount,
+        reviewStatus: entry.reviewStatus,
+        publishedAt: entry.publishedAt,
+        finalizedAt: entry.finalizedAt,
+        reward: entry.reward
+      }))
+    };
+
+    return reply.send({
+      success: true,
+      data: safeHistory
+    });
+  } catch (error) {
+    return sendError(reply, error, 'Could not load squad history.');
   }
 }
