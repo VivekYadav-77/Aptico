@@ -5,7 +5,16 @@ import api from '../api/axios.js';
 import AppShell from '../components/AppShell.jsx';
 import { selectAuth } from '../store/authSlice.js';
 
-const TABS = ['Overview', 'Visitors', 'Users', 'User Controls', 'Restrictions', 'Moderation', 'Content', 'Invites', 'Activity', 'Health', 'Security', 'Audit', 'Admin Logs'];
+const SECTIONS = [
+  { id: 'command', label: 'Command', icon: 'dashboard', description: 'Platform pulse' },
+  { id: 'people', label: 'People', icon: 'group', description: 'Users and access' },
+  { id: 'activity', label: 'Activity', icon: 'monitoring', description: 'Visits and events' },
+  { id: 'moderation', label: 'Moderation', icon: 'shield_person', description: 'Content review' },
+  { id: 'security', label: 'Security', icon: 'security', description: 'Risk signals' },
+  { id: 'system', label: 'System', icon: 'dns', description: 'API health' },
+  { id: 'audit', label: 'Audit', icon: 'receipt_long', description: 'Admin trail' }
+];
+
 const FEATURES = ['login', 'posting', 'commenting', 'squad_actions', 'analysis', 'job_saving', 'profile_visibility', 'activity_logging'];
 const STATUSES = ['active', 'restricted', 'blocked', 'deactivated'];
 const ROLES = ['user', 'admin'];
@@ -108,83 +117,246 @@ function humanize(value) {
   return String(value || '').replaceAll('_', ' ');
 }
 
-function StatCard({ label, value, detail }) {
+function toneForStatus(status) {
+  if (status === 'blocked' || status === 'delete' || status === 'critical' || status === 'high') return 'danger';
+  if (status === 'restricted' || status === 'hidden' || status === 'watch' || status === 'medium') return 'warning';
+  if (status === 'active' || status === 'visible' || status === 'healthy') return 'success';
+  return 'neutral';
+}
+
+function StatusBadge({ value, tone = toneForStatus(String(value || '').toLowerCase()) }) {
+  return <span className={`admin-badge ${tone}`}>{humanize(value || 'unknown')}</span>;
+}
+
+function AdminCard({ icon, label, value, detail, tone = 'neutral' }) {
   return (
-    <article className="app-panel-soft">
-      <p className="app-field-label">{label}</p>
-      <p className="mt-3 text-3xl font-black tracking-tight text-[var(--text)]">{value}</p>
-      {detail ? <p className="mt-2 text-xs text-[var(--muted-strong)]">{detail}</p> : null}
+    <article className={`admin-stat ${tone}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="admin-eyebrow">{label}</p>
+          <p className="mt-3 text-3xl font-black text-[var(--text)]">{value}</p>
+        </div>
+        <span className="material-symbols-outlined admin-stat-icon">{icon}</span>
+      </div>
+      {detail ? <p className="mt-3 text-xs font-semibold text-[var(--muted-strong)]">{detail}</p> : null}
     </article>
   );
 }
 
-function BreakdownList({ title, items }) {
+function SectionNav({ activeSection, onChange }) {
+  return (
+    <nav className="admin-section-nav" aria-label="Admin sections">
+      {SECTIONS.map((section) => (
+        <button
+          key={section.id}
+          type="button"
+          className={`admin-section-button ${activeSection === section.id ? 'active' : ''}`}
+          onClick={() => onChange(section.id)}
+        >
+          <span className="material-symbols-outlined text-[19px]">{section.icon}</span>
+          <span>
+            <span className="block text-sm font-black">{section.label}</span>
+            <span className="hidden text-[11px] font-semibold text-[var(--muted)] sm:block">{section.description}</span>
+          </span>
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function BreakdownList({ title, items, icon = 'bar_chart' }) {
   const maxValue = Math.max(...items.map((item) => item.value), 1);
   return (
-    <article className="app-panel">
-      <p className="app-kicker">{title}</p>
+    <article className="admin-panel">
+      <div className="admin-panel-header">
+        <span className="material-symbols-outlined text-[18px] text-[var(--accent-strong)]">{icon}</span>
+        <h2>{title}</h2>
+      </div>
       <div className="mt-5 space-y-3">
         {items.length ? items.map((item) => (
           <div key={item.label} className="space-y-2">
             <div className="flex items-center justify-between gap-3 text-sm">
               <span className="truncate font-semibold text-[var(--text)]">{item.label}</span>
-              <span className="text-[var(--muted-strong)]">{item.value}</span>
+              <span className="admin-mono">{item.value}</span>
             </div>
             <div className="h-2 overflow-hidden rounded-full bg-[var(--panel-soft)]">
               <div className="h-full rounded-full bg-[var(--accent)]" style={{ width: `${Math.max((item.value / maxValue) * 100, 5)}%` }} />
             </div>
           </div>
-        )) : <p className="rounded-2xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--muted-strong)]">No data yet.</p>}
+        )) : <EmptyState label="No data yet" />}
       </div>
     </article>
+  );
+}
+
+function EmptyState({ label, detail = 'Nothing needs attention in this view.' }) {
+  return (
+    <div className="admin-empty">
+      <span className="material-symbols-outlined text-[22px]">inbox</span>
+      <div>
+        <p className="font-bold text-[var(--text)]">{label}</p>
+        <p className="text-xs text-[var(--muted-strong)]">{detail}</p>
+      </div>
+    </div>
   );
 }
 
 function EventRow({ event }) {
   const metadata = parseMetadata(event.metadata);
-  const metadataText = Object.entries(metadata).map(([key, value]) => `${key}: ${String(value)}`).join(' | ');
+  const metadataText = Object.entries(metadata).slice(0, 4).map(([key, value]) => `${key}: ${String(value)}`).join(' | ');
   return (
-    <article className="rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] p-4">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="app-chip">{event.eventType}</span>
-            {event.userEmail ? <span className="app-chip">{event.userEmail}</span> : null}
-            {event.source ? <span className="app-chip">{event.source}</span> : null}
-          </div>
-          <p className="mt-3 truncate text-sm font-semibold text-[var(--text)]">{event.path || 'No route'}</p>
-          <p className="mt-1 text-xs text-[var(--muted-strong)]">
-            {[event.city, event.region, event.country].filter(Boolean).join(', ') || 'Unknown location'} | {event.deviceCategory || 'device'} | {event.browserName || 'browser'}
-          </p>
-          {metadataText ? <p className="mt-2 text-xs text-[var(--muted-strong)]">{metadataText}</p> : null}
+    <article className="admin-list-row">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <StatusBadge value={event.eventType} tone={event.eventType === 'api_error' ? 'danger' : 'neutral'} />
+          {event.userEmail ? <span className="admin-chip truncate">{event.userEmail}</span> : null}
+          {event.source ? <span className="admin-chip">{event.source}</span> : null}
         </div>
-        <p className="shrink-0 text-xs font-semibold text-[var(--muted-strong)]">{formatDate(event.createdAt)}</p>
+        <p className="mt-2 truncate text-sm font-bold text-[var(--text)]">{event.path || 'No route'}</p>
+        <p className="mt-1 text-xs text-[var(--muted-strong)]">
+          {[event.city, event.region, event.country].filter(Boolean).join(', ') || 'Unknown location'} | {event.deviceCategory || 'device'} | {event.browserName || 'browser'}
+        </p>
+        {metadataText ? <p className="mt-2 text-xs text-[var(--muted-strong)]">{metadataText}</p> : null}
       </div>
+      <time className="admin-time">{formatDate(event.createdAt)}</time>
     </article>
   );
 }
 
-function UserCard({ user, selected, onClick }) {
+function UserTable({ users, selectedUserId, onSelect }) {
   return (
-    <button type="button" className={`rounded-2xl border p-4 text-left ${selected ? 'border-[var(--accent)] bg-[var(--accent-soft)]' : 'border-[var(--border)] bg-[var(--panel-soft)]'}`} onClick={onClick}>
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-        <div>
-          <p className="font-semibold text-[var(--text)]">{user.name || user.email}</p>
-          <p className="mt-1 text-sm text-[var(--muted-strong)]">{user.email}</p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <span className="app-chip">{user.role}</span>
-            <span className="app-chip">{user.status || 'active'}</span>
-            <span className="app-chip">{user.restrictionCount || 0} restrictions</span>
-            <span className="app-chip">{user.activeSessionCount} sessions</span>
-          </div>
+    <div className="admin-table-wrap">
+      <table className="admin-table">
+        <thead>
+          <tr>
+            <th>User</th>
+            <th>Status</th>
+            <th>Sessions</th>
+            <th>Activity</th>
+            <th>Last seen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {users.map((user) => (
+            <tr key={user.id} className={selectedUserId === user.id ? 'selected' : ''} onClick={() => onSelect(user.id)}>
+              <td>
+                <button type="button" className="text-left">
+                  <span className="block font-black text-[var(--text)]">{user.name || user.email}</span>
+                  <span className="block text-xs text-[var(--muted-strong)]">{user.email}</span>
+                </button>
+              </td>
+              <td>
+                <div className="flex flex-wrap gap-2">
+                  <StatusBadge value={user.status || 'active'} />
+                  <StatusBadge value={user.role} tone={user.role === 'admin' ? 'info' : 'neutral'} />
+                </div>
+              </td>
+              <td className="admin-mono">{user.activeSessionCount}</td>
+              <td className="admin-mono">{user.eventCount}</td>
+              <td>{formatDate(user.lastSeenAt)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function UserDetailPanel({
+  selectedUser,
+  controlForm,
+  setControlForm,
+  restrictionForm,
+  setRestrictionForm,
+  onSaveProfile,
+  onSaveRole,
+  onSaveStatus,
+  onSaveRestrictions,
+  onRevoke,
+  busyAction
+}) {
+  if (!selectedUser) {
+    return <EmptyState label="Select a user" detail="Choose a user to view activity, restrictions, and account actions." />;
+  }
+
+  return (
+    <aside className="admin-detail-panel">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="admin-eyebrow">Selected account</p>
+          <h2 className="mt-2 truncate text-xl font-black text-[var(--text)]">{selectedUser.name || selectedUser.email}</h2>
+          <p className="truncate text-sm text-[var(--muted-strong)]">{selectedUser.email}</p>
         </div>
-        <div className="text-xs leading-6 text-[var(--muted-strong)]">
-          <p>Joined: {formatDate(user.createdAt)}</p>
-          <p>Last login: {formatDate(user.lastLogin)}</p>
-          <p>Last seen: {formatDate(user.lastSeenAt)}</p>
+        <StatusBadge value={selectedUser.status || 'active'} />
+      </div>
+
+      <div className="mt-5 grid grid-cols-3 gap-2">
+        <div className="admin-mini-stat"><span>{selectedUser.activeSessionCount}</span><p>Sessions</p></div>
+        <div className="admin-mini-stat"><span>{selectedUser.restrictionCount || 0}</span><p>Restrictions</p></div>
+        <div className="admin-mini-stat"><span>{selectedUser.savedJobsCount || 0}</span><p>Jobs</p></div>
+      </div>
+
+      <div className="mt-6 space-y-4">
+        <div className="admin-form-grid">
+          <label>
+            <span className="app-field-label">Name</span>
+            <input className="app-input" value={controlForm.name} onChange={(event) => setControlForm((form) => ({ ...form, name: event.target.value }))} />
+          </label>
+          <label>
+            <span className="app-field-label">Email</span>
+            <input className="app-input" value={controlForm.email} onChange={(event) => setControlForm((form) => ({ ...form, email: event.target.value }))} />
+          </label>
+          <label>
+            <span className="app-field-label">Role</span>
+            <select className="app-input" value={controlForm.role} onChange={(event) => setControlForm((form) => ({ ...form, role: event.target.value }))}>
+              {ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
+            </select>
+          </label>
+          <label>
+            <span className="app-field-label">Status</span>
+            <select className="app-input" value={controlForm.status} onChange={(event) => setControlForm((form) => ({ ...form, status: event.target.value }))}>
+              {STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+            </select>
+          </label>
+        </div>
+
+        <label className="block">
+          <span className="app-field-label">Reason</span>
+          <textarea className="app-input mt-2 min-h-20" value={controlForm.reason} onChange={(event) => setControlForm((form) => ({ ...form, reason: event.target.value }))} placeholder="Required for account changes" />
+        </label>
+        <label className="block">
+          <span className="app-field-label">Typed confirmation</span>
+          <input className="app-input mt-2" value={controlForm.confirmTarget} onChange={(event) => setControlForm((form) => ({ ...form, confirmTarget: event.target.value }))} placeholder={selectedUser.email} />
+        </label>
+
+        <div className="admin-action-group">
+          <button type="button" className="app-button-secondary" onClick={onSaveProfile} disabled={busyAction === 'edit-user'}>Save profile</button>
+          <button type="button" className="app-button-secondary" onClick={onSaveRole} disabled={busyAction === 'role-user'}>Role</button>
+          <button type="button" className="app-button" onClick={onSaveStatus} disabled={busyAction === 'status-user'}>Apply status</button>
+          <button type="button" className="app-button-danger" onClick={onRevoke} disabled={busyAction === 'revoke'}>Revoke sessions</button>
         </div>
       </div>
-    </button>
+
+      <div className="mt-7 border-t border-[var(--border)] pt-5">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="admin-eyebrow">Feature restrictions</p>
+            <p className="mt-1 text-xs text-[var(--muted-strong)]">Disable specific write actions without blocking the full account.</p>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-2">
+          {FEATURES.map((feature) => (
+            <label key={feature} className="admin-toggle-row">
+              <span>{humanize(feature)}</span>
+              <input type="checkbox" checked={Boolean(restrictionForm.flags[feature])} onChange={(event) => setRestrictionForm((form) => ({ ...form, flags: { ...form.flags, [feature]: event.target.checked } }))} />
+            </label>
+          ))}
+        </div>
+        <textarea className="app-input mt-4 min-h-20" value={restrictionForm.reason} onChange={(event) => setRestrictionForm((form) => ({ ...form, reason: event.target.value }))} placeholder="Restriction reason" />
+        <input className="app-input mt-3" value={restrictionForm.confirmTarget} onChange={(event) => setRestrictionForm((form) => ({ ...form, confirmTarget: event.target.value }))} placeholder={`Type ${selectedUser.email} for login restriction`} />
+        <button type="button" className="app-button mt-4 w-full" onClick={onSaveRestrictions} disabled={busyAction === 'restrictions'}>Save restrictions</button>
+      </div>
+    </aside>
   );
 }
 
@@ -192,7 +364,7 @@ export default function ControlCenter() {
   const auth = useSelector(selectAuth);
   const [roleCheckComplete, setRoleCheckComplete] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
-  const [activeTab, setActiveTab] = useState('Overview');
+  const [activeSection, setActiveSection] = useState('command');
   const [eventType, setEventType] = useState('');
   const [userSearch, setUserSearch] = useState('');
   const [selectedUserId, setSelectedUserId] = useState('');
@@ -329,10 +501,6 @@ export default function ControlCenter() {
     }
   }
 
-  function selectedEmail() {
-    return selectedUser?.email || '';
-  }
-
   async function revokeSessions(userId) {
     await runAdminAction('revoke', async () => {
       const response = await api.post(`/api/admin/revoke/${userId}`);
@@ -419,6 +587,8 @@ export default function ControlCenter() {
   if (!isAuthorized) return <Navigate replace to="/dashboard" />;
 
   const overview = data.adminOverview || {};
+  const highRiskCount = (overview.blockedUsers || 0) + (overview.restrictedUsers || 0) + (overview.apiErrors || 0);
+  const hiddenContentCount = (overview.hiddenPosts || 0) + (overview.hiddenWins || 0);
   const filteredUsers = data.adminUsers.filter((user) => {
     const search = userSearch.trim().toLowerCase();
     if (!search) return true;
@@ -430,21 +600,25 @@ export default function ControlCenter() {
     const hasRecent429 = last429At && Date.now() - last429At < 7 * 24 * 60 * 60 * 1000;
     return {
       name: metric.sourceName,
-      status: hasRecent429 ? 'Watch' : 'Healthy',
+      status: hasRecent429 ? 'watch' : 'healthy',
       detail: hasRecent429 ? `Last 429: ${formatDate(metric.last429At)}` : 'No recent rate-limit pressure detected.',
       requests: metric.requestCount
     };
   });
 
   return (
-    <AppShell title="Admin Control Center" description="Monitor analytics, user access, moderation, platform health, and security controls from one operational dashboard.">
-      <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap gap-2">
-          {TABS.map((tab) => (
-            <button key={tab} type="button" className={`app-tab ${activeTab === tab ? 'active' : ''}`} onClick={() => setActiveTab(tab)}>
-              {tab}
-            </button>
-          ))}
+    <AppShell title="Admin Control Center" description="Professional operations workspace for analytics, people control, moderation, security, and system health.">
+      <section className="admin-command-hero">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge value="live operations" tone="info" />
+            <StatusBadge value={`${overview.activeVisitors || 0} active now`} tone="success" />
+            {highRiskCount ? <StatusBadge value={`${highRiskCount} risk signals`} tone="warning" /> : <StatusBadge value="stable" tone="success" />}
+          </div>
+          <h1 className="mt-4 text-3xl font-black tracking-tight text-[var(--text)] md:text-4xl">Admin command center</h1>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-[var(--muted-strong)]">
+            Monitor visitors, manage accounts, moderate content, and audit sensitive actions from one focused workspace.
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" className="app-button-secondary" onClick={() => loadDashboard({ silent: false })}>
@@ -453,327 +627,326 @@ export default function ControlCenter() {
           </button>
           <button type="button" className="app-button-secondary" onClick={cleanupAnalytics} disabled={busyAction === 'cleanup'}>
             <span className="material-symbols-outlined text-[18px]">delete_sweep</span>
-            90 day cleanup
+            Cleanup
           </button>
         </div>
-      </div>
+      </section>
 
-      {message ? <div className="mb-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">{message}</div> : null}
-      {error ? <div className="mb-5 rounded-2xl border border-[var(--danger-border)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-rose-300">{error}</div> : null}
-      {isLoading ? <div className="app-panel text-center text-sm text-[var(--muted-strong)]">Loading control center...</div> : null}
+      <SectionNav activeSection={activeSection} onChange={setActiveSection} />
 
-      {!isLoading && activeTab === 'Overview' ? (
-        <div className="space-y-6">
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <StatCard label="Total users" value={overview.totalUsers || 0} detail={`${overview.activeRefreshTokens || 0} active sessions`} />
-            <StatCard label="Restricted users" value={overview.restrictedUsers || 0} detail={`${overview.blockedUsers || 0} blocked, ${overview.deactivatedUsers || 0} deactivated`} />
-            <StatCard label="Visits" value={overview.totalVisits || 0} detail={`${overview.uniqueVisitors || 0} unique visitors`} />
-            <StatCard label="Active now" value={overview.activeVisitors || 0} detail="Seen in the last 15 minutes" />
-            <StatCard label="Tracked events" value={overview.totalEvents || 0} detail={`${overview.apiErrors || 0} API errors`} />
-            <StatCard label="Hidden content" value={(overview.hiddenPosts || 0) + (overview.hiddenWins || 0)} detail={`${overview.pendingModeration || 0} active restrictions`} />
-            <StatCard label="Saved jobs" value={overview.totalSavedJobs || 0} detail={`${overview.totalAnalyses || 0} analyses`} />
-            <StatCard label="Admin actions" value={overview.adminActions || 0} detail={`${overview.revokedRefreshTokens || 0} revoked sessions`} />
-          </section>
-          <section className="app-panel">
-            <p className="app-kicker">14 day activity</p>
-            <div className="mt-6 grid min-h-56 grid-cols-7 items-end gap-2 md:grid-cols-14">
-              {data.visitorTrends.map((point) => (
-                <div key={point.date} className="flex min-h-48 flex-col justify-end gap-2">
-                  <div className="rounded-t-xl bg-[var(--accent)]" style={{ height: `${Math.max((point.visits / maxTrendValue) * 180, 8)}px` }} title={`${point.visits} visits`} />
-                  <p className="truncate text-center text-[10px] text-[var(--muted-strong)]">{point.date.slice(5)}</p>
+      {message ? <div className="admin-alert success">{message}</div> : null}
+      {error ? <div className="admin-alert danger">{error}</div> : null}
+      {isLoading ? <div className="admin-panel text-center text-sm text-[var(--muted-strong)]">Loading admin workspace...</div> : null}
+
+      {!isLoading && activeSection === 'command' ? (
+        <div className="admin-workspace">
+          <main className="space-y-6">
+            <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <AdminCard icon="group" label="Total users" value={overview.totalUsers || 0} detail={`${overview.activeRefreshTokens || 0} active sessions`} tone="info" />
+              <AdminCard icon="person_off" label="Restricted users" value={overview.restrictedUsers || 0} detail={`${overview.blockedUsers || 0} blocked, ${overview.deactivatedUsers || 0} deactivated`} tone={overview.blockedUsers ? 'danger' : 'warning'} />
+              <AdminCard icon="visibility" label="Visits" value={overview.totalVisits || 0} detail={`${overview.uniqueVisitors || 0} unique visitors`} tone="success" />
+              <AdminCard icon="report" label="API errors" value={overview.apiErrors || 0} detail={`${overview.adminActions || 0} admin actions`} tone={overview.apiErrors ? 'danger' : 'success'} />
+              <AdminCard icon="psychology" label="Analyses" value={overview.totalAnalyses || 0} detail={`${overview.totalGeneratedContent || 0} generated items`} />
+              <AdminCard icon="bookmark" label="Saved jobs" value={overview.totalSavedJobs || 0} />
+              <AdminCard icon="visibility_off" label="Hidden content" value={hiddenContentCount} detail={`${overview.pendingModeration || 0} active restrictions`} tone={hiddenContentCount ? 'warning' : 'neutral'} />
+              <AdminCard icon="api" label="API requests" value={overview.totalApiRequests || 0} />
+            </section>
+
+            <section className="admin-panel">
+              <div className="admin-panel-header">
+                <span className="material-symbols-outlined text-[18px] text-[var(--accent-strong)]">stacked_bar_chart</span>
+                <h2>14 day visitor trend</h2>
+              </div>
+              <div className="mt-6 grid min-h-56 grid-cols-7 items-end gap-2 md:grid-cols-14">
+                {data.visitorTrends.map((point) => (
+                  <div key={point.date} className="flex min-h-48 flex-col justify-end gap-2">
+                    <div className="admin-trend-bar" style={{ height: `${Math.max((point.visits / maxTrendValue) * 180, 8)}px` }} title={`${point.visits} visits`} />
+                    <p className="truncate text-center text-[10px] font-bold text-[var(--muted-strong)]">{point.date.slice(5)}</p>
+                  </div>
+                ))}
+                {!data.visitorTrends.length ? <div className="col-span-full"><EmptyState label="No trend data yet" /></div> : null}
+              </div>
+            </section>
+          </main>
+          <aside className="space-y-6">
+            <section className="admin-panel">
+              <div className="admin-panel-header">
+                <span className="material-symbols-outlined text-[18px] text-[var(--accent-strong)]">priority_high</span>
+                <h2>Priority signals</h2>
+              </div>
+              <div className="mt-4 space-y-3">
+                {data.suspiciousSignals.slice(0, 4).map((signal) => (
+                  <article key={`${signal.label}-${signal.lastSeenAt}`} className="admin-compact-row">
+                    <StatusBadge value={signal.severity} />
+                    <div className="min-w-0">
+                      <p className="truncate font-bold text-[var(--text)]">{signal.label}</p>
+                      <p className="text-xs text-[var(--muted-strong)]">{signal.count} events | {formatDate(signal.lastSeenAt)}</p>
+                    </div>
+                  </article>
+                ))}
+                {!data.suspiciousSignals.length ? <EmptyState label="No suspicious signals" detail="Risk monitoring is quiet right now." /> : null}
+              </div>
+            </section>
+            <BreakdownList title="Top pages" items={data.topPages} icon="web" />
+          </aside>
+        </div>
+      ) : null}
+
+      {!isLoading && activeSection === 'people' ? (
+        <div className="admin-workspace">
+          <main className="space-y-6">
+            <section className="admin-panel">
+              <div className="admin-toolbar">
+                <div>
+                  <p className="admin-eyebrow">People operations</p>
+                  <h2 className="text-xl font-black text-[var(--text)]">Users and account access</h2>
                 </div>
-              ))}
-            </div>
+                <input className="app-input max-w-sm" value={userSearch} onChange={(event) => setUserSearch(event.target.value)} placeholder="Search users, role, or status..." />
+              </div>
+              {filteredUsers.length ? (
+                <UserTable users={filteredUsers} selectedUserId={selectedUser?.id} onSelect={setSelectedUserId} />
+              ) : <EmptyState label="No users found" detail="Try another email, name, role, or status." />}
+            </section>
+
+            <section className="admin-panel">
+              <div className="admin-panel-header">
+                <span className="material-symbols-outlined text-[18px] text-[var(--accent-strong)]">person_add</span>
+                <h2>Invite user</h2>
+              </div>
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
+                <input className="app-input" value={inviteForm.email} onChange={(event) => setInviteForm((form) => ({ ...form, email: event.target.value }))} placeholder="Email" />
+                <input className="app-input" value={inviteForm.name} onChange={(event) => setInviteForm((form) => ({ ...form, name: event.target.value }))} placeholder="Name" />
+                <select className="app-input" value={inviteForm.role} onChange={(event) => setInviteForm((form) => ({ ...form, role: event.target.value }))}>
+                  {ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
+                </select>
+                <input className="app-input" value={inviteForm.confirmTarget} onChange={(event) => setInviteForm((form) => ({ ...form, confirmTarget: event.target.value }))} placeholder="Type the invite email" />
+                <textarea className="app-input min-h-20 md:col-span-2" value={inviteForm.reason} onChange={(event) => setInviteForm((form) => ({ ...form, reason: event.target.value }))} placeholder="Invite reason" />
+                <button type="button" className="app-button w-fit" onClick={inviteNewUser} disabled={busyAction === 'invite'}>Send invite</button>
+              </div>
+            </section>
+          </main>
+          <UserDetailPanel
+            selectedUser={selectedUser}
+            controlForm={controlForm}
+            setControlForm={setControlForm}
+            restrictionForm={restrictionForm}
+            setRestrictionForm={setRestrictionForm}
+            onSaveProfile={saveUserProfile}
+            onSaveRole={saveUserRole}
+            onSaveStatus={saveUserStatus}
+            onSaveRestrictions={saveRestrictions}
+            onRevoke={() => selectedUser && revokeSessions(selectedUser.id)}
+            busyAction={busyAction}
+          />
+        </div>
+      ) : null}
+
+      {!isLoading && activeSection === 'activity' ? (
+        <div className="space-y-6">
+          <section className="grid gap-6 xl:grid-cols-4">
+            <BreakdownList title="Approximate locations" items={data.geoBreakdown} icon="public" />
+            <BreakdownList title="Traffic sources" items={data.trafficSources} icon="campaign" />
+            <BreakdownList title="Devices" items={data.deviceBreakdown} icon="devices" />
+            <BreakdownList title="Top pages" items={data.topPages} icon="web" />
           </section>
-          <section className="grid gap-6 xl:grid-cols-3">
-            <BreakdownList title="Top pages" items={data.topPages} />
-            <BreakdownList title="Traffic sources" items={data.trafficSources} />
-            <BreakdownList title="Device mix" items={data.deviceBreakdown} />
+          <section className="admin-panel">
+            <div className="admin-toolbar">
+              <div>
+                <p className="admin-eyebrow">Activity stream</p>
+                <h2 className="text-xl font-black text-[var(--text)]">Recent platform events</h2>
+              </div>
+              <select className="app-input max-w-xs" value={eventType} onChange={(event) => setEventType(event.target.value)}>
+                {EVENT_TYPES.map((type) => <option key={type || 'all'} value={type}>{type || 'All events'}</option>)}
+              </select>
+            </div>
+            <div className="mt-5 grid gap-3">
+              {data.recentEvents.length ? data.recentEvents.map((event) => <EventRow key={event.id} event={event} />) : <EmptyState label="No matching events" />}
+            </div>
           </section>
         </div>
       ) : null}
 
-      {!isLoading && activeTab === 'Visitors' ? (
-        <section className="grid gap-6 xl:grid-cols-2">
-          <BreakdownList title="Approximate locations" items={data.geoBreakdown} />
-          <BreakdownList title="Traffic sources" items={data.trafficSources} />
-          <BreakdownList title="Top pages" items={data.topPages} />
-          <BreakdownList title="Devices" items={data.deviceBreakdown} />
-        </section>
-      ) : null}
-
-      {!isLoading && ['Users', 'User Controls', 'Restrictions'].includes(activeTab) ? (
-        <section className="grid gap-6 xl:grid-cols-[1fr_0.95fr]">
-          <article className="app-panel">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <p className="app-kicker">User directory</p>
-              <input className="app-input max-w-sm" value={userSearch} onChange={(event) => setUserSearch(event.target.value)} placeholder="Search users..." />
+      {!isLoading && activeSection === 'moderation' ? (
+        <div className="admin-workspace">
+          <main className="admin-panel">
+            <div className="admin-toolbar">
+              <div>
+                <p className="admin-eyebrow">Moderation queue</p>
+                <h2 className="text-xl font-black text-[var(--text)]">Review user-owned content</h2>
+              </div>
+              <div className="flex w-full flex-col gap-2 md:w-auto md:flex-row">
+                <select className="app-input md:w-48" value={contentType} onChange={(event) => setContentType(event.target.value)}>
+                  {CONTENT_TYPES.map((type) => <option key={type} value={type}>{humanize(type)}</option>)}
+                </select>
+                <input className="app-input md:w-64" value={contentSearch} onChange={(event) => setContentSearch(event.target.value)} placeholder="Search content or owner" />
+              </div>
             </div>
-            <div className="mt-5 grid gap-3">
-              {filteredUsers.map((user) => (
-                <UserCard key={user.id} user={user} selected={selectedUser?.id === user.id} onClick={() => setSelectedUserId(user.id)} />
-              ))}
-              {!filteredUsers.length ? <p className="text-sm text-[var(--muted-strong)]">No users match this search.</p> : null}
-            </div>
-          </article>
-
-          {activeTab === 'Users' ? (
-            <article className="app-panel">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="app-kicker">Selected user</p>
-                  <h2 className="mt-3 text-2xl font-black text-[var(--text)]">{selectedUser?.name || selectedUser?.email || 'No user selected'}</h2>
-                  {selectedUser ? <p className="mt-1 text-sm text-[var(--muted-strong)]">{selectedUser.email}</p> : null}
-                </div>
-                {selectedUser ? (
-                  <button type="button" className="app-button-secondary" onClick={() => revokeSessions(selectedUser.id)} disabled={busyAction === 'revoke'}>
-                    <span className="material-symbols-outlined text-[18px]">block</span>
-                    Revoke
-                  </button>
-                ) : null}
-              </div>
-              <div className="mt-5 grid gap-3">
-                {data.userActivity.length ? data.userActivity.map((event) => <EventRow key={event.id} event={event} />) : <p className="text-sm text-[var(--muted-strong)]">No user activity yet.</p>}
-              </div>
-            </article>
-          ) : null}
-
-          {activeTab === 'User Controls' ? (
-            <article className="app-panel">
-              <p className="app-kicker">Account controls</p>
-              <h2 className="mt-3 text-2xl font-black text-[var(--text)]">{selectedUser?.email || 'Select a user'}</h2>
-              <div className="mt-5 grid gap-4">
-                <label className="space-y-2">
-                  <span className="app-field-label">Name</span>
-                  <input className="app-input" value={controlForm.name} onChange={(event) => setControlForm((form) => ({ ...form, name: event.target.value }))} />
-                </label>
-                <label className="space-y-2">
-                  <span className="app-field-label">Email</span>
-                  <input className="app-input" value={controlForm.email} onChange={(event) => setControlForm((form) => ({ ...form, email: event.target.value }))} />
-                </label>
-                <div className="grid gap-4 md:grid-cols-2">
-                  <label className="space-y-2">
-                    <span className="app-field-label">Role</span>
-                    <select className="app-input" value={controlForm.role} onChange={(event) => setControlForm((form) => ({ ...form, role: event.target.value }))}>
-                      {ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
-                    </select>
-                  </label>
-                  <label className="space-y-2">
-                    <span className="app-field-label">Status</span>
-                    <select className="app-input" value={controlForm.status} onChange={(event) => setControlForm((form) => ({ ...form, status: event.target.value }))}>
-                      {STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
-                    </select>
-                  </label>
-                </div>
-                <label className="space-y-2">
-                  <span className="app-field-label">Reason</span>
-                  <textarea className="app-input min-h-24" value={controlForm.reason} onChange={(event) => setControlForm((form) => ({ ...form, reason: event.target.value }))} />
-                </label>
-                <label className="space-y-2">
-                  <span className="app-field-label">Typed confirmation for dangerous changes</span>
-                  <input className="app-input" value={controlForm.confirmTarget} onChange={(event) => setControlForm((form) => ({ ...form, confirmTarget: event.target.value }))} placeholder={selectedEmail()} />
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  <button type="button" className="app-button-secondary" onClick={saveUserProfile} disabled={!selectedUser || busyAction === 'edit-user'}>Save profile</button>
-                  <button type="button" className="app-button-secondary" onClick={saveUserRole} disabled={!selectedUser || busyAction === 'role-user'}>Change role</button>
-                  <button type="button" className="app-button" onClick={saveUserStatus} disabled={!selectedUser || busyAction === 'status-user'}>Apply status</button>
-                  <button type="button" className="app-button-secondary" onClick={() => selectedUser && revokeSessions(selectedUser.id)} disabled={!selectedUser || busyAction === 'revoke'}>Revoke sessions</button>
-                </div>
-              </div>
-            </article>
-          ) : null}
-
-          {activeTab === 'Restrictions' ? (
-            <article className="app-panel">
-              <p className="app-kicker">Feature restrictions</p>
-              <h2 className="mt-3 text-2xl font-black text-[var(--text)]">{selectedUser?.email || 'Select a user'}</h2>
-              <div className="mt-5 grid gap-3">
-                {FEATURES.map((feature) => (
-                  <label key={feature} className="flex items-center justify-between gap-4 rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] p-4">
-                    <span className="font-semibold text-[var(--text)]">{humanize(feature)}</span>
-                    <input type="checkbox" checked={Boolean(restrictionForm.flags[feature])} onChange={(event) => setRestrictionForm((form) => ({ ...form, flags: { ...form.flags, [feature]: event.target.checked } }))} />
-                  </label>
-                ))}
-                <textarea className="app-input min-h-24" value={restrictionForm.reason} onChange={(event) => setRestrictionForm((form) => ({ ...form, reason: event.target.value }))} placeholder="Reason" />
-                <input className="app-input" value={restrictionForm.confirmTarget} onChange={(event) => setRestrictionForm((form) => ({ ...form, confirmTarget: event.target.value }))} placeholder={`Type ${selectedEmail()} when restricting login`} />
-                <button type="button" className="app-button" onClick={saveRestrictions} disabled={!selectedUser || busyAction === 'restrictions'}>Save restrictions</button>
-              </div>
-            </article>
-          ) : null}
-        </section>
-      ) : null}
-
-      {!isLoading && activeTab === 'Invites' ? (
-        <section className="app-panel max-w-3xl">
-          <p className="app-kicker">Invite user</p>
-          <div className="mt-5 grid gap-4">
-            <input className="app-input" value={inviteForm.email} onChange={(event) => setInviteForm((form) => ({ ...form, email: event.target.value }))} placeholder="Email" />
-            <input className="app-input" value={inviteForm.name} onChange={(event) => setInviteForm((form) => ({ ...form, name: event.target.value }))} placeholder="Name" />
-            <select className="app-input" value={inviteForm.role} onChange={(event) => setInviteForm((form) => ({ ...form, role: event.target.value }))}>
-              {ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
-            </select>
-            <textarea className="app-input min-h-24" value={inviteForm.reason} onChange={(event) => setInviteForm((form) => ({ ...form, reason: event.target.value }))} placeholder="Reason" />
-            <input className="app-input" value={inviteForm.confirmTarget} onChange={(event) => setInviteForm((form) => ({ ...form, confirmTarget: event.target.value }))} placeholder="Type the invite email" />
-            <button type="button" className="app-button" onClick={inviteNewUser} disabled={busyAction === 'invite'}>Send invite</button>
-          </div>
-        </section>
-      ) : null}
-
-      {!isLoading && ['Moderation', 'Content'].includes(activeTab) ? (
-        <section className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
-          <article className="app-panel">
-            <p className="app-kicker">Moderation filters</p>
-            <div className="mt-5 grid gap-4">
-              <select className="app-input" value={contentType} onChange={(event) => setContentType(event.target.value)}>
-                {CONTENT_TYPES.map((type) => <option key={type} value={type}>{humanize(type)}</option>)}
-              </select>
-              <input className="app-input" value={contentSearch} onChange={(event) => setContentSearch(event.target.value)} placeholder="Search content or owner" />
-              <select className="app-input" value={contentForm.action} onChange={(event) => setContentForm((form) => ({ ...form, action: event.target.value }))}>
-                <option value="hide">hide</option>
-                <option value="unhide">unhide</option>
-                <option value="delete">delete</option>
-              </select>
-              <textarea className="app-input min-h-24" value={contentForm.reason} onChange={(event) => setContentForm((form) => ({ ...form, reason: event.target.value }))} placeholder="Reason" />
-              <input className="app-input" value={contentForm.confirmTarget} onChange={(event) => setContentForm((form) => ({ ...form, confirmTarget: event.target.value }))} placeholder="Type the content ID before action" />
-            </div>
-          </article>
-          <article className="app-panel">
-            <p className="app-kicker">Moderation queue</p>
             <div className="mt-5 grid gap-3">
               {data.adminModerationQueue.map((item) => (
-                <article key={item.id} className="rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] p-4">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap gap-2">
-                        <span className="app-chip">{item.status}</span>
-                        <span className="app-chip">{humanize(item.type)}</span>
-                        {item.ownerEmail ? <span className="app-chip">{item.ownerEmail}</span> : null}
-                      </div>
-                      <p className="mt-3 text-sm font-semibold text-[var(--text)]">{item.title || item.id}</p>
-                      <p className="mt-2 line-clamp-3 text-sm text-[var(--muted-strong)]">{item.body || 'No body preview'}</p>
-                      <p className="mt-2 text-xs text-[var(--muted-strong)]">ID: {item.id}</p>
+                <article key={item.id} className="admin-content-row">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap gap-2">
+                      <StatusBadge value={item.status} />
+                      <StatusBadge value={item.type} tone="info" />
+                      {item.ownerEmail ? <span className="admin-chip truncate">{item.ownerEmail}</span> : null}
                     </div>
-                    <div className="flex shrink-0 flex-wrap gap-2">
-                      <button type="button" className="app-button-secondary" onClick={() => moderateContent(item, item.status === 'hidden' ? 'unhide' : 'hide')} disabled={busyAction === `content-${item.id}`}>{item.status === 'hidden' ? 'Unhide' : 'Hide'}</button>
-                      <button type="button" className="app-button-secondary" onClick={() => moderateContent(item, 'delete')} disabled={busyAction === `content-${item.id}`}>Delete</button>
-                    </div>
+                    <p className="mt-3 text-sm font-black text-[var(--text)]">{item.title || item.id}</p>
+                    <p className="mt-2 line-clamp-3 text-sm leading-6 text-[var(--muted-strong)]">{item.body || 'No body preview'}</p>
+                    <p className="mt-2 text-xs text-[var(--muted)]">ID: {item.id}</p>
+                  </div>
+                  <div className="admin-action-group shrink-0">
+                    <button type="button" className="app-button-secondary" onClick={() => moderateContent(item, item.status === 'hidden' ? 'unhide' : 'hide')} disabled={busyAction === `content-${item.id}`}>{item.status === 'hidden' ? 'Unhide' : 'Hide'}</button>
+                    <button type="button" className="app-button-danger" onClick={() => moderateContent(item, 'delete')} disabled={busyAction === `content-${item.id}`}>Delete</button>
                   </div>
                 </article>
               ))}
-              {!data.adminModerationQueue.length ? <p className="text-sm text-[var(--muted-strong)]">No moderation items match this filter.</p> : null}
+              {!data.adminModerationQueue.length ? <EmptyState label="No moderation items" detail="This queue is clear for the current filter." /> : null}
             </div>
-          </article>
-        </section>
+          </main>
+          <aside className="admin-detail-panel">
+            <p className="admin-eyebrow">Action confirmation</p>
+            <h2 className="mt-2 text-xl font-black text-[var(--text)]">Moderation controls</h2>
+            <div className="mt-5 grid gap-4">
+              <label>
+                <span className="app-field-label">Default action</span>
+                <select className="app-input mt-2" value={contentForm.action} onChange={(event) => setContentForm((form) => ({ ...form, action: event.target.value }))}>
+                  <option value="hide">hide</option>
+                  <option value="unhide">unhide</option>
+                  <option value="delete">delete</option>
+                </select>
+              </label>
+              <label>
+                <span className="app-field-label">Reason</span>
+                <textarea className="app-input mt-2 min-h-28" value={contentForm.reason} onChange={(event) => setContentForm((form) => ({ ...form, reason: event.target.value }))} placeholder="Required before moderation actions" />
+              </label>
+              <label>
+                <span className="app-field-label">Typed content ID</span>
+                <input className="app-input mt-2" value={contentForm.confirmTarget} onChange={(event) => setContentForm((form) => ({ ...form, confirmTarget: event.target.value }))} placeholder="Paste target content ID" />
+              </label>
+              <div className="admin-warning-box">
+                Hide/unhide is preferred for public content. Delete is reserved for content types where the backend already supports safe removal.
+              </div>
+            </div>
+          </aside>
+        </div>
       ) : null}
 
-      {!isLoading && activeTab === 'Activity' ? (
-        <section className="app-panel">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <p className="app-kicker">Event stream</p>
-            <select className="app-input max-w-xs" value={eventType} onChange={(event) => setEventType(event.target.value)}>
-              {EVENT_TYPES.map((type) => <option key={type || 'all'} value={type}>{type || 'All events'}</option>)}
-            </select>
-          </div>
-          <div className="mt-5 grid gap-3">
-            {data.recentEvents.length ? data.recentEvents.map((event) => <EventRow key={event.id} event={event} />) : <p className="text-sm text-[var(--muted-strong)]">No events match this filter.</p>}
-          </div>
-        </section>
+      {!isLoading && activeSection === 'security' ? (
+        <div className="admin-workspace">
+          <main className="space-y-6">
+            <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+              <AdminCard icon="vpn_key" label="Active sessions" value={overview.activeRefreshTokens || 0} />
+              <AdminCard icon="block" label="Blocked users" value={overview.blockedUsers || 0} tone={overview.blockedUsers ? 'danger' : 'neutral'} />
+              <AdminCard icon="error" label="API errors" value={overview.apiErrors || 0} tone={overview.apiErrors ? 'danger' : 'success'} />
+              <AdminCard icon="history" label="Admin actions" value={overview.adminActions || 0} />
+            </section>
+            <section className="admin-panel">
+              <div className="admin-panel-header">
+                <span className="material-symbols-outlined text-[18px] text-[var(--accent-strong)]">crisis_alert</span>
+                <h2>Suspicious signals</h2>
+              </div>
+              <div className="mt-5 grid gap-3">
+                {data.suspiciousSignals.length ? data.suspiciousSignals.map((signal) => (
+                  <article key={`${signal.label}-${signal.lastSeenAt}`} className="admin-list-row">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <StatusBadge value={signal.severity} />
+                        <span className="admin-chip">{signal.count} events</span>
+                      </div>
+                      <p className="mt-3 font-black text-[var(--text)]">{signal.label}</p>
+                      <p className="mt-2 text-sm text-[var(--muted-strong)]">{signal.detail}</p>
+                    </div>
+                    <time className="admin-time">{formatDate(signal.lastSeenAt)}</time>
+                  </article>
+                )) : <EmptyState label="No suspicious signals" />}
+              </div>
+            </section>
+          </main>
+          <UserDetailPanel
+            selectedUser={selectedUser}
+            controlForm={controlForm}
+            setControlForm={setControlForm}
+            restrictionForm={restrictionForm}
+            setRestrictionForm={setRestrictionForm}
+            onSaveProfile={saveUserProfile}
+            onSaveRole={saveUserRole}
+            onSaveStatus={saveUserStatus}
+            onSaveRestrictions={saveRestrictions}
+            onRevoke={() => selectedUser && revokeSessions(selectedUser.id)}
+            busyAction={busyAction}
+          />
+        </div>
       ) : null}
 
-      {!isLoading && activeTab === 'Health' ? (
+      {!isLoading && activeSection === 'system' ? (
         <section className="grid gap-6 xl:grid-cols-2">
           {serviceCards.map((service) => (
-            <article key={service.name} className="app-panel">
-              <div className="flex items-center justify-between gap-3">
+            <article key={service.name} className="admin-panel">
+              <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="app-kicker">{service.name}</p>
+                  <p className="admin-eyebrow">{service.name}</p>
                   <h2 className="mt-3 text-2xl font-black text-[var(--text)]">{service.requests} requests</h2>
                 </div>
-                <span className={`rounded-full px-3 py-1 text-xs font-bold ${service.status === 'Healthy' ? 'bg-emerald-500/12 text-emerald-300' : 'bg-amber-500/12 text-amber-300'}`}>{service.status}</span>
+                <StatusBadge value={service.status} />
               </div>
               <p className="mt-4 text-sm leading-7 text-[var(--muted-strong)]">{service.detail}</p>
             </article>
           ))}
-          {!serviceCards.length ? <div className="app-panel text-sm text-[var(--muted-strong)]">No API usage rows are available yet.</div> : null}
+          {!serviceCards.length ? <div className="admin-panel"><EmptyState label="No API usage rows" detail="System usage data will appear after services record activity." /></div> : null}
         </section>
       ) : null}
 
-      {!isLoading && activeTab === 'Security' ? (
-        <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-1">
-            <StatCard label="Active sessions" value={overview.activeRefreshTokens || 0} />
-            <StatCard label="Blocked users" value={overview.blockedUsers || 0} />
-            <StatCard label="API errors" value={overview.apiErrors || 0} />
-            <StatCard label="Admin actions" value={overview.adminActions || 0} />
-          </div>
-          <article className="app-panel">
-            <p className="app-kicker">Suspicious signals</p>
-            <div className="mt-5 grid gap-3">
-              {data.suspiciousSignals.length ? data.suspiciousSignals.map((signal) => (
-                <div key={`${signal.label}-${signal.lastSeenAt}`} className="rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <p className="font-semibold text-[var(--text)]">{signal.label}</p>
-                    <span className={`rounded-full px-3 py-1 text-xs font-bold ${signal.severity === 'high' ? 'bg-rose-500/12 text-rose-300' : 'bg-amber-500/12 text-amber-300'}`}>{signal.severity}</span>
-                  </div>
-                  <p className="mt-2 text-sm text-[var(--muted-strong)]">{signal.detail}</p>
-                  <p className="mt-2 text-xs text-[var(--muted-strong)]">{signal.count} events | Last seen {formatDate(signal.lastSeenAt)}</p>
-                </div>
-              )) : <p className="text-sm text-[var(--muted-strong)]">No suspicious signals detected.</p>}
+      {!isLoading && activeSection === 'audit' ? (
+        <div className="grid gap-6 xl:grid-cols-2">
+          <section className="admin-panel">
+            <div className="admin-panel-header">
+              <span className="material-symbols-outlined text-[18px] text-[var(--accent-strong)]">policy</span>
+              <h2>Moderation audit</h2>
             </div>
-          </article>
-        </section>
-      ) : null}
-
-      {!isLoading && activeTab === 'Audit' ? (
-        <section className="app-panel">
-          <p className="app-kicker">Moderation audit</p>
-          <div className="mt-5 grid gap-3">
-            {data.adminModerationActions.length ? data.adminModerationActions.map((log) => (
-              <article key={log.id} className="rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] p-4">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                  <div>
+            <div className="mt-5 grid gap-3">
+              {data.adminModerationActions.length ? data.adminModerationActions.map((log) => (
+                <article key={log.id} className="admin-list-row">
+                  <div className="min-w-0">
                     <div className="flex flex-wrap gap-2">
-                      <span className="app-chip">{log.action}</span>
-                      <span className="app-chip">{humanize(log.targetType)}</span>
-                      {log.adminEmail ? <span className="app-chip">{log.adminEmail}</span> : null}
+                      <StatusBadge value={log.action} />
+                      <StatusBadge value={log.targetType} tone="info" />
+                      {log.adminEmail ? <span className="admin-chip truncate">{log.adminEmail}</span> : null}
                     </div>
                     <p className="mt-3 text-sm text-[var(--text)]">Target: {log.targetId}</p>
                     <p className="mt-2 text-sm text-[var(--muted-strong)]">{log.reason}</p>
                   </div>
-                  <p className="shrink-0 text-xs font-semibold text-[var(--muted-strong)]">{formatDate(log.createdAt)}</p>
-                </div>
-              </article>
-            )) : <p className="text-sm text-[var(--muted-strong)]">No moderation actions have been recorded yet.</p>}
-          </div>
-        </section>
-      ) : null}
-
-      {!isLoading && activeTab === 'Admin Logs' ? (
-        <section className="app-panel">
-          <p className="app-kicker">Admin audit trail</p>
-          <div className="mt-5 grid gap-3">
-            {data.adminAuditLogs.length ? data.adminAuditLogs.map((log) => {
-              const metadata = parseMetadata(log.metadata);
-              const metadataText = Object.entries(metadata).map(([key, value]) => `${key}: ${String(value)}`).join(' | ');
-              return (
-                <article key={log.id} className="rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] p-4">
-                  <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                    <div>
+                  <time className="admin-time">{formatDate(log.createdAt)}</time>
+                </article>
+              )) : <EmptyState label="No moderation actions" />}
+            </div>
+          </section>
+          <section className="admin-panel">
+            <div className="admin-panel-header">
+              <span className="material-symbols-outlined text-[18px] text-[var(--accent-strong)]">receipt_long</span>
+              <h2>Admin audit trail</h2>
+            </div>
+            <div className="mt-5 grid gap-3">
+              {data.adminAuditLogs.length ? data.adminAuditLogs.map((log) => {
+                const metadata = parseMetadata(log.metadata);
+                const metadataText = Object.entries(metadata).slice(0, 4).map(([key, value]) => `${key}: ${String(value)}`).join(' | ');
+                return (
+                  <article key={log.id} className="admin-list-row">
+                    <div className="min-w-0">
                       <div className="flex flex-wrap gap-2">
-                        <span className="app-chip">{log.action}</span>
-                        {log.adminEmail ? <span className="app-chip">{log.adminEmail}</span> : null}
-                        {log.targetType ? <span className="app-chip">{log.targetType}</span> : null}
+                        <StatusBadge value={log.action} />
+                        {log.adminEmail ? <span className="admin-chip truncate">{log.adminEmail}</span> : null}
+                        {log.targetType ? <StatusBadge value={log.targetType} tone="info" /> : null}
                       </div>
                       {log.targetId ? <p className="mt-3 text-sm text-[var(--text)]">Target: {log.targetId}</p> : null}
                       {metadataText ? <p className="mt-2 text-xs text-[var(--muted-strong)]">{metadataText}</p> : null}
                     </div>
-                    <p className="shrink-0 text-xs font-semibold text-[var(--muted-strong)]">{formatDate(log.createdAt)}</p>
-                  </div>
-                </article>
-              );
-            }) : <p className="text-sm text-[var(--muted-strong)]">No admin actions have been recorded yet.</p>}
-          </div>
-        </section>
+                    <time className="admin-time">{formatDate(log.createdAt)}</time>
+                  </article>
+                );
+              }) : <EmptyState label="No admin actions" />}
+            </div>
+          </section>
+        </div>
       ) : null}
     </AppShell>
   );
