@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from '@/lib/router-compat.jsx';
-import { useSelector } from 'react-redux';
+import { useDispatch, useSelector } from 'react-redux';
 import api from '../api/axios.js';
+import { refreshSessionRequest } from '../api/authApi.js';
 import AppShell from '../components/AppShell.jsx';
 import { selectAuth } from '../store/authSlice.js';
 
@@ -115,6 +116,14 @@ function parseMetadata(value) {
 
 function humanize(value) {
   return String(value || '').replaceAll('_', ' ');
+}
+
+function getRequestErrorMessage(error, fallback) {
+  const data = error.response?.data;
+  if (typeof data?.error === 'string') return data.error;
+  if (typeof data?.message === 'string') return data.message;
+  if (typeof data?.error?.message === 'string') return data.error.message;
+  return error.message || fallback;
 }
 
 function toneForStatus(status) {
@@ -361,6 +370,7 @@ function UserDetailPanel({
 }
 
 export default function ControlCenter() {
+  const dispatch = useDispatch();
   const auth = useSelector(selectAuth);
   const [roleCheckComplete, setRoleCheckComplete] = useState(false);
   const [isAuthorized, setIsAuthorized] = useState(false);
@@ -432,7 +442,7 @@ export default function ControlCenter() {
     contentSearch: contentSearch.trim() || null
   }), [eventType, selectedUser?.id, contentType, contentSearch]);
 
-  async function loadDashboard({ silent = false } = {}) {
+  async function loadDashboard({ silent = false, authRetried = false } = {}) {
     if (!isAuthorized) {
       setIsLoading(false);
       return;
@@ -463,7 +473,19 @@ export default function ControlCenter() {
         suspiciousSignals: next.suspiciousSignals || []
       });
     } catch (requestError) {
-      setError(requestError.response?.data?.error || requestError.message || 'Could not load admin dashboard.');
+      const status = requestError.response?.status;
+      if ((status === 401 || status === 403) && !authRetried) {
+        try {
+          await refreshSessionRequest({ dispatch });
+          await loadDashboard({ silent: true, authRetried: true });
+          return;
+        } catch (refreshError) {
+          setError(getRequestErrorMessage(refreshError, 'Admin access could not be refreshed. Please sign in again.'));
+          return;
+        }
+      }
+
+      setError(getRequestErrorMessage(requestError, 'Could not load admin dashboard.'));
     } finally {
       setIsLoading(false);
     }
@@ -495,7 +517,7 @@ export default function ControlCenter() {
       setMessage(result || 'Admin action completed.');
       await loadDashboard({ silent: true });
     } catch (requestError) {
-      setError(requestError.response?.data?.error || requestError.message || 'Admin action failed.');
+      setError(getRequestErrorMessage(requestError, 'Admin action failed.'));
     } finally {
       setBusyAction('');
     }
