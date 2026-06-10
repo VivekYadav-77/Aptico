@@ -266,8 +266,12 @@ function UserTable({ users, selectedUserId, onSelect }) {
 
 function UserDetailPanel({
   selectedUser,
-  controlForm,
-  setControlForm,
+  profileForm,
+  setProfileForm,
+  roleForm,
+  setRoleForm,
+  statusForm,
+  setStatusForm,
   restrictionForm,
   setRestrictionForm,
   onSaveProfile,
@@ -308,16 +312,16 @@ function UserDetailPanel({
           <div className="admin-form-grid">
             <label>
               <span className="app-field-label">Name</span>
-              <input className="app-input" value={controlForm.name} onChange={(event) => setControlForm((form) => ({ ...form, name: event.target.value }))} />
+              <input className="app-input" value={profileForm.name} onChange={(event) => setProfileForm((form) => ({ ...form, name: event.target.value }))} />
             </label>
             <label>
               <span className="app-field-label">Email</span>
-              <input className="app-input" value={controlForm.email} onChange={(event) => setControlForm((form) => ({ ...form, email: event.target.value }))} />
+              <input className="app-input" value={profileForm.email} onChange={(event) => setProfileForm((form) => ({ ...form, email: event.target.value }))} />
             </label>
           </div>
-          <textarea className="app-input min-h-20" value={controlForm.reason} onChange={(event) => setControlForm((form) => ({ ...form, reason: event.target.value }))} placeholder="Reason for profile/account change" />
-          {controlForm.email !== selectedUser.email ? (
-            <input className="app-input" value={controlForm.confirmTarget} onChange={(event) => setControlForm((form) => ({ ...form, confirmTarget: event.target.value }))} placeholder={`Type current email: ${selectedUser.email}`} />
+          <textarea className="app-input min-h-20" value={profileForm.reason} onChange={(event) => setProfileForm((form) => ({ ...form, reason: event.target.value }))} placeholder="Reason for profile/account change" />
+          {profileForm.email !== selectedUser.email ? (
+            <input className="app-input" value={profileForm.confirmTarget} onChange={(event) => setProfileForm((form) => ({ ...form, confirmTarget: event.target.value }))} placeholder={`Type current email: ${selectedUser.email}`} />
           ) : null}
           <button type="button" className="app-button-secondary w-fit" onClick={onSaveProfile} disabled={busyAction === 'edit-user'}>Save profile</button>
         </section>
@@ -327,11 +331,11 @@ function UserDetailPanel({
             <p className="admin-eyebrow">Role control</p>
             <p className="mt-1 text-xs text-[var(--muted-strong)]">Changing roles requires a reason and typed target email.</p>
           </div>
-          <select className="app-input" value={controlForm.role} onChange={(event) => setControlForm((form) => ({ ...form, role: event.target.value }))}>
+          <select className="app-input" value={roleForm.role} onChange={(event) => setRoleForm((form) => ({ ...form, role: event.target.value }))}>
             {ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
           </select>
-          <textarea className="app-input min-h-20" value={controlForm.reason} onChange={(event) => setControlForm((form) => ({ ...form, reason: event.target.value }))} placeholder="Reason for role change" />
-          <input className="app-input" value={controlForm.confirmTarget} onChange={(event) => setControlForm((form) => ({ ...form, confirmTarget: event.target.value }))} placeholder={`Type ${selectedUser.email}`} />
+          <textarea className="app-input min-h-20" value={roleForm.reason} onChange={(event) => setRoleForm((form) => ({ ...form, reason: event.target.value }))} placeholder="Reason for role change" />
+          <input className="app-input" value={roleForm.confirmTarget} onChange={(event) => setRoleForm((form) => ({ ...form, confirmTarget: event.target.value }))} placeholder={`Type ${selectedUser.email}`} />
           <button type="button" className="app-button-secondary w-fit" onClick={onSaveRole} disabled={busyAction === 'role-user'}>Apply role</button>
         </section>
 
@@ -340,11 +344,11 @@ function UserDetailPanel({
             <p className="admin-eyebrow">Status control</p>
             <p className="mt-1 text-xs text-[var(--muted-strong)]">Blocked and deactivated accounts lose access and require typed target email.</p>
           </div>
-          <select className="app-input" value={controlForm.status} onChange={(event) => setControlForm((form) => ({ ...form, status: event.target.value }))}>
+          <select className="app-input" value={statusForm.status} onChange={(event) => setStatusForm((form) => ({ ...form, status: event.target.value }))}>
             {STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
           </select>
-          <textarea className="app-input min-h-20" value={controlForm.reason} onChange={(event) => setControlForm((form) => ({ ...form, reason: event.target.value }))} placeholder="Reason for status change" />
-          <input className="app-input" value={controlForm.confirmTarget} onChange={(event) => setControlForm((form) => ({ ...form, confirmTarget: event.target.value }))} placeholder={`Type ${selectedUser.email} for block/deactivate`} />
+          <textarea className="app-input min-h-20" value={statusForm.reason} onChange={(event) => setStatusForm((form) => ({ ...form, reason: event.target.value }))} placeholder="Reason for status change" />
+          <input className="app-input" value={statusForm.confirmTarget} onChange={(event) => setStatusForm((form) => ({ ...form, confirmTarget: event.target.value }))} placeholder={`Type ${selectedUser.email} for block/deactivate`} />
           <div className="admin-action-group">
             <button type="button" className="app-button" onClick={onSaveStatus} disabled={busyAction === 'status-user'}>Apply status</button>
             <button type="button" className="app-button-danger" onClick={onBlockAccount} disabled={busyAction === 'block-user'}>Block whole account</button>
@@ -400,7 +404,9 @@ export default function ControlCenter() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [busyAction, setBusyAction] = useState('');
-  const [controlForm, setControlForm] = useState({ name: '', email: '', role: 'user', status: 'active', reason: '', confirmTarget: '' });
+  const [profileForm, setProfileForm] = useState({ name: '', email: '', reason: '', confirmTarget: '' });
+  const [roleForm, setRoleForm] = useState({ role: 'user', reason: '', confirmTarget: '' });
+  const [statusForm, setStatusForm] = useState({ status: 'active', reason: '', confirmTarget: '' });
   const [inviteForm, setInviteForm] = useState({ email: '', name: '', role: 'user', reason: '', confirmTarget: '' });
   const [restrictionForm, setRestrictionForm] = useState({ reason: '', confirmTarget: '', flags: {} });
   const [contentForm, setContentForm] = useState({ action: 'hide', reason: '', confirmTarget: '' });
@@ -434,12 +440,24 @@ export default function ControlCenter() {
 
   useEffect(() => {
     if (!selectedUser) return;
-    setControlForm((current) => ({
+    setProfileForm((current) => ({
       ...current,
       name: selectedUser.name || '',
       email: selectedUser.email || '',
+      reason: '',
+      confirmTarget: ''
+    }));
+    setRoleForm((current) => ({
+      ...current,
       role: selectedUser.role || 'user',
-      status: selectedUser.status || 'active'
+      reason: '',
+      confirmTarget: ''
+    }));
+    setStatusForm((current) => ({
+      ...current,
+      status: selectedUser.status || 'active',
+      reason: '',
+      confirmTarget: ''
     }));
   }, [selectedUser?.id]);
 
@@ -565,10 +583,10 @@ export default function ControlCenter() {
     if (!selectedUser) return;
     await runAdminAction('edit-user', async () => {
       await api.patch(`/api/admin/users/${selectedUser.id}`, {
-        name: controlForm.name,
-        email: controlForm.email,
-        reason: controlForm.reason,
-        confirmTarget: controlForm.email !== selectedUser.email ? controlForm.confirmTarget : undefined
+        name: profileForm.name,
+        email: profileForm.email,
+        reason: profileForm.reason,
+        confirmTarget: profileForm.email !== selectedUser.email ? profileForm.confirmTarget : undefined
       });
       return 'User account fields updated.';
     });
@@ -578,9 +596,9 @@ export default function ControlCenter() {
     if (!selectedUser) return;
     await runAdminAction('role-user', async () => {
       await api.post(`/api/admin/users/${selectedUser.id}/role`, {
-        role: controlForm.role,
-        reason: controlForm.reason,
-        confirmTarget: controlForm.confirmTarget
+        role: roleForm.role,
+        reason: roleForm.reason,
+        confirmTarget: roleForm.confirmTarget
       });
       return 'User role updated.';
     });
@@ -590,9 +608,9 @@ export default function ControlCenter() {
     if (!selectedUser) return;
     await runAdminAction('status-user', async () => {
       await api.post(`/api/admin/users/${selectedUser.id}/status`, {
-        status: controlForm.status,
-        reason: controlForm.reason,
-        confirmTarget: ['blocked', 'deactivated'].includes(controlForm.status) ? controlForm.confirmTarget : undefined
+        status: statusForm.status,
+        reason: statusForm.reason,
+        confirmTarget: ['blocked', 'deactivated'].includes(statusForm.status) ? statusForm.confirmTarget : undefined
       });
       return 'User status updated.';
     });
@@ -603,8 +621,8 @@ export default function ControlCenter() {
     await runAdminAction('block-user', async () => {
       await api.post(`/api/admin/users/${selectedUser.id}/status`, {
         status: 'blocked',
-        reason: controlForm.reason,
-        confirmTarget: controlForm.confirmTarget
+        reason: statusForm.reason,
+        confirmTarget: statusForm.confirmTarget
       });
       return 'User account blocked and active sessions revoked.';
     });
@@ -777,8 +795,12 @@ export default function ControlCenter() {
           </main>
           <UserDetailPanel
             selectedUser={selectedUser}
-            controlForm={controlForm}
-            setControlForm={setControlForm}
+            profileForm={profileForm}
+            setProfileForm={setProfileForm}
+            roleForm={roleForm}
+            setRoleForm={setRoleForm}
+            statusForm={statusForm}
+            setStatusForm={setStatusForm}
             restrictionForm={restrictionForm}
             setRestrictionForm={setRestrictionForm}
             onSaveProfile={saveUserProfile}
@@ -915,8 +937,12 @@ export default function ControlCenter() {
           </main>
           <UserDetailPanel
             selectedUser={selectedUser}
-            controlForm={controlForm}
-            setControlForm={setControlForm}
+            profileForm={profileForm}
+            setProfileForm={setProfileForm}
+            roleForm={roleForm}
+            setRoleForm={setRoleForm}
+            statusForm={statusForm}
+            setStatusForm={setStatusForm}
             restrictionForm={restrictionForm}
             setRestrictionForm={setRestrictionForm}
             onSaveProfile={saveUserProfile}
