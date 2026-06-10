@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { getSquadComms, postSquadMessage, setSquadArchetype } from '../api/squadApi.js';
 import { getStickerById } from '../utils/stickerRegistry.js';
 import StickerVisual from './StickerVisual.jsx';
+import { getRequestErrorMessage } from '../utils/requestError.js';
 
 const PHASE_LABELS = ['Pre-25%', '25-50%', '50-75%', '75-100%', 'Goal secured'];
 const QUICK_SIGNAL_META = {
@@ -237,7 +238,7 @@ export default function SquadCommsHub({ progressPercent = 0, members = [], myAli
         setError('');
       } catch (apiError) {
         if (!cancelled) {
-          setError(apiError.response?.data?.error || 'Could not reach squad comms.');
+          setError(getRequestErrorMessage(apiError, 'Could not reach squad comms.'));
         }
       }
     }
@@ -282,7 +283,7 @@ export default function SquadCommsHub({ progressPercent = 0, members = [], myAli
       setStickerId('');
       await refreshComms();
     } catch (apiError) {
-      setError(apiError.response?.data?.error || 'Signal rejected by comms control.');
+      setError(getRequestErrorMessage(apiError, 'Signal rejected by comms control.'));
     } finally {
       setSending(false);
     }
@@ -338,7 +339,7 @@ export default function SquadCommsHub({ progressPercent = 0, members = [], myAli
       setMyArchetype(role);
       await refreshComms();
     } catch (apiError) {
-      setError(apiError.response?.data?.error || 'Role lock failed.');
+      setError(getRequestErrorMessage(apiError, 'Role lock failed.'));
     } finally {
       setSending(false);
     }

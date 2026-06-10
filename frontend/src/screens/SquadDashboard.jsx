@@ -4,6 +4,7 @@ import AppShell from '../components/AppShell.jsx';
 import SquadCommsHub from '../components/SquadCommsHub.jsx';
 import { getMySquad, joinSquad, logSquadApplications, pingSquad } from '../api/squadApi.js';
 import { updateAuthUser } from '../store/authSlice.js';
+import { getRequestErrorMessage } from '../utils/requestError.js';
 
 const SQUAD_EXPLAINER_KEY = 'aptico-squad-explainer-dismissed';
 
@@ -193,7 +194,7 @@ export default function SquadDashboard() {
         setSquadData(response.data || null);
       })
       .catch((apiError) => {
-        setError(apiError.response?.data?.error || 'Could not load your squad yet.');
+        setError(getRequestErrorMessage(apiError, 'Could not load your squad yet.'));
       })
       .finally(() => setLoading(false));
   }, []);
@@ -207,7 +208,7 @@ export default function SquadDashboard() {
       setSquadData(response.data || null);
       setToast(response.joined ? 'You dropped into a live squad.' : 'Your squad is ready for this week.');
     } catch (apiError) {
-      setError(apiError.response?.data?.error || 'Could not join a squad right now.');
+      setError(getRequestErrorMessage(apiError, 'Could not join a squad right now.'));
     } finally {
       setJoining(false);
     }
@@ -245,7 +246,7 @@ export default function SquadDashboard() {
           : `${roleTitle} at ${companyName} logged. Squad total is now ${response.data?.squad?.totalApps || 0}.`
       );
     } catch (apiError) {
-      setError(apiError.response?.data?.error || 'Could not log applications.');
+      setError(getRequestErrorMessage(apiError, 'Could not log applications.'));
     } finally {
       setLoggingApps(false);
     }
@@ -266,7 +267,7 @@ export default function SquadDashboard() {
       const latest = await getMySquad();
       setSquadData(latest.data || null);
     } catch (apiError) {
-      setError(apiError.response?.data?.error || 'Could not send a ping.');
+      setError(getRequestErrorMessage(apiError, 'Could not send a ping.'));
     } finally {
       setPinging(false);
     }

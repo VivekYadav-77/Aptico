@@ -16,6 +16,7 @@ import {
 } from '../../db/schema.js';
 import { requestPasswordReset } from '../auth/auth.service.js';
 import { recordAdminAuditLog } from '../analytics/analytics.service.js';
+import { createNotification } from '../../shared/utils/notification-helper.js';
 
 export const ADMIN_USER_STATUSES = ['active', 'restricted', 'blocked', 'deactivated'];
 export const ADMIN_ROLES = ['user', 'admin'];
@@ -25,6 +26,7 @@ export const ADMIN_RESTRICTION_FEATURES = [
   'commenting',
   'squad_actions',
   'analysis',
+  'job_search',
   'job_saving',
   'profile_visibility',
   'activity_logging'
@@ -70,6 +72,21 @@ export function normalizeRestrictionFeature(feature) {
 function serializeDate(value) {
   if (!value) return null;
   return value instanceof Date ? value.toISOString() : String(value);
+}
+
+function formatFeatureLabel(feature) {
+  return String(feature || '').replaceAll('_', ' ');
+}
+
+function notifyAdminAccountChange({ db, targetUserId, adminUserId, type, message }) {
+  createNotification(db, {
+    userId: targetUserId,
+    type,
+    actorId: adminUserId,
+    entityId: targetUserId,
+    entityType: 'admin_action',
+    message
+  });
 }
 
 async function findAdminTargetUser(db, userId) {
@@ -173,10 +190,12 @@ export async function editUser({ db, request, adminUserId, userId, payload }) {
   if (Object.prototype.hasOwnProperty.call(payload, 'name')) updates.name = String(payload.name || '').trim() || null;
   if (payload.email) {
     const email = String(payload.email).trim().toLowerCase();
-    assertConfirmationMatches(target.email, payload.confirmTarget);
-    const existing = await db.select({ id: users.id }).from(users).where(and(eq(users.email, email), sql`${users.id} <> ${userId}`)).limit(1);
-    if (existing[0]) throw createAdminControlError('That email is already used by another account.', 409, 'EMAIL_EXISTS');
-    updates.email = email;
+    if (email !== target.email) {
+      assertConfirmationMatches(target.email, payload.confirmTarget);
+      const existing = await db.select({ id: users.id }).from(users).where(and(eq(users.email, email), sql`${users.id} <> ${userId}`)).limit(1);
+      if (existing[0]) throw createAdminControlError('That email is already used by another account.', 409, 'EMAIL_EXISTS');
+      updates.email = email;
+    }
   }
 
   if (!Object.keys(updates).length) {
@@ -276,6 +295,14 @@ export async function changeUserStatus({ db, request, adminUserId, userId, paylo
     metadata: { previousStatus: target.status, status }
   });
 
+  notifyAdminAccountChange({
+    db,
+    targetUserId: userId,
+    adminUserId,
+    type: 'admin_account_status',
+    message: `Your account status was changed from ${target.status || 'active'} to ${status}. Reason: ${reason}`
+  });
+
   return updated[0];
 }
 
@@ -293,6 +320,15 @@ export async function setUserRestrictions({ db, request, adminUserId, userId, pa
   }
 
   const changed = [];
+  const previousRows = await db
+    .select({
+      feature: adminRestrictions.feature,
+      isRestricted: adminRestrictions.isRestricted
+    })
+    .from(adminRestrictions)
+    .where(eq(adminRestrictions.userId, userId));
+  const previousState = new Map(previousRows.map((row) => [row.feature, Boolean(row.isRestricted)]));
+
   for (const item of restrictions) {
     const feature = normalizeRestrictionFeature(item.feature);
     const isRestricted = Boolean(item.isRestricted);
@@ -336,6 +372,23 @@ export async function setUserRestrictions({ db, request, adminUserId, userId, pa
     reason,
     metadata: { restrictions: changed }
   });
+
+  const materialChanges = changed.filter((item) => previousState.get(item.feature) !== item.isRestricted);
+  if (materialChanges.length) {
+    const restrictedFeatures = materialChanges.filter((item) => item.isRestricted).map((item) => formatFeatureLabel(item.feature));
+    const restoredFeatures = materialChanges.filter((item) => !item.isRestricted).map((item) => formatFeatureLabel(item.feature));
+    const segments = [];
+    if (restrictedFeatures.length) segments.push(`restricted: ${restrictedFeatures.join(', ')}`);
+    if (restoredFeatures.length) segments.push(`restored: ${restoredFeatures.join(', ')}`);
+
+    notifyAdminAccountChange({
+      db,
+      targetUserId: userId,
+      adminUserId,
+      type: 'admin_restriction_update',
+      message: `Admin updated your account restrictions (${segments.join('; ')}). Reason: ${reason}`
+    });
+  }
 
   return listRestrictionsForUser(db, userId);
 }

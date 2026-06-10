@@ -9,6 +9,7 @@ import ContainedSelect from '../components/ContainedSelect.jsx';
 import { selectAuth } from '../store/authSlice.js';
 import { clearJobSearchState, selectCurrentAnalysis, selectJobSearchState, setJobSearchState } from '../store/historySlice.js';
 import { saveSavedJobDetails } from '../utils/savedJobsStorage.js';
+import { getRequestErrorMessage } from '../utils/requestError.js';
 
 const JOB_TYPE_OPTIONS = [
   { label: 'Remote', value: 'remote', icon: 'wifi' },
@@ -435,7 +436,7 @@ export default function ModernJobSearchPage() {
 
       setStatusMessage(`${job.title} was saved to your pipeline.`);
     } catch (requestError) {
-      setActionError(requestError.response?.data?.error || 'Could not save job.');
+      setActionError(getRequestErrorMessage(requestError, 'Could not save job.'));
     } finally {
       setSavingJobId(null);
     }
@@ -606,7 +607,7 @@ export default function ModernJobSearchPage() {
 
           {jobsQuery.error ? (
             <div className="rounded-[1.25rem] border border-[var(--danger-border)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-rose-300">
-              {jobsQuery.error.response?.data?.error || 'Could not load jobs.'}
+              {getRequestErrorMessage(jobsQuery.error, 'Could not load jobs.')}
             </div>
           ) : null}
 

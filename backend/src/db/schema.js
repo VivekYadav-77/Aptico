@@ -559,7 +559,7 @@ export const notifications = pgTable(
     userReadCreatedAtIdx: index('notifications_user_id_is_read_created_at_idx').on(table.userId, table.isRead, table.createdAt),
     typeCheck: check(
       'notifications_type_check',
-      sql`${table.type} in ('new_follower', 'new_connection_request', 'connection_accepted', 'post_like', 'post_comment', 'job_match_alert', 'squad_ping', 'squad_goal_reached', 'squad_synergy_burst')`
+      sql`${table.type} in ('new_follower', 'new_connection_request', 'connection_accepted', 'post_like', 'post_comment', 'job_match_alert', 'squad_ping', 'squad_goal_reached', 'squad_synergy_burst', 'admin_restriction_update', 'admin_account_status')`
     )
   })
 );

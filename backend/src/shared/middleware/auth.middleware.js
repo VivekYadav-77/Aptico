@@ -49,7 +49,8 @@ async function loadAccountControls(request, userId) {
 
   const restrictionRows = await db
     .select({
-      feature: adminRestrictions.feature
+      feature: adminRestrictions.feature,
+      reason: adminRestrictions.reason
     })
     .from(adminRestrictions)
     .where(
@@ -63,7 +64,8 @@ async function loadAccountControls(request, userId) {
   return {
     status: userRow.status || 'active',
     role: userRow.role,
-    restrictions: restrictionRows.map((row) => row.feature)
+    restrictions: restrictionRows.map((row) => row.feature),
+    restrictionReasons: Object.fromEntries(restrictionRows.map((row) => [row.feature, row.reason || null]))
   };
 }
 
@@ -135,7 +137,8 @@ async function resolveAuth(request, reply, { optional, adminOnly = false }) {
     role: payload.role,
     tokenId: payload.jti,
     status: 'active',
-    restrictions: []
+    restrictions: [],
+    restrictionReasons: {}
   };
 
   const accountControls = await loadAccountControls(request, payload.sub);
@@ -149,17 +152,13 @@ async function resolveAuth(request, reply, { optional, adminOnly = false }) {
   }
 
   if (isBlockedStatus(accountControls.status) || accountControls.restrictions.includes('login')) {
-    if (allowGuestFallback) {
-      request.auth = null;
-      return;
-    }
-
     return sendAuthError(reply, 'This account is blocked from platform access.', 403);
   }
 
   request.auth.role = accountControls.role || request.auth.role;
   request.auth.status = accountControls.status;
   request.auth.restrictions = accountControls.restrictions;
+  request.auth.restrictionReasons = accountControls.restrictionReasons || {};
 
   if (adminOnly && request.auth.role !== 'admin') {
     return sendAuthError(reply, 'Admin access is required.', 403);
@@ -185,9 +184,16 @@ export function requireFeatureAccess(feature) {
     }
 
     if (request.auth.restrictions?.includes(feature)) {
+      const reason = request.auth.restrictionReasons?.[feature] || null;
+      const featureLabel = feature.replaceAll('_', ' ');
       return reply.code(403).send({
         success: false,
-        error: `This account is restricted from ${feature.replaceAll('_', ' ')}.`
+        code: 'FEATURE_RESTRICTED',
+        feature,
+        reason,
+        error: reason
+          ? `This account is restricted from ${featureLabel}. Reason: ${reason}`
+          : `This account is restricted from ${featureLabel}.`
       });
     }
   };

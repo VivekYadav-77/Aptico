@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { createRejectionLog } from '../api/rejectionApi.js';
 import { updateAuthUser } from '../store/authSlice.js';
 import ContainedSelect from './ContainedSelect.jsx';
+import { getRequestErrorMessage } from '../utils/requestError.js';
 
 const stageOptions = [
   { value: 'resume', label: 'Resume screen', xp: 50 },
@@ -130,7 +131,7 @@ export default function RejectionModal({ isOpen, onClose, onSuccess }) {
         onClose();
       }, 1600);
     } catch (submitError) {
-      setError(submitError.response?.data?.error || 'Could not log this rejection right now.');
+      setError(getRequestErrorMessage(submitError, 'Could not log this rejection right now.'));
     } finally {
       setIsSubmitting(false);
     }

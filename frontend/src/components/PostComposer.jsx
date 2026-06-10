@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createSocialPost, updateSocialPost } from '../api/socialApi.js';
+import { getRequestErrorMessage } from '../utils/requestError.js';
 
 const postTypes = [
   ['career_update', 'emoji_events', 'Career Update', 'Share a milestone'],
@@ -178,7 +179,7 @@ export default function PostComposer({ open, onClose, onCreated, onUpdated, rece
       }
       resetAndClose();
     } catch (requestError) {
-      setError(requestError.response?.data?.error || 'Could not save this post.');
+      setError(getRequestErrorMessage(requestError, 'Could not save this post.'));
     } finally {
       setSubmitting(false);
     }

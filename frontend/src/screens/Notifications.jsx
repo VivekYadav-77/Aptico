@@ -3,7 +3,7 @@ import AppShell from '../components/AppShell.jsx';
 import { getNotifications, markNotificationsRead } from '../api/socialApi.js';
 
 const socialTypes = ['new_follower', 'new_connection_request', 'connection_accepted', 'post_like', 'post_comment'];
-const careerTypes = ['job_match_alert'];
+const careerTypes = ['job_match_alert', 'admin_restriction_update', 'admin_account_status'];
 
 function initials(name) {
   return String(name || 'A').trim().charAt(0).toUpperCase() || 'A';

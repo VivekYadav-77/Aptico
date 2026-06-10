@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux';
 import { addPostComment, getPostComments, likeComment, deletePostComment } from '../api/socialApi.js';
 import { selectAuth } from '../store/authSlice.js';
 import ConfirmDialog from './ConfirmDialog.jsx';
+import { getRequestErrorMessage } from '../utils/requestError.js';
 
 function timeAgo(value) {
   if (!value) return '';
@@ -100,6 +101,7 @@ export default function PostComments({ postId, initialCommentsCount, onCommentAd
   const [totalCount, setTotalCount] = useState(initialCommentsCount || 0);
   const [expandedReplies, setExpandedReplies] = useState({});
   const [highlightedCommentId, setHighlightedCommentId] = useState(null);
+  const [error, setError] = useState('');
 
   const toggleReplies = (id) => {
     setExpandedReplies((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -158,6 +160,7 @@ export default function PostComments({ postId, initialCommentsCount, onCommentAd
     if (!trimmed || submitting) return;
 
     setSubmitting(true);
+    setError('');
     try {
       const created = await addPostComment(postId, trimmed, replyingTo?.id || null);
       setComments((cur) => [...cur, created]);
@@ -165,7 +168,9 @@ export default function PostComments({ postId, initialCommentsCount, onCommentAd
       setReplyingTo(null);
       setTotalCount((c) => c + 1);
       onCommentAdded?.();
-    } catch (err) {}
+    } catch (err) {
+      setError(getRequestErrorMessage(err, 'Could not post this comment.'));
+    }
     setSubmitting(false);
   }
 
@@ -196,6 +201,7 @@ export default function PostComments({ postId, initialCommentsCount, onCommentAd
         );
         pendingLikeStates.current[commentId] = res.liked;
       } catch (err) {
+        setError(getRequestErrorMessage(err, 'Could not update this comment reaction.'));
         const rollbackState = !nextState;
         setComments((cur) =>
           cur.map((c) =>
@@ -216,12 +222,15 @@ export default function PostComments({ postId, initialCommentsCount, onCommentAd
   async function confirmDelete() {
     if (!deleteTarget) return;
     setDeleting(true);
+    setError('');
     try {
       await deletePostComment(deleteTarget);
       setComments((cur) => cur.filter((c) => c.id !== deleteTarget));
       setTotalCount((c) => Math.max(c - 1, 0));
       setDeleteTarget(null);
-    } catch (err) {}
+    } catch (err) {
+      setError(getRequestErrorMessage(err, 'Could not delete this comment.'));
+    }
     setDeleting(false);
   }
 
@@ -235,6 +244,11 @@ export default function PostComments({ postId, initialCommentsCount, onCommentAd
   return (
     <>
     <div style={{ marginTop: 12, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
+      {error ? (
+        <p style={{ marginBottom: 10, border: '1px solid var(--danger-border)', borderRadius: 10, background: 'var(--danger-soft)', padding: 10, color: '#ef4444', fontSize: 13, fontWeight: 700 }}>
+          {error}
+        </p>
+      ) : null}
       {/* Comments list */}
       {loading && !hasLoaded ? (
         <p style={{ fontSize: 13, color: 'var(--muted-strong)', padding: '8px 0' }}>Loading...</p>

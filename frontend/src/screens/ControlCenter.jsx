@@ -5,6 +5,7 @@ import api from '../api/axios.js';
 import { refreshSessionRequest } from '../api/authApi.js';
 import AppShell from '../components/AppShell.jsx';
 import { selectAuth } from '../store/authSlice.js';
+import { getRequestErrorMessage } from '../utils/requestError.js';
 
 const SECTIONS = [
   { id: 'command', label: 'Command', icon: 'dashboard', description: 'Platform pulse' },
@@ -16,7 +17,7 @@ const SECTIONS = [
   { id: 'audit', label: 'Audit', icon: 'receipt_long', description: 'Admin trail' }
 ];
 
-const FEATURES = ['login', 'posting', 'commenting', 'squad_actions', 'analysis', 'job_saving', 'profile_visibility', 'activity_logging'];
+const FEATURES = ['posting', 'commenting', 'squad_actions', 'analysis', 'job_search', 'job_saving', 'profile_visibility', 'activity_logging', 'login'];
 const STATUSES = ['active', 'restricted', 'blocked', 'deactivated'];
 const ROLES = ['user', 'admin'];
 const CONTENT_TYPES = ['post', 'comment', 'community_win'];
@@ -116,14 +117,6 @@ function parseMetadata(value) {
 
 function humanize(value) {
   return String(value || '').replaceAll('_', ' ');
-}
-
-function getRequestErrorMessage(error, fallback) {
-  const data = error.response?.data;
-  if (typeof data?.error === 'string') return data.error;
-  if (typeof data?.message === 'string') return data.message;
-  if (typeof data?.error?.message === 'string') return data.error.message;
-  return error.message || fallback;
 }
 
 function toneForStatus(status) {
@@ -281,6 +274,7 @@ function UserDetailPanel({
   onSaveRole,
   onSaveStatus,
   onSaveRestrictions,
+  onBlockAccount,
   onRevoke,
   busyAction
 }) {
@@ -305,52 +299,72 @@ function UserDetailPanel({
         <div className="admin-mini-stat"><span>{selectedUser.savedJobsCount || 0}</span><p>Jobs</p></div>
       </div>
 
-      <div className="mt-6 space-y-4">
-        <div className="admin-form-grid">
-          <label>
-            <span className="app-field-label">Name</span>
-            <input className="app-input" value={controlForm.name} onChange={(event) => setControlForm((form) => ({ ...form, name: event.target.value }))} />
-          </label>
-          <label>
-            <span className="app-field-label">Email</span>
-            <input className="app-input" value={controlForm.email} onChange={(event) => setControlForm((form) => ({ ...form, email: event.target.value }))} />
-          </label>
-          <label>
-            <span className="app-field-label">Role</span>
-            <select className="app-input" value={controlForm.role} onChange={(event) => setControlForm((form) => ({ ...form, role: event.target.value }))}>
-              {ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
-            </select>
-          </label>
-          <label>
-            <span className="app-field-label">Status</span>
-            <select className="app-input" value={controlForm.status} onChange={(event) => setControlForm((form) => ({ ...form, status: event.target.value }))}>
-              {STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
-            </select>
-          </label>
-        </div>
+      <div className="mt-6 space-y-5">
+        <section className="admin-control-block">
+          <div>
+            <p className="admin-eyebrow">Profile fields</p>
+            <p className="mt-1 text-xs text-[var(--muted-strong)]">Reason is required. Confirmation is only needed when changing the email.</p>
+          </div>
+          <div className="admin-form-grid">
+            <label>
+              <span className="app-field-label">Name</span>
+              <input className="app-input" value={controlForm.name} onChange={(event) => setControlForm((form) => ({ ...form, name: event.target.value }))} />
+            </label>
+            <label>
+              <span className="app-field-label">Email</span>
+              <input className="app-input" value={controlForm.email} onChange={(event) => setControlForm((form) => ({ ...form, email: event.target.value }))} />
+            </label>
+          </div>
+          <textarea className="app-input min-h-20" value={controlForm.reason} onChange={(event) => setControlForm((form) => ({ ...form, reason: event.target.value }))} placeholder="Reason for profile/account change" />
+          {controlForm.email !== selectedUser.email ? (
+            <input className="app-input" value={controlForm.confirmTarget} onChange={(event) => setControlForm((form) => ({ ...form, confirmTarget: event.target.value }))} placeholder={`Type current email: ${selectedUser.email}`} />
+          ) : null}
+          <button type="button" className="app-button-secondary w-fit" onClick={onSaveProfile} disabled={busyAction === 'edit-user'}>Save profile</button>
+        </section>
 
-        <label className="block">
-          <span className="app-field-label">Reason</span>
-          <textarea className="app-input mt-2 min-h-20" value={controlForm.reason} onChange={(event) => setControlForm((form) => ({ ...form, reason: event.target.value }))} placeholder="Required for account changes" />
-        </label>
-        <label className="block">
-          <span className="app-field-label">Typed confirmation</span>
-          <input className="app-input mt-2" value={controlForm.confirmTarget} onChange={(event) => setControlForm((form) => ({ ...form, confirmTarget: event.target.value }))} placeholder={selectedUser.email} />
-        </label>
+        <section className="admin-control-block">
+          <div>
+            <p className="admin-eyebrow">Role control</p>
+            <p className="mt-1 text-xs text-[var(--muted-strong)]">Changing roles requires a reason and typed target email.</p>
+          </div>
+          <select className="app-input" value={controlForm.role} onChange={(event) => setControlForm((form) => ({ ...form, role: event.target.value }))}>
+            {ROLES.map((role) => <option key={role} value={role}>{role}</option>)}
+          </select>
+          <textarea className="app-input min-h-20" value={controlForm.reason} onChange={(event) => setControlForm((form) => ({ ...form, reason: event.target.value }))} placeholder="Reason for role change" />
+          <input className="app-input" value={controlForm.confirmTarget} onChange={(event) => setControlForm((form) => ({ ...form, confirmTarget: event.target.value }))} placeholder={`Type ${selectedUser.email}`} />
+          <button type="button" className="app-button-secondary w-fit" onClick={onSaveRole} disabled={busyAction === 'role-user'}>Apply role</button>
+        </section>
 
-        <div className="admin-action-group">
-          <button type="button" className="app-button-secondary" onClick={onSaveProfile} disabled={busyAction === 'edit-user'}>Save profile</button>
-          <button type="button" className="app-button-secondary" onClick={onSaveRole} disabled={busyAction === 'role-user'}>Role</button>
-          <button type="button" className="app-button" onClick={onSaveStatus} disabled={busyAction === 'status-user'}>Apply status</button>
-          <button type="button" className="app-button-danger" onClick={onRevoke} disabled={busyAction === 'revoke'}>Revoke sessions</button>
-        </div>
+        <section className="admin-control-block">
+          <div>
+            <p className="admin-eyebrow">Status control</p>
+            <p className="mt-1 text-xs text-[var(--muted-strong)]">Blocked and deactivated accounts lose access and require typed target email.</p>
+          </div>
+          <select className="app-input" value={controlForm.status} onChange={(event) => setControlForm((form) => ({ ...form, status: event.target.value }))}>
+            {STATUSES.map((status) => <option key={status} value={status}>{status}</option>)}
+          </select>
+          <textarea className="app-input min-h-20" value={controlForm.reason} onChange={(event) => setControlForm((form) => ({ ...form, reason: event.target.value }))} placeholder="Reason for status change" />
+          <input className="app-input" value={controlForm.confirmTarget} onChange={(event) => setControlForm((form) => ({ ...form, confirmTarget: event.target.value }))} placeholder={`Type ${selectedUser.email} for block/deactivate`} />
+          <div className="admin-action-group">
+            <button type="button" className="app-button" onClick={onSaveStatus} disabled={busyAction === 'status-user'}>Apply status</button>
+            <button type="button" className="app-button-danger" onClick={onBlockAccount} disabled={busyAction === 'block-user'}>Block whole account</button>
+          </div>
+        </section>
+
+        <section className="admin-control-block">
+          <div>
+            <p className="admin-eyebrow">Session control</p>
+            <p className="mt-1 text-xs text-[var(--muted-strong)]">Immediately invalidate active refresh sessions for this user.</p>
+          </div>
+          <button type="button" className="app-button-danger w-fit" onClick={onRevoke} disabled={busyAction === 'revoke'}>Revoke sessions</button>
+        </section>
       </div>
 
       <div className="mt-7 border-t border-[var(--border)] pt-5">
         <div className="flex items-center justify-between gap-3">
           <div>
             <p className="admin-eyebrow">Feature restrictions</p>
-            <p className="mt-1 text-xs text-[var(--muted-strong)]">Disable specific write actions without blocking the full account.</p>
+            <p className="mt-1 text-xs text-[var(--muted-strong)]">Disable specific product actions without blocking the full account.</p>
           </div>
         </div>
         <div className="mt-4 grid gap-2">
@@ -362,7 +376,9 @@ function UserDetailPanel({
           ))}
         </div>
         <textarea className="app-input mt-4 min-h-20" value={restrictionForm.reason} onChange={(event) => setRestrictionForm((form) => ({ ...form, reason: event.target.value }))} placeholder="Restriction reason" />
-        <input className="app-input mt-3" value={restrictionForm.confirmTarget} onChange={(event) => setRestrictionForm((form) => ({ ...form, confirmTarget: event.target.value }))} placeholder={`Type ${selectedUser.email} for login restriction`} />
+        {restrictionForm.flags.login ? (
+          <input className="app-input mt-3" value={restrictionForm.confirmTarget} onChange={(event) => setRestrictionForm((form) => ({ ...form, confirmTarget: event.target.value }))} placeholder={`Type ${selectedUser.email} for login restriction`} />
+        ) : null}
         <button type="button" className="app-button mt-4 w-full" onClick={onSaveRestrictions} disabled={busyAction === 'restrictions'}>Save restrictions</button>
       </div>
     </aside>
@@ -576,9 +592,21 @@ export default function ControlCenter() {
       await api.post(`/api/admin/users/${selectedUser.id}/status`, {
         status: controlForm.status,
         reason: controlForm.reason,
-        confirmTarget: controlForm.confirmTarget
+        confirmTarget: ['blocked', 'deactivated'].includes(controlForm.status) ? controlForm.confirmTarget : undefined
       });
       return 'User status updated.';
+    });
+  }
+
+  async function blockWholeAccount() {
+    if (!selectedUser) return;
+    await runAdminAction('block-user', async () => {
+      await api.post(`/api/admin/users/${selectedUser.id}/status`, {
+        status: 'blocked',
+        reason: controlForm.reason,
+        confirmTarget: controlForm.confirmTarget
+      });
+      return 'User account blocked and active sessions revoked.';
     });
   }
 
@@ -757,6 +785,7 @@ export default function ControlCenter() {
             onSaveRole={saveUserRole}
             onSaveStatus={saveUserStatus}
             onSaveRestrictions={saveRestrictions}
+            onBlockAccount={blockWholeAccount}
             onRevoke={() => selectedUser && revokeSessions(selectedUser.id)}
             busyAction={busyAction}
           />
@@ -894,6 +923,7 @@ export default function ControlCenter() {
             onSaveRole={saveUserRole}
             onSaveStatus={saveUserStatus}
             onSaveRestrictions={saveRestrictions}
+            onBlockAccount={blockWholeAccount}
             onRevoke={() => selectedUser && revokeSessions(selectedUser.id)}
             busyAction={busyAction}
           />
