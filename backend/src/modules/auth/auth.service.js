@@ -168,6 +168,19 @@ function resolveAuthProvider(existingUser, nextProvider) {
   return 'hybrid';
 }
 
+function shouldVerifyInvitePasswordSetup(user) {
+  if (user.emailVerifiedAt) {
+    return false;
+  }
+
+  if (user.authProvider === 'admin_invite') {
+    return true;
+  }
+
+  // Older invite resets converted admin-invited users to hybrid before verifying.
+  return user.authProvider === 'hybrid' && Boolean(user.passwordHash);
+}
+
 async function upsertGoogleUser(db, payload) {
   const now = new Date();
   const existingUser = await findUserByEmail(db, payload.email);
@@ -636,13 +649,18 @@ export async function resetPassword({ db, token, password }) {
   }
 
   const passwordHash = await createPasswordHash(password);
+  const updates = {
+    passwordHash,
+    authProvider: resolveAuthProvider(user, 'password')
+  };
+
+  if (shouldVerifyInvitePasswordSetup(user)) {
+    updates.emailVerifiedAt = new Date();
+  }
 
   await db
     .update(users)
-    .set({
-      passwordHash,
-      authProvider: resolveAuthProvider(user, 'password')
-    })
+    .set(updates)
     .where(eq(users.id, user.id));
 
   await revokeAllRefreshTokensForUser(db, user.id);
