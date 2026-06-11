@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from '@/lib/router-compat.jsx';
 import { useDispatch, useSelector } from 'react-redux';
 import { startBackgroundAnalysis, abortActiveAnalysis, getActiveController } from '../api/analysisManager.js';
+import { checkAnalysisAccess } from '../api/analyzeApi.js';
 import AppShell from '../components/AppShell.jsx';
 import { selectAuth } from '../store/authSlice.js';
 import {
@@ -19,7 +20,7 @@ import {
   selectAnalysisWorkspace,
   setAnalysisWorkspace
 } from '../store/historySlice.js';
-import { isRestrictionMessage } from '../utils/requestError.js';
+import { getRequestErrorMessage, isRestrictionMessage } from '../utils/requestError.js';
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
@@ -91,6 +92,27 @@ function ProgressStep({ label, state }) {
   );
 }
 
+function AnalysisErrorBanner({ message }) {
+  if (!message) return null;
+
+  const restricted = isRestrictionMessage(message);
+
+  return (
+    <div className="mb-6 overflow-hidden rounded-2xl border border-[var(--danger-border)] bg-[var(--panel)] text-[var(--text)] shadow-[0_18px_42px_rgba(0,0,0,0.14)] ring-1 ring-[var(--danger-border)]">
+      <div className="h-1 bg-[var(--danger-strong)]" />
+      <div className="flex items-start gap-3 p-5 text-sm font-bold leading-6">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[var(--danger-border)] bg-[var(--danger-soft)] text-[var(--danger-strong)]">
+          <span className="material-symbols-outlined text-[20px]">{restricted ? 'admin_panel_settings' : 'warning'}</span>
+        </span>
+        <div>
+          {restricted ? <p className="mb-1 text-xs uppercase tracking-[0.18em] text-[var(--danger-strong)]">Admin restriction</p> : null}
+          <p className="text-[var(--text)]">{message}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AnalysisWorkspace() {
   const auth = useSelector(selectAuth);
   const persistedWorkspace = useSelector(selectAnalysisWorkspace);
@@ -99,6 +121,7 @@ export default function AnalysisWorkspace() {
   const fileInputRef = useRef(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [selectedFileMeta, setSelectedFileMeta] = useState(persistedWorkspace?.selectedFileMeta || null);
+  const [checkingAccess, setCheckingAccess] = useState(false);
   const location = useLocation();
   const [jobDescription, setJobDescription] = useState(location.state?.jobDescription ?? persistedWorkspace?.jobDescription ?? '');
   const navigate = useNavigate();
@@ -147,29 +170,39 @@ export default function AnalysisWorkspace() {
   ];
 
   const handleAnalyze = useCallback(
-    (event) => {
+    async (event) => {
       event.preventDefault();
       setGlobalError('');
 
-      if (!selectedFile && !selectedFileMeta) {
+      if (!selectedFile) {
         setGlobalError('Please choose a PDF or DOCX resume first.');
         return;
       }
 
-      if (selectedFile && selectedFile.size > MAX_FILE_BYTES) {
+      if (selectedFile.size > MAX_FILE_BYTES) {
         setGlobalError('File must be under 5 MB.');
         return;
       }
 
-      const fileMeta = selectedFile ? { name: selectedFile.name, size: selectedFile.size, type: selectedFile.type } : selectedFileMeta;
+      const fileMeta = { name: selectedFile.name, size: selectedFile.size, type: selectedFile.type };
       setSelectedFileMeta(fileMeta);
+
+      setCheckingAccess(true);
+      try {
+        await checkAnalysisAccess();
+      } catch (accessError) {
+        setGlobalError(getRequestErrorMessage(accessError, 'Resume analysis is currently unavailable for your account.'));
+        return;
+      } finally {
+        setCheckingAccess(false);
+      }
 
       startBackgroundAnalysis(
         { file: selectedFile, jobDescription },
         { selectedFileMeta: fileMeta }
       );
     },
-    [jobDescription, selectedFile, selectedFileMeta, setGlobalError]
+    [jobDescription, selectedFile, setGlobalError]
   );
 
   return (
@@ -209,6 +242,8 @@ export default function AnalysisWorkspace() {
         </aside>
 
         <section className="w-full">
+          <AnalysisErrorBanner message={globalError} />
+
           {isSubmitting ? (
             <div className="flex flex-col items-center justify-center rounded-[2.5rem] border border-[var(--border)] bg-[var(--panel)] p-16 shadow-2xl min-h-[500px]">
               <div className="relative mb-8 flex h-32 w-32 items-center justify-center">
@@ -264,16 +299,6 @@ export default function AnalysisWorkspace() {
               <div className="absolute top-0 right-0 p-32 bg-[radial-gradient(circle_at_top_right,rgba(78,222,163,0.05),transparent_70%)] pointer-events-none" />
               
               <form className="relative z-10 space-y-8" onSubmit={handleAnalyze}>
-                {globalError ? (
-                  <div className="flex items-start gap-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-5 text-sm font-bold leading-6 text-rose-300">
-                    <span className="material-symbols-outlined text-rose-400">{isRestrictionMessage(globalError) ? 'admin_panel_settings' : 'warning'}</span>
-                    <div>
-                      {isRestrictionMessage(globalError) ? <p className="mb-1 text-xs uppercase tracking-[0.18em] text-rose-300">Admin restriction</p> : null}
-                      <p>{globalError}</p>
-                    </div>
-                  </div>
-                ) : null}
-
                 <div className="grid gap-6 md:grid-cols-2">
                   <label className="group relative flex min-h-[280px] cursor-pointer flex-col items-center justify-center rounded-[2rem] border-2 border-dashed border-[var(--border)] bg-[var(--panel-soft)] transition-all hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]">
                     <input
@@ -335,10 +360,11 @@ export default function AnalysisWorkspace() {
                   
                   <button 
                     type="submit" 
+                    disabled={checkingAccess}
                     className="group relative flex items-center justify-center gap-2 rounded-full bg-[var(--text)] px-8 py-3.5 text-sm font-black uppercase tracking-widest text-[var(--panel)] transition-transform hover:scale-[1.02] active:scale-[0.98]"
                   >
-                    Initialize Sequence
-                    <span className="material-symbols-outlined text-[18px] transition-transform group-hover:translate-x-1">arrow_forward</span>
+                    {checkingAccess ? 'Checking Access...' : 'Initialize Sequence'}
+                    <span className="material-symbols-outlined text-[18px] transition-transform group-hover:translate-x-1">{checkingAccess ? 'sync' : 'arrow_forward'}</span>
                   </button>
                 </div>
               </form>

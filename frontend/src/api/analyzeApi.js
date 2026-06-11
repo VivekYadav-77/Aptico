@@ -1,7 +1,18 @@
 import { clearAuthSession, store } from '../store/authSlice.js';
 import { refreshSessionRequest } from './authApi.js';
+import api from './axios.js';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || '';
+
+function formatAnalysisError(errorJson, fallback) {
+  const message = errorJson?.error || errorJson?.message || fallback;
+
+  if (errorJson?.code === 'FEATURE_RESTRICTED') {
+    return message ? `Access restricted: ${message}` : 'Access restricted: Resume analysis is restricted on your account.';
+  }
+
+  return message;
+}
 
 function getAuthHeaders() {
   const token = store.getState()?.auth?.accessToken;
@@ -35,6 +46,12 @@ export function streamAnalysis(payload, callbacks) {
 
   (async () => {
     try {
+      if (!payload?.file || typeof payload.file.arrayBuffer !== 'function') {
+        callbacks.onError?.('Please choose a PDF or DOCX resume first.');
+        callbacks.onDone?.();
+        return;
+      }
+
       const arrayBuffer = await payload.file.arrayBuffer();
       let binary = '';
       const bytes = new Uint8Array(arrayBuffer);
@@ -77,7 +94,7 @@ export function streamAnalysis(payload, callbacks) {
         let errorMsg = 'Analysis failed.';
         try {
           const errorJson = await response.json();
-          errorMsg = errorJson.error || errorJson.message || errorMsg;
+          errorMsg = formatAnalysisError(errorJson, errorMsg);
         } catch (e) {
           // couldn't parse error response
         }
@@ -149,4 +166,9 @@ export function streamAnalysis(payload, callbacks) {
   })();
 
   return controller;
+}
+
+export async function checkAnalysisAccess() {
+  const response = await api.get('/api/analyze/access');
+  return response.data;
 }
