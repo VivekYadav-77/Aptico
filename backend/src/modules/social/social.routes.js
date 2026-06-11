@@ -186,6 +186,7 @@ export default async function socialRoutes(app) {
 
   app.get('/profile/:username/is-following', { preHandler: authenticateRequest }, async (request, reply) => {
     try {
+      await getPublicProfile(request.server.db, request.params.username, request.auth.userId);
       const target = await getProfileByUsername(request.server.db, request.params.username);
 
       if (!target) {
@@ -201,6 +202,7 @@ export default async function socialRoutes(app) {
 
   app.get('/profile/:username/followers', { preHandler: optionalAuthenticateRequest }, async (request, reply) => {
     try {
+      await getPublicProfile(request.server.db, request.params.username, request.auth?.userId || null);
       const followers = await getFollowers(request.server.db, request.params.username);
       return reply.send({ followers });
     } catch (error) {
@@ -210,6 +212,7 @@ export default async function socialRoutes(app) {
 
   app.get('/profile/:username/following', { preHandler: optionalAuthenticateRequest }, async (request, reply) => {
     try {
+      await getPublicProfile(request.server.db, request.params.username, request.auth?.userId || null);
       const following = await getFollowing(request.server.db, request.params.username);
       return reply.send({ following });
     } catch (error) {
@@ -219,6 +222,7 @@ export default async function socialRoutes(app) {
 
   app.get('/profile/:username/connections', { preHandler: optionalAuthenticateRequest }, async (request, reply) => {
     try {
+      await getPublicProfile(request.server.db, request.params.username, request.auth?.userId || null);
       const userConnections = await getPublicConnections(request.server.db, request.params.username);
       return reply.send({ connections: userConnections });
     } catch (error) {
@@ -270,22 +274,6 @@ export default async function socialRoutes(app) {
     try {
       const username = String(request.params.username || '').trim();
       const viewerId = request.auth?.userId || null;
-      const redis = request.server.services?.redis;
-
-      // Authenticated viewers always get fresh data (settings changes, visibility updates)
-      // Only anonymous visitors use cache
-      if (!viewerId) {
-        const cacheKey = `profile:username:${username}`;
-        const cached = parseCachedJson(await redis?.get(cacheKey));
-        if (cached) {
-          return reply.send(cached);
-        }
-
-        const profile = await getPublicProfile(request.server.db, username, null);
-        await redis?.set(cacheKey, JSON.stringify(profile), 120);
-        return reply.send(profile);
-      }
-
       const profile = await getPublicProfile(request.server.db, username, viewerId);
       return reply.send(profile);
     } catch (error) {
@@ -785,25 +773,6 @@ export default async function socialRoutes(app) {
       return sendError(reply, error, 'Could not mark notifications as read.');
     }
   });
-
-  // app.get('/notifications/count', { preHandler: authenticateRequest }, async (request, reply) => {
-  //   try {
-  //     const cacheKey = `notif:count:${request.auth.userId}`;
-  //     const redis = request.server.services?.redis;
-  //     const cached = parseCachedJson(await redis?.get(cacheKey));
-
-  //     if (cached) {
-  //       return reply.send(cached);
-  //     }
-
-  //     const unreadCount = await getUnreadCount(request.server.db, request.auth.userId);
-  //     const payload = { unreadCount };
-  //     await redis?.set(cacheKey, JSON.stringify(payload), 30);
-  //     return reply.send(payload);
-  //   } catch (error) {
-  //     return sendError(reply, error, 'Could not load notification count.');
-  //   }
-  // });
 
   app.get('/people/search', { preHandler: authenticateRequest }, async (request, reply) => {
     try {

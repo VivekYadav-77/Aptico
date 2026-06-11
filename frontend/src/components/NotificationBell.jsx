@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from '@/lib/router-compat.jsx';
-import { getNotifications, getUnreadNotificationCount, markNotificationsRead } from '../api/socialApi.js';
+import { getNotifications, markNotificationsRead } from '../api/socialApi.js';
 
 function initials(name) {
   return String(name || 'A').trim().charAt(0).toUpperCase() || 'A';
@@ -33,21 +33,11 @@ export default function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [items, setItems] = useState([]);
 
-  async function refreshCount() {
-    getUnreadNotificationCount().then(setUnreadCount).catch(() => null);
-  }
-
   async function loadItems() {
     const result = await getNotifications({ limit: 10 });
     setItems(result.notifications || []);
     setUnreadCount(result.unreadCount || 0);
   }
-
-  useEffect(() => {
-    void refreshCount();
-    const timer = window.setInterval(refreshCount, 60000);
-    return () => window.clearInterval(timer);
-  }, []);
 
   useEffect(() => {
     function handleClick(event) {

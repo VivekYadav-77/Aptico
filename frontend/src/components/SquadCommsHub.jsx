@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { getSquadComms, postSquadMessage, setSquadArchetype } from '../api/squadApi.js';
 import { getStickerById } from '../utils/stickerRegistry.js';
 import StickerVisual from './StickerVisual.jsx';
-import { getRequestErrorMessage } from '../utils/requestError.js';
+import { getRequestErrorMessage, isRestrictionError } from '../utils/requestError.js';
 
 const PHASE_LABELS = ['Pre-25%', '25-50%', '50-75%', '75-100%', 'Goal secured'];
 const QUICK_SIGNAL_META = {
@@ -61,6 +61,52 @@ function StickerIcon({ stickerId, size = 44 }) {
     return <span className="material-symbols-outlined text-[32px]">interests</span>;
   }
   return <StickerVisual id={sticker.id} visualId={sticker.visualId} subVariant={sticker.subVariant} color={sticker.color} size={size} rarity={sticker.rarity} tier={sticker.tier || 1} />;
+}
+
+function CommsToast({ toast, onDismiss }) {
+  if (!toast) return null;
+
+  const isDanger = toast.tone === 'danger';
+  const toneClasses = isDanger
+    ? {
+        container: 'border-[var(--danger-border)] bg-[var(--panel)] text-[var(--text)] ring-1 ring-[var(--danger-border)]',
+        iconWrap: 'border-[var(--danger-border)] bg-[var(--danger-soft)] text-[var(--danger-strong)]',
+        title: 'text-[var(--danger-strong)]'
+      }
+    : {
+        container: 'border-[var(--accent)]/35 bg-[var(--panel)] text-[var(--text)] ring-1 ring-[var(--accent)]/20',
+        iconWrap: 'border-[var(--accent)]/30 bg-[var(--accent-soft)] text-[var(--accent-strong)]',
+        title: 'text-[var(--accent-strong)]'
+      };
+
+  return (
+    <div className="fixed bottom-8 right-4 z-[260] w-[min(420px,calc(100vw-2rem))] animate-fade-in-up sm:right-6">
+      <div
+        className={`overflow-hidden rounded-2xl border shadow-[0_24px_60px_rgba(0,0,0,0.28)] backdrop-blur-xl ${toneClasses.container}`}
+      >
+        <div className={`h-1 ${isDanger ? 'bg-[var(--danger-strong)]' : 'bg-[var(--accent)]'}`} />
+        <div className="flex items-start gap-3 px-4 py-4">
+          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${toneClasses.iconWrap}`}>
+            <span className="material-symbols-outlined text-[20px]">
+              {isDanger ? 'admin_panel_settings' : 'info'}
+            </span>
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className={`text-xs font-black uppercase tracking-[0.18em] ${toneClasses.title}`}>{toast.title}</p>
+            <p className="mt-1 text-sm font-semibold leading-6 text-[var(--text)]">{toast.message}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--panel-soft)] text-[var(--muted-strong)] transition hover:text-[var(--text)]"
+            aria-label="Dismiss notification"
+          >
+            <span className="material-symbols-outlined text-[16px]">close</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function MessageCard({ message, myAlias }) {
@@ -213,7 +259,22 @@ export default function SquadCommsHub({ progressPercent = 0, members = [], myAli
   const [sending, setSending] = useState(false);
   const [lastPollAt, setLastPollAt] = useState(null);
   const [error, setError] = useState('');
+  const [toast, setToast] = useState(null);
   const feedEndRef = useRef(null);
+
+  function showToast({ title, message, tone = 'danger' }) {
+    setToast({ title, message, tone, id: Date.now() });
+  }
+
+  function showRequestFailure(apiError, fallback) {
+    const message = getRequestErrorMessage(apiError, fallback);
+    const restricted = isRestrictionError(apiError);
+    showToast({
+      title: restricted ? 'Squad access restricted' : 'Comms action failed',
+      message,
+      tone: 'danger'
+    });
+  }
 
   useEffect(() => {
     setCurrentPhase(getMilestonePhase(progressPercent));
@@ -256,6 +317,15 @@ export default function SquadCommsHub({ progressPercent = 0, members = [], myAli
     feedEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  useEffect(() => {
+    if (!toast) return undefined;
+    const toastId = toast.id;
+    const timer = window.setTimeout(() => {
+      setToast((current) => (current?.id === toastId ? null : current));
+    }, 6500);
+    return () => window.clearTimeout(timer);
+  }, [toast?.id]);
+
   async function refreshComms() {
     const data = await getSquadComms();
     setMessages(data.messages || []);
@@ -283,7 +353,7 @@ export default function SquadCommsHub({ progressPercent = 0, members = [], myAli
       setStickerId('');
       await refreshComms();
     } catch (apiError) {
-      setError(getRequestErrorMessage(apiError, 'Signal rejected by comms control.'));
+      showRequestFailure(apiError, 'Signal rejected by comms control.');
     } finally {
       setSending(false);
     }
@@ -339,7 +409,7 @@ export default function SquadCommsHub({ progressPercent = 0, members = [], myAli
       setMyArchetype(role);
       await refreshComms();
     } catch (apiError) {
-      setError(getRequestErrorMessage(apiError, 'Role lock failed.'));
+      showRequestFailure(apiError, 'Role lock failed.');
     } finally {
       setSending(false);
     }
@@ -350,6 +420,7 @@ export default function SquadCommsHub({ progressPercent = 0, members = [], myAli
 
   return (
     <article className={`app-panel relative overflow-hidden ${synergyBurstActive ? 'synergy-burst-flash' : ''}`}>
+      <CommsToast toast={toast} onDismiss={() => setToast(null)} />
       <div className="absolute inset-x-0 top-0 h-24 hud-scanlines opacity-60" />
       <div className="relative">
         <div className="flex flex-wrap items-start justify-between gap-4">

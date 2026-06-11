@@ -19,6 +19,7 @@ import {
   selectAnalysisWorkspace,
   setAnalysisWorkspace
 } from '../store/historySlice.js';
+import { isRestrictionMessage } from '../utils/requestError.js';
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 
@@ -264,9 +265,12 @@ export default function AnalysisWorkspace() {
               
               <form className="relative z-10 space-y-8" onSubmit={handleAnalyze}>
                 {globalError ? (
-                  <div className="flex items-center gap-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-5 text-sm font-medium text-rose-300">
-                    <span className="material-symbols-outlined text-rose-400">warning</span>
-                    {globalError}
+                  <div className="flex items-start gap-3 rounded-2xl border border-rose-500/30 bg-rose-500/10 p-5 text-sm font-bold leading-6 text-rose-300">
+                    <span className="material-symbols-outlined text-rose-400">{isRestrictionMessage(globalError) ? 'admin_panel_settings' : 'warning'}</span>
+                    <div>
+                      {isRestrictionMessage(globalError) ? <p className="mb-1 text-xs uppercase tracking-[0.18em] text-rose-300">Admin restriction</p> : null}
+                      <p>{globalError}</p>
+                    </div>
                   </div>
                 ) : null}
 

@@ -24,7 +24,7 @@ const strictSquadRateLimit = {
 
 export default async function squadRoutes(app) {
   app.post('/join', { preHandler: [authenticateRequest, requireFeatureAccess('squad_actions')] }, joinSquadController);
-  app.post('/log-app', { preHandler: [authenticateRequest, requireFeatureAccess('squad_actions')], config: strictSquadRateLimit }, logSquadAppController);
+  app.post('/log-app', { preHandler: [authenticateRequest, requireFeatureAccess('squad_actions'), requireFeatureAccess('activity_logging')], config: strictSquadRateLimit }, logSquadAppController);
   app.get('/my-squad', { preHandler: authenticateRequest }, getMySquadController);
   app.get('/leaderboard', { preHandler: optionalAuthenticateRequest }, getSquadLeaderboardController);
   app.get('/leaderboard/my-rank', { preHandler: authenticateRequest }, getMySquadLeaderboardRankController);

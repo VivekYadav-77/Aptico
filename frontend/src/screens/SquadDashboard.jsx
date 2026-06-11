@@ -150,12 +150,15 @@ export default function SquadDashboard() {
 
   useEffect(() => {
     if (toast || error) {
+      const feedbackText = toast || error;
       const timer = setTimeout(() => {
+        if ((toast || error) !== feedbackText) return;
         setToast('');
         setError('');
-      }, 4000);
+      }, 6500);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [toast, error]);
 
   const laggingCount = useMemo(
@@ -301,10 +304,26 @@ export default function SquadDashboard() {
         </div>
       ) : null}
       {error ? (
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 animate-fade-in-up">
-          <div className="rounded-full bg-rose-500 px-6 py-3.5 text-sm font-black text-white shadow-[0_10px_40px_rgba(244,63,94,0.4)] flex items-center gap-3">
-             <span className="material-symbols-outlined text-[20px]">error</span>
-             {error}
+        <div className="fixed bottom-8 left-4 right-4 z-50 mx-auto w-[min(520px,calc(100vw-2rem))] animate-fade-in-up sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
+          <div className="overflow-hidden rounded-2xl border border-[var(--danger-border)] bg-[var(--panel)] text-[var(--text)] shadow-[0_24px_60px_rgba(0,0,0,0.28)] ring-1 ring-[var(--danger-border)]">
+            <div className="h-1 bg-[var(--danger-strong)]" />
+            <div className="flex items-start gap-3 px-4 py-4">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[var(--danger-border)] bg-[var(--danger-soft)] text-[var(--danger-strong)]">
+                <span className="material-symbols-outlined text-[20px]">admin_panel_settings</span>
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--danger-strong)]">Action blocked</p>
+                <p className="mt-1 text-sm font-semibold leading-6 text-[var(--text)]">{error}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setError('')}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--panel-soft)] text-[var(--muted-strong)] transition hover:text-[var(--text)]"
+                aria-label="Dismiss notification"
+              >
+                <span className="material-symbols-outlined text-[16px]">close</span>
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

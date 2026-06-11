@@ -202,11 +202,6 @@ export async function markNotificationsRead(payload) {
   return response.data;
 }
 
-export async function getUnreadNotificationCount() {
-  //const response = await api.get('/api/social/notifications/count');
- // return response.data.unreadCount || 0;
-}
-
 export async function searchPeople(params = {}) {
   const response = await api.get('/api/social/people/search', { params });
   return response.data.people || [];

@@ -25,6 +25,18 @@ function isBlockedStatus(status) {
   return status === 'blocked' || status === 'deactivated';
 }
 
+const FEATURE_RESTRICTION_COPY = {
+  posting: 'Posting is restricted on your account.',
+  commenting: 'Commenting is restricted on your account.',
+  squad_actions: 'Squad activity is restricted on your account.',
+  analysis: 'Resume analysis is restricted on your account.',
+  job_search: 'Job search is restricted on your account.',
+  job_saving: 'Saving jobs is restricted on your account.',
+  profile_visibility: 'Your public profile visibility is restricted by an administrator.',
+  activity_logging: 'Activity logging is restricted on your account.',
+  login: 'Platform access is restricted on your account.'
+};
+
 async function loadAccountControls(request, userId) {
   const db = request.server.db;
   if (!db) {
@@ -152,7 +164,7 @@ async function resolveAuth(request, reply, { optional, adminOnly = false }) {
   }
 
   if (isBlockedStatus(accountControls.status) || accountControls.restrictions.includes('login')) {
-    return sendAuthError(reply, 'This account is blocked from platform access.', 403);
+    return sendAuthError(reply, 'Your account is blocked from platform access.', 403);
   }
 
   request.auth.role = accountControls.role || request.auth.role;
@@ -185,15 +197,15 @@ export function requireFeatureAccess(feature) {
 
     if (request.auth.restrictions?.includes(feature)) {
       const reason = request.auth.restrictionReasons?.[feature] || null;
-      const featureLabel = feature.replaceAll('_', ' ');
+      const baseMessage = FEATURE_RESTRICTION_COPY[feature] || `This feature is restricted on your account.`;
       return reply.code(403).send({
         success: false,
         code: 'FEATURE_RESTRICTED',
         feature,
         reason,
         error: reason
-          ? `This account is restricted from ${featureLabel}. Reason: ${reason}`
-          : `This account is restricted from ${featureLabel}.`
+          ? `${baseMessage} Reason: ${reason}`
+          : baseMessage
       });
     }
   };
