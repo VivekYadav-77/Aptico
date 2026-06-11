@@ -119,6 +119,55 @@ function humanize(value) {
   return String(value || '').replaceAll('_', ' ');
 }
 
+function AdminFeedbackToast({ message, error, onDismiss }) {
+  const text = error || message;
+  if (!text) return null;
+
+  const isError = Boolean(error);
+  const tone = isError
+    ? {
+        label: 'Admin action failed',
+        icon: 'error',
+        bar: 'bg-[var(--danger-strong)]',
+        container: 'border-[var(--danger-border)] ring-[var(--danger-border)]',
+        iconBox: 'border-[var(--danger-border)] bg-[var(--danger-soft)] text-[var(--danger-strong)]',
+        title: 'text-[var(--danger-strong)]'
+      }
+    : {
+        label: 'Admin action complete',
+        icon: 'check_circle',
+        bar: 'bg-[var(--success-strong)]',
+        container: 'border-[var(--success-border)] ring-[var(--success-border)]',
+        iconBox: 'border-[var(--success-border)] bg-[var(--success-soft)] text-[var(--success-strong)]',
+        title: 'text-[var(--success-strong)]'
+      };
+
+  return (
+    <div className="fixed inset-x-3 bottom-4 z-[280] sm:inset-x-auto sm:bottom-5 sm:right-5 sm:w-[min(440px,calc(100vw-2rem))]" role="status" aria-live="polite">
+      <div className={`overflow-hidden rounded-2xl border bg-[var(--panel)] text-[var(--text)] shadow-[0_24px_60px_rgba(0,0,0,0.28)] ring-1 backdrop-blur-xl ${tone.container}`}>
+        <div className={`h-1 ${tone.bar}`} />
+        <div className="flex items-start gap-3 px-4 py-4">
+          <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border ${tone.iconBox}`}>
+            <span className="material-symbols-outlined text-[20px]">{tone.icon}</span>
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className={`text-xs font-black uppercase tracking-[0.18em] ${tone.title}`}>{tone.label}</p>
+            <p className="mt-1 text-sm font-semibold leading-6 text-[var(--text)]">{text}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onDismiss}
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--panel-soft)] text-[var(--muted-strong)] transition hover:text-[var(--text)]"
+            aria-label="Dismiss admin feedback"
+          >
+            <span className="material-symbols-outlined text-[16px]">close</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function toneForStatus(status) {
   if (status === 'blocked' || status === 'delete' || status === 'critical' || status === 'high') return 'danger';
   if (status === 'restricted' || status === 'hidden' || status === 'watch' || status === 'medium') return 'warning';
@@ -469,6 +518,23 @@ export default function ControlCenter() {
     setRestrictionForm((current) => ({ ...current, flags }));
   }, [data.adminRestrictions]);
 
+  useEffect(() => {
+    if (!message && !error) return undefined;
+
+    const currentMessage = message;
+    const currentError = error;
+    const timer = window.setTimeout(() => {
+      if (currentMessage) {
+        setMessage((value) => (value === currentMessage ? '' : value));
+      }
+      if (currentError) {
+        setError((value) => (value === currentError ? '' : value));
+      }
+    }, error ? 8000 : 5500);
+
+    return () => window.clearTimeout(timer);
+  }, [message, error]);
+
   const queryVariables = useMemo(() => ({
     eventType: eventType || null,
     selectedUserId: selectedUser?.id || '00000000-0000-0000-0000-000000000000',
@@ -702,8 +768,7 @@ export default function ControlCenter() {
 
       <SectionNav activeSection={activeSection} onChange={setActiveSection} />
 
-      {message ? <div className="admin-alert success">{message}</div> : null}
-      {error ? <div className="admin-alert danger">{error}</div> : null}
+      <AdminFeedbackToast message={message} error={error} onDismiss={() => { setMessage(''); setError(''); }} />
       {isLoading ? <div className="admin-panel text-center text-sm text-[var(--muted-strong)]">Loading admin workspace...</div> : null}
 
       {!isLoading && activeSection === 'command' ? (
