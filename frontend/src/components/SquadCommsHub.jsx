@@ -285,7 +285,7 @@ export default function SquadCommsHub({ progressPercent = 0, members = [], myAli
 
     let cancelled = false;
 
-    async function poll() {
+    async function syncComms() {
       try {
         const data = await getSquadComms();
         if (cancelled) return;
@@ -304,12 +304,20 @@ export default function SquadCommsHub({ progressPercent = 0, members = [], myAli
       }
     }
 
-    poll();
-    const interval = setInterval(poll, 10000);
+    function syncWhenVisible() {
+      if (document.visibilityState === 'visible') {
+        void syncComms();
+      }
+    }
+
+    void syncComms();
+    document.addEventListener('visibilitychange', syncWhenVisible);
+    window.addEventListener('focus', syncWhenVisible);
 
     return () => {
       cancelled = true;
-      clearInterval(interval);
+      document.removeEventListener('visibilitychange', syncWhenVisible);
+      window.removeEventListener('focus', syncWhenVisible);
     };
   }, [isOpen, progressPercent]);
 

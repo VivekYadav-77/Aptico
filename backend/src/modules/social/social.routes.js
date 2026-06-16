@@ -92,13 +92,27 @@ const connectionResponseSchema = z.object({
 });
 
 const notificationQuerySchema = paginationSchema.extend({
-  unreadOnly: z.coerce.boolean().default(false)
+  unreadOnly: z.coerce.boolean().default(false),
+  readStatus: z.enum(['all', 'read', 'unread']).default('all'),
+  type: z.string().trim().max(80).optional(),
+  category: z.enum(['social', 'career', 'squad', 'admin']).optional()
 });
 
 const notificationReadSchema = z.object({
   notificationIds: z.array(z.string().uuid()).optional(),
   markAllRead: z.boolean().optional()
 });
+
+const notificationParamsSchema = z.object({
+  notificationId: z.string().uuid()
+});
+
+const notificationTypeGroups = {
+  social: ['new_follower', 'new_connection_request', 'connection_accepted', 'post_like', 'post_comment'],
+  career: ['job_match_alert'],
+  squad: ['squad_ping', 'squad_goal_reached', 'squad_synergy_burst'],
+  admin: ['admin_restriction_update', 'admin_account_status']
+};
 
 const socialWriteRateLimit = {
   rateLimit: {
@@ -714,8 +728,16 @@ export default async function socialRoutes(app) {
       const query = notificationQuerySchema.parse(request.query || {});
       const filters = [eq(notifications.userId, request.auth.userId)];
 
-      if (query.unreadOnly) {
+      if (query.unreadOnly || query.readStatus === 'unread') {
         filters.push(eq(notifications.isRead, false));
+      } else if (query.readStatus === 'read') {
+        filters.push(eq(notifications.isRead, true));
+      }
+
+      if (query.type) {
+        filters.push(eq(notifications.type, query.type));
+      } else if (query.category) {
+        filters.push(inArray(notifications.type, notificationTypeGroups[query.category]));
       }
 
       const rows = await request.server.db
@@ -771,6 +793,20 @@ export default async function socialRoutes(app) {
       return reply.send({ success: true, updatedCount: updated.length });
     } catch (error) {
       return sendError(reply, error, 'Could not mark notifications as read.');
+    }
+  });
+
+  app.delete('/notifications/:notificationId', { preHandler: authenticateRequest }, async (request, reply) => {
+    try {
+      const { notificationId } = notificationParamsSchema.parse(request.params || {});
+      const deleted = await request.server.db
+        .delete(notifications)
+        .where(and(eq(notifications.userId, request.auth.userId), eq(notifications.id, notificationId)))
+        .returning({ id: notifications.id });
+
+      return reply.send({ success: true, deletedCount: deleted.length });
+    } catch (error) {
+      return sendError(reply, error, 'Could not delete notification.');
     }
   });
 

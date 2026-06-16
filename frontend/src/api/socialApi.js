@@ -202,6 +202,11 @@ export async function markNotificationsRead(payload) {
   return response.data;
 }
 
+export async function deleteNotification(notificationId) {
+  const response = await api.delete(`/api/social/notifications/${notificationId}`);
+  return response.data;
+}
+
 export async function searchPeople(params = {}) {
   const response = await api.get('/api/social/people/search', { params });
   return response.data.people || [];
