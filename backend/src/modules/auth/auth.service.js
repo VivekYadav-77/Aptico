@@ -46,6 +46,12 @@ function createAuthError(message, statusCode, code = null) {
   return error;
 }
 
+function dispatchAuthEmailInBackground(emailPromise, label) {
+  void emailPromise.catch((error) => {
+    console.error(`[authService] Background ${label} email dispatch failed:`, error?.message || error);
+  });
+}
+
 function requireDatabase(db) {
   if (!db) {
     throw createAuthError('Database is not configured yet.', 503);
@@ -651,18 +657,21 @@ export async function requestPasswordReset({ db, email, request = null, userId =
     ttlSeconds: PASSWORD_RESET_TTL_SECONDS
   });
 
-  await sendAuthEmail({
-    type: 'password_reset',
-    email: user.email,
-    name: user.name,
-    link: buildFrontendActionUrl('reset-password', token.rawToken),
-    expiresAt: token.expiresAt.toISOString(),
-    appName: 'Aptico',
-    db,
-    request,
-    userId: userId || user.id,
-    logType
-  });
+  dispatchAuthEmailInBackground(
+    sendAuthEmail({
+      type: 'password_reset',
+      email: user.email,
+      name: user.name,
+      link: buildFrontendActionUrl('reset-password', token.rawToken),
+      expiresAt: token.expiresAt.toISOString(),
+      appName: 'Aptico',
+      db,
+      request,
+      userId: userId || user.id,
+      logType
+    }),
+    logType || 'password_reset'
+  );
 
   return {
     sent: true
