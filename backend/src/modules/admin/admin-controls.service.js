@@ -5,6 +5,7 @@ import {
   analyses,
   applicationLogs,
   communityWins,
+  emailServiceBlocks,
   generatedContent,
   postComments,
   posts,
@@ -186,6 +187,58 @@ export async function inviteUser({ db, request, adminUserId, payload }) {
   });
 
   return created[0];
+}
+
+export async function setEmailServiceBlock({ db, request, adminUserId, payload }) {
+  const email = String(payload.email || '').trim().toLowerCase();
+  const reason = requireReason(payload.reason);
+  const isBlocked = Boolean(payload.isBlocked);
+
+  if (!email || !email.includes('@')) {
+    throw createAdminControlError('A valid email is required.', 400, 'INVALID_EMAIL');
+  }
+
+  if (isBlocked) {
+    assertConfirmationMatches(email, payload.confirmTarget || payload.confirmEmail);
+  }
+
+  const existing = await db
+    .select({ id: emailServiceBlocks.id })
+    .from(emailServiceBlocks)
+    .where(eq(emailServiceBlocks.email, email))
+    .limit(1);
+
+  const values = {
+    email,
+    isBlocked,
+    reason,
+    createdBy: adminUserId || null,
+    updatedAt: new Date()
+  };
+
+  const rows = existing[0]
+    ? await db
+        .update(emailServiceBlocks)
+        .set(values)
+        .where(eq(emailServiceBlocks.id, existing[0].id))
+        .returning()
+    : await db
+        .insert(emailServiceBlocks)
+        .values(values)
+        .returning();
+
+  await writeAdminAudit({
+    db,
+    request,
+    adminUserId,
+    action: isBlocked ? 'block_email_service' : 'unblock_email_service',
+    targetType: 'email',
+    targetId: email,
+    reason,
+    metadata: { email, isBlocked }
+  });
+
+  return rows[0];
 }
 
 export async function editUser({ db, request, adminUserId, userId, payload }) {

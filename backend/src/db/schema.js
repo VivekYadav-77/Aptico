@@ -287,6 +287,24 @@ export const emailDeliveryLogs = pgTable(
   })
 );
 
+export const emailServiceBlocks = pgTable(
+  'email_service_blocks',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    email: text('email').notNull(),
+    isBlocked: boolean('is_blocked').notNull().default(true),
+    reason: text('reason').notNull(),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    emailIdx: uniqueIndex('email_service_blocks_email_idx').on(table.email),
+    activeIdx: index('email_service_blocks_active_idx').on(table.isBlocked),
+    updatedAtIdx: index('email_service_blocks_updated_at_idx').on(table.updatedAt)
+  })
+);
+
 export const visitorSessions = pgTable(
   'visitor_sessions',
   {

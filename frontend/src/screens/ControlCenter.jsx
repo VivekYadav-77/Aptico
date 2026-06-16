@@ -80,6 +80,16 @@ const ADMIN_CONTROL_CENTER_QUERY = `
       createdAt
       deliveredAt
     }
+    emailServiceBlocks(limit: 50, email: $emailSearch) {
+      id
+      email
+      isBlocked
+      reason
+      createdBy
+      createdByEmail
+      createdAt
+      updatedAt
+    }
     adminUsers {
       id
       email
@@ -484,6 +494,7 @@ export default function ControlCenter() {
   const [emailSearch, setEmailSearch] = useState('');
   const [emailType, setEmailType] = useState('');
   const [emailStatus, setEmailStatus] = useState('');
+  const [emailBlockForm, setEmailBlockForm] = useState({ email: '', reason: '', confirmTarget: '' });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -499,6 +510,7 @@ export default function ControlCenter() {
     apiUsageMetrics: [],
     emailUsageMetrics: null,
     emailDeliveryLogs: [],
+    emailServiceBlocks: [],
     adminUsers: [],
     visitorTrends: [],
     topPages: [],
@@ -600,6 +612,7 @@ export default function ControlCenter() {
         apiUsageMetrics: next.apiUsageMetrics || [],
         emailUsageMetrics: next.emailUsageMetrics || null,
         emailDeliveryLogs: next.emailDeliveryLogs || [],
+        emailServiceBlocks: next.emailServiceBlocks || [],
         adminUsers: next.adminUsers || [],
         visitorTrends: next.visitorTrends || [],
         topPages: next.topPages || [],
@@ -756,6 +769,20 @@ export default function ControlCenter() {
         confirmTarget: contentForm.confirmTarget
       });
       return `Content ${action} action completed.`;
+    });
+  }
+
+  async function updateEmailServiceBlock(isBlocked) {
+    await runAdminAction(isBlocked ? 'block-email-service' : 'unblock-email-service', async () => {
+      const email = emailBlockForm.email.trim().toLowerCase();
+      await api.post('/api/admin/email-service/block', {
+        email,
+        isBlocked,
+        reason: emailBlockForm.reason,
+        confirmTarget: isBlocked ? emailBlockForm.confirmTarget : undefined
+      });
+      setEmailBlockForm({ email: '', reason: '', confirmTarget: '' });
+      return isBlocked ? `Email service blocked for ${email}.` : `Email service restored for ${email}.`;
     });
   }
 
@@ -1152,6 +1179,80 @@ export default function ControlCenter() {
                 </article>
               )) : <EmptyState label="No email service logs" detail="Verification, reset, and invite setup emails will appear after the next send." />}
             </div>
+          </section>
+
+          <section className="grid gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <article className="admin-panel">
+              <div className="admin-panel-header">
+                <span className="material-symbols-outlined text-[18px] text-[var(--accent-strong)]">unsubscribe</span>
+                <h2>Email service access</h2>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-[var(--muted-strong)]">
+                Block or restore transactional email delivery for one address. Blocked addresses cannot receive verification, password reset, or invite setup emails.
+              </p>
+              <div className="mt-5 grid gap-3">
+                <input
+                  className="app-input"
+                  value={emailBlockForm.email}
+                  onChange={(event) => setEmailBlockForm((form) => ({ ...form, email: event.target.value }))}
+                  placeholder="Email address"
+                />
+                <textarea
+                  className="app-input min-h-24"
+                  value={emailBlockForm.reason}
+                  onChange={(event) => setEmailBlockForm((form) => ({ ...form, reason: event.target.value }))}
+                  placeholder="Admin reason shown to the user"
+                />
+                <input
+                  className="app-input"
+                  value={emailBlockForm.confirmTarget}
+                  onChange={(event) => setEmailBlockForm((form) => ({ ...form, confirmTarget: event.target.value }))}
+                  placeholder="Type email to confirm block"
+                />
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <button
+                    type="button"
+                    className="app-button-danger flex-1"
+                    onClick={() => updateEmailServiceBlock(true)}
+                    disabled={busyAction === 'block-email-service'}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">block</span>
+                    Block email service
+                  </button>
+                  <button
+                    type="button"
+                    className="app-button-secondary flex-1"
+                    onClick={() => updateEmailServiceBlock(false)}
+                    disabled={busyAction === 'unblock-email-service'}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">mark_email_read</span>
+                    Unblock
+                  </button>
+                </div>
+              </div>
+            </article>
+
+            <article className="admin-panel">
+              <div className="admin-panel-header">
+                <span className="material-symbols-outlined text-[18px] text-[var(--accent-strong)]">rule</span>
+                <h2>Email blocklist</h2>
+              </div>
+              <div className="mt-5 grid gap-3">
+                {data.emailServiceBlocks.length ? data.emailServiceBlocks.map((block) => (
+                  <article key={block.id} className="admin-list-row">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap gap-2">
+                        <StatusBadge value={block.isBlocked ? 'blocked' : 'unblocked'} />
+                        {block.createdByEmail ? <span className="admin-chip truncate">{block.createdByEmail}</span> : null}
+                      </div>
+                      <p className="mt-3 break-words text-sm font-bold text-[var(--text)]">{block.email}</p>
+                      <p className="mt-2 text-xs leading-5 text-[var(--muted-strong)]">{block.reason}</p>
+                    </div>
+                    <time className="admin-time">{formatDate(block.updatedAt)}</time>
+                  </article>
+                )) : <EmptyState label="No blocked email addresses" detail="Blocked and restored email service records will appear here." />}
+              </div>
+            </article>
           </section>
 
           <section>

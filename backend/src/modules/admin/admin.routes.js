@@ -8,6 +8,7 @@ import {
   changeUserStatus,
   editUser,
   inviteUser,
+  setEmailServiceBlock,
   setUserRestrictions
 } from './admin-controls.service.js';
 import { finalizeMonthlyLeaderboard, getLeaderboard } from '../squads/squad-leaderboard.service.js';
@@ -84,6 +85,14 @@ const contentActionSchema = z.object({
   confirmTarget: z.string().trim()
 });
 
+const emailServiceBlockSchema = z.object({
+  email: z.string().trim().email(),
+  isBlocked: z.boolean(),
+  reason: z.string().trim(),
+  confirmTarget: z.string().trim().optional(),
+  confirmEmail: z.string().trim().optional()
+});
+
 function sendAdminError(reply, error, fallbackMessage) {
   const statusCode = error.name === 'ZodError' ? 400 : error.statusCode || 500;
   return reply.code(statusCode).send({
@@ -99,6 +108,26 @@ function wait(durationMs) {
 }
 
 export default async function adminRoutes(app) {
+  app.post('/email-service/block', async (request, reply) => {
+    try {
+      const body = emailServiceBlockSchema.parse(request.body || {});
+      if (!request.server.db) {
+        return reply.code(503).send({ success: false, error: 'Database is not configured yet.' });
+      }
+
+      const block = await setEmailServiceBlock({
+        db: request.server.db,
+        request,
+        adminUserId: request.auth.userId,
+        payload: body
+      });
+
+      return reply.send({ success: true, data: block });
+    } catch (error) {
+      return sendAdminError(reply, error, 'Could not update email service access.');
+    }
+  });
+
   app.post('/users/invite', async (request, reply) => {
     try {
       const body = inviteUserSchema.parse(request.body || {});

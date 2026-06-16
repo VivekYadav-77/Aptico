@@ -3,7 +3,7 @@ import util from 'node:util';
 import jwt from 'jsonwebtoken';
 import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import { env } from '../../config/env.js';
-import { authTokens, refreshTokens, users } from '../../db/schema.js';
+import { authTokens, emailServiceBlocks, refreshTokens, users } from '../../db/schema.js';
 import { ensureUserProfile } from '../profile/profile.service.js';
 import { sendAuthEmail } from '../../shared/services/email.service.js';
 
@@ -166,6 +166,28 @@ function resolveAuthProvider(existingUser, nextProvider) {
   }
 
   return 'hybrid';
+}
+
+async function assertEmailServiceAllowed(db, email) {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (!normalizedEmail) return;
+
+  const [block] = await db
+    .select({
+      reason: emailServiceBlocks.reason
+    })
+    .from(emailServiceBlocks)
+    .where(and(eq(emailServiceBlocks.email, normalizedEmail), eq(emailServiceBlocks.isBlocked, true)))
+    .limit(1);
+
+  if (block) {
+    const reason = block.reason ? ` Reason: ${block.reason}` : '';
+    throw createAuthError(
+      `Email service is currently blocked for this address by an administrator.${reason}`,
+      403,
+      'EMAIL_SERVICE_BLOCKED'
+    );
+  }
 }
 
 function shouldVerifyInvitePasswordSetup(user) {
@@ -467,6 +489,7 @@ export async function registerWithPassword({ db, email, password, name, request 
   requireDatabase(db);
 
   const normalizedEmail = email.trim().toLowerCase();
+  await assertEmailServiceAllowed(db, normalizedEmail);
   const existingUser = await findUserByEmail(db, normalizedEmail);
 
   if (existingUser) {
@@ -561,6 +584,8 @@ export async function sendEmailVerification({ db, email = null, user = null, req
     };
   }
 
+  await assertEmailServiceAllowed(db, targetUser.email);
+
   const token = await createOneTimeToken(db, {
     userId: targetUser.id,
     tokenType: AUTH_TOKEN_TYPES.emailVerification,
@@ -609,7 +634,10 @@ export async function verifyEmailToken({ db, token, request }) {
 export async function requestPasswordReset({ db, email, request = null, userId = null, logType = null }) {
   requireDatabase(db);
 
-  const user = await findUserByEmail(db, email.trim().toLowerCase());
+  const normalizedEmail = email.trim().toLowerCase();
+  await assertEmailServiceAllowed(db, normalizedEmail);
+
+  const user = await findUserByEmail(db, normalizedEmail);
 
   if (!user) {
     return {

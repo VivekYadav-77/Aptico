@@ -7,6 +7,7 @@ import {
   apiUsage,
   communityWins,
   emailDeliveryLogs,
+  emailServiceBlocks,
   generatedContent,
   posts,
   refreshTokens,
@@ -220,6 +221,39 @@ export const resolvers = {
         ...row,
         createdAt: serializeDate(row.createdAt),
         deliveredAt: serializeDate(row.deliveredAt)
+      }));
+    },
+    emailServiceBlocks: async (_source, args, context) => {
+      const db = await requireDb(context);
+      const conditions = [];
+      const emailSearch = String(args.email || '').trim();
+
+      if (emailSearch) conditions.push(ilike(emailServiceBlocks.email, `%${emailSearch}%`));
+
+      const creator = users;
+      const baseQuery = db
+        .select({
+          id: emailServiceBlocks.id,
+          email: emailServiceBlocks.email,
+          isBlocked: emailServiceBlocks.isBlocked,
+          reason: emailServiceBlocks.reason,
+          createdBy: emailServiceBlocks.createdBy,
+          createdByEmail: creator.email,
+          createdAt: emailServiceBlocks.createdAt,
+          updatedAt: emailServiceBlocks.updatedAt
+        })
+        .from(emailServiceBlocks)
+        .leftJoin(creator, eq(emailServiceBlocks.createdBy, creator.id));
+
+      const filteredQuery = conditions.length ? baseQuery.where(and(...conditions)) : baseQuery;
+      const rows = await filteredQuery
+        .orderBy(desc(emailServiceBlocks.updatedAt))
+        .limit(normalizeLimit(args.limit, 50, 100));
+
+      return rows.map((row) => ({
+        ...row,
+        createdAt: serializeDate(row.createdAt),
+        updatedAt: serializeDate(row.updatedAt)
       }));
     },
     adminUsers: async (_source, _args, context) => {

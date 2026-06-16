@@ -56,6 +56,17 @@ export const schema = /* GraphQL */ `
     deliveredAt: String
   }
 
+  type EmailServiceBlock {
+    id: ID!
+    email: String!
+    isBlocked: Boolean!
+    reason: String!
+    createdBy: ID
+    createdByEmail: String
+    createdAt: String!
+    updatedAt: String!
+  }
+
   type AdminUser {
     id: ID!
     email: String!
@@ -162,6 +173,7 @@ export const schema = /* GraphQL */ `
     apiUsageMetrics: [ApiUsageMetric!]!
     emailUsageMetrics: EmailUsageMetrics!
     emailDeliveryLogs(limit: Int = 50, email: String, emailType: String, status: String): [EmailDeliveryLog!]!
+    emailServiceBlocks(limit: Int = 50, email: String): [EmailServiceBlock!]!
     adminUsers: [AdminUser!]!
     visitorTrends(days: Int = 14): [AdminTrendPoint!]!
     topPages(limit: Int = 10): [AdminBreakdown!]!
