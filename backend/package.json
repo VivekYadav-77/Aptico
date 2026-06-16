@@ -13,7 +13,8 @@
     "db:migrate:social-scheduling": "node scripts/migrations/apply-social-scheduling-migration.js",
     "db:migrate:admin-notifications": "node scripts/migrations/apply-admin-notifications-migration.js",
     "db:migrate:email-logs": "node scripts/migrations/apply-email-delivery-logs-migration.js",
-    "db:migrate:email-blocks": "node scripts/migrations/apply-email-service-blocks-migration.js"
+    "db:migrate:email-blocks": "node scripts/migrations/apply-email-service-blocks-migration.js",
+    "db:migrate:support": "node scripts/migrations/apply-support-tickets-migration.js"
   },
   "dependencies": {
     "@fastify/helmet": "^13.0.2",

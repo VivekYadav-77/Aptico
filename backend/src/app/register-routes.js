@@ -14,6 +14,7 @@ import rejectionRoutes from '../modules/rejections/rejections.routes.js';
 import shadowResumeRoutes from '../modules/shadow-resume/shadow-resume.routes.js';
 import socialRoutes from '../modules/social/social.routes.js';
 import squadRoutes from '../modules/squads/squads.routes.js';
+import supportRoutes from '../modules/support/support.routes.js';
 import { authenticateAdminRequest } from '../shared/middleware/auth.middleware.js';
 
 const require = createRequire(import.meta.url);
@@ -32,6 +33,7 @@ export function registerRoutes(app) {
   app.register(rejectionRoutes, { prefix: '/api' });
   app.register(shadowResumeRoutes, { prefix: '/api/shadow-resume' });
   app.register(squadRoutes, { prefix: '/api/squads' });
+  app.register(supportRoutes, { prefix: '/api/support' });
   app.register(badgeRoutes, { prefix: '/api/badge' });
 
   app.register(async function adminScope(adminApp) {

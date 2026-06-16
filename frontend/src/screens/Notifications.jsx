@@ -5,7 +5,7 @@ import { deleteNotification, getNotifications, markNotificationsRead } from '../
 const socialTypes = ['new_follower', 'new_connection_request', 'connection_accepted', 'post_like', 'post_comment'];
 const careerTypes = ['job_match_alert'];
 const squadTypes = ['squad_ping', 'squad_goal_reached', 'squad_synergy_burst'];
-const adminTypes = ['admin_restriction_update', 'admin_account_status'];
+const adminTypes = ['admin_restriction_update', 'admin_account_status', 'support_ticket_reply', 'support_ticket_status'];
 const typeOptions = ['', ...socialTypes, ...careerTypes, ...squadTypes, ...adminTypes];
 
 function initials(name) {

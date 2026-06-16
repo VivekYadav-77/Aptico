@@ -12,6 +12,7 @@ const SECTIONS = [
   { id: 'people', label: 'People', icon: 'group', description: 'Users and access' },
   { id: 'activity', label: 'Activity', icon: 'monitoring', description: 'Visits and events' },
   { id: 'moderation', label: 'Moderation', icon: 'shield_person', description: 'Content review' },
+  { id: 'support', label: 'Support', icon: 'support_agent', description: 'User tickets' },
   { id: 'security', label: 'Security', icon: 'security', description: 'Risk signals' },
   { id: 'system', label: 'System', icon: 'dns', description: 'API health' },
   { id: 'audit', label: 'Audit', icon: 'receipt_long', description: 'Admin trail' }
@@ -24,9 +25,12 @@ const CONTENT_TYPES = ['post', 'comment', 'community_win'];
 const EVENT_TYPES = ['', 'page_view', 'signup', 'login', 'logout', 'analysis_created', 'job_saved', 'application_logged', 'rejection_logged', 'post_created', 'comment_created', 'squad_joined', 'admin_action', 'api_error'];
 const EMAIL_TYPES = ['', 'email_verification', 'password_reset', 'admin_invite_setup'];
 const EMAIL_STATUSES = ['', 'pending', 'sent', 'failed'];
+const SUPPORT_CATEGORIES = ['', 'account_restriction', 'feature_restriction_appeal', 'email_access', 'job_search', 'analysis', 'squad_community', 'bug_report', 'feedback', 'other'];
+const SUPPORT_STATUSES = ['', 'open', 'pending_admin', 'waiting_user', 'resolved', 'closed'];
+const SUPPORT_PRIORITIES = ['', 'low', 'normal', 'high', 'urgent'];
 
 const ADMIN_CONTROL_CENTER_QUERY = `
-  query AdminControlCenter($eventType: String, $selectedUserId: ID!, $contentType: String!, $contentSearch: String, $emailSearch: String, $emailType: String, $emailStatus: String) {
+  query AdminControlCenter($eventType: String, $selectedUserId: ID!, $contentType: String!, $contentSearch: String, $emailSearch: String, $emailType: String, $emailStatus: String, $supportTicketId: ID!, $supportStatus: String, $supportCategory: String, $supportPriority: String, $supportSearch: String) {
     adminOverview {
       totalUsers
       totalAnalyses
@@ -135,6 +139,12 @@ const ADMIN_CONTROL_CENTER_QUERY = `
     }
     suspiciousSignals {
       label severity detail count lastSeenAt
+    }
+    adminSupportTickets(status: $supportStatus, category: $supportCategory, priority: $supportPriority, search: $supportSearch, limit: 50) {
+      id userId userEmail userName category subject message status priority relatedFeature createdAt updatedAt lastAdminReplyAt lastUserReplyAt
+    }
+    adminSupportMessages(ticketId: $supportTicketId, limit: 100) {
+      id ticketId senderUserId senderRole senderEmail senderName message createdAt
     }
   }
 `;
@@ -495,6 +505,13 @@ export default function ControlCenter() {
   const [emailType, setEmailType] = useState('');
   const [emailStatus, setEmailStatus] = useState('');
   const [emailBlockForm, setEmailBlockForm] = useState({ email: '', reason: '', confirmTarget: '' });
+  const [supportStatus, setSupportStatus] = useState('');
+  const [supportCategory, setSupportCategory] = useState('');
+  const [supportPriority, setSupportPriority] = useState('');
+  const [supportSearch, setSupportSearch] = useState('');
+  const [selectedSupportTicketId, setSelectedSupportTicketId] = useState('');
+  const [supportReply, setSupportReply] = useState('');
+  const [supportUpdateForm, setSupportUpdateForm] = useState({ status: 'open', priority: 'normal', reason: '' });
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -523,7 +540,9 @@ export default function ControlCenter() {
     adminRestrictions: [],
     adminModerationQueue: [],
     adminModerationActions: [],
-    suspiciousSignals: []
+    suspiciousSignals: [],
+    adminSupportTickets: [],
+    adminSupportMessages: []
   });
 
   useEffect(() => {
@@ -535,6 +554,21 @@ export default function ControlCenter() {
     () => data.adminUsers.find((user) => user.id === selectedUserId) || data.adminUsers[0] || null,
     [data.adminUsers, selectedUserId]
   );
+
+  const selectedSupportTicket = useMemo(
+    () => data.adminSupportTickets.find((ticket) => ticket.id === selectedSupportTicketId) || data.adminSupportTickets[0] || null,
+    [data.adminSupportTickets, selectedSupportTicketId]
+  );
+
+  useEffect(() => {
+    if (!selectedSupportTicket) return;
+    setSupportUpdateForm((current) => ({
+      ...current,
+      status: selectedSupportTicket.status || 'open',
+      priority: selectedSupportTicket.priority || 'normal',
+      reason: ''
+    }));
+  }, [selectedSupportTicket?.id]);
 
   useEffect(() => {
     if (!selectedUser) return;
@@ -591,8 +625,13 @@ export default function ControlCenter() {
     contentSearch: contentSearch.trim() || null,
     emailSearch: emailSearch.trim() || null,
     emailType: emailType || null,
-    emailStatus: emailStatus || null
-  }), [eventType, selectedUser?.id, contentType, contentSearch, emailSearch, emailType, emailStatus]);
+    emailStatus: emailStatus || null,
+    supportTicketId: selectedSupportTicket?.id || '00000000-0000-0000-0000-000000000000',
+    supportStatus: supportStatus || null,
+    supportCategory: supportCategory || null,
+    supportPriority: supportPriority || null,
+    supportSearch: supportSearch.trim() || null
+  }), [eventType, selectedUser?.id, contentType, contentSearch, emailSearch, emailType, emailStatus, selectedSupportTicket?.id, supportStatus, supportCategory, supportPriority, supportSearch]);
 
   async function loadDashboard({ silent = false, authRetried = false } = {}) {
     if (!isAuthorized) {
@@ -625,7 +664,9 @@ export default function ControlCenter() {
         adminRestrictions: next.adminRestrictions || [],
         adminModerationQueue: next.adminModerationQueue || [],
         adminModerationActions: next.adminModerationActions || [],
-        suspiciousSignals: next.suspiciousSignals || []
+        suspiciousSignals: next.suspiciousSignals || [],
+        adminSupportTickets: next.adminSupportTickets || [],
+        adminSupportMessages: next.adminSupportMessages || []
       });
     } catch (requestError) {
       const status = requestError.response?.status;
@@ -783,6 +824,25 @@ export default function ControlCenter() {
       });
       setEmailBlockForm({ email: '', reason: '', confirmTarget: '' });
       return isBlocked ? `Email service blocked for ${email}.` : `Email service restored for ${email}.`;
+    });
+  }
+
+  async function replyToSupportTicket() {
+    if (!selectedSupportTicket) return;
+    await runAdminAction('support-reply', async () => {
+      await api.post(`/api/admin/support/${selectedSupportTicket.id}/reply`, {
+        message: supportReply
+      });
+      setSupportReply('');
+      return 'Support reply sent and user notified.';
+    });
+  }
+
+  async function updateSupportTicket() {
+    if (!selectedSupportTicket) return;
+    await runAdminAction('support-update', async () => {
+      await api.patch(`/api/admin/support/${selectedSupportTicket.id}`, supportUpdateForm);
+      return 'Support ticket updated.';
     });
   }
 
@@ -1065,6 +1125,100 @@ export default function ControlCenter() {
                 Hide/unhide is preferred for public content. Delete is reserved for content types where the backend already supports safe removal.
               </div>
             </div>
+          </aside>
+        </div>
+      ) : null}
+
+      {!isLoading && activeSection === 'support' ? (
+        <div className="admin-workspace">
+          <main className="admin-panel">
+            <div className="admin-toolbar">
+              <div>
+                <p className="admin-eyebrow">Support queue</p>
+                <h2 className="text-xl font-black text-[var(--text)]">User support tickets</h2>
+              </div>
+              <div className="grid w-full gap-2 md:w-auto md:grid-cols-4">
+                <select className="app-input" value={supportStatus} onChange={(event) => setSupportStatus(event.target.value)}>
+                  {SUPPORT_STATUSES.map((status) => <option key={status || 'all'} value={status}>{status ? humanize(status) : 'All status'}</option>)}
+                </select>
+                <select className="app-input" value={supportPriority} onChange={(event) => setSupportPriority(event.target.value)}>
+                  {SUPPORT_PRIORITIES.map((priority) => <option key={priority || 'all'} value={priority}>{priority ? humanize(priority) : 'All priority'}</option>)}
+                </select>
+                <select className="app-input" value={supportCategory} onChange={(event) => setSupportCategory(event.target.value)}>
+                  {SUPPORT_CATEGORIES.map((category) => <option key={category || 'all'} value={category}>{category ? humanize(category) : 'All category'}</option>)}
+                </select>
+                <input className="app-input" value={supportSearch} onChange={(event) => setSupportSearch(event.target.value)} placeholder="Search tickets" />
+              </div>
+            </div>
+            <div className="mt-5 grid gap-3">
+              {data.adminSupportTickets.length ? data.adminSupportTickets.map((ticket) => (
+                <button
+                  key={ticket.id}
+                  type="button"
+                  onClick={() => setSelectedSupportTicketId(ticket.id)}
+                  className={`admin-list-row text-left transition ${selectedSupportTicket?.id === ticket.id ? 'border-[var(--accent)] bg-[var(--accent-soft)]' : ''}`}
+                >
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap gap-2">
+                      <StatusBadge value={ticket.status} />
+                      <StatusBadge value={ticket.priority} tone={ticket.priority === 'urgent' || ticket.priority === 'high' ? 'danger' : 'neutral'} />
+                      <StatusBadge value={ticket.category} tone="info" />
+                      {ticket.userEmail ? <span className="admin-chip truncate">{ticket.userEmail}</span> : null}
+                    </div>
+                    <p className="mt-3 text-sm font-black text-[var(--text)]">{ticket.subject}</p>
+                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--muted-strong)]">{ticket.message}</p>
+                  </div>
+                  <time className="admin-time">{formatDate(ticket.updatedAt)}</time>
+                </button>
+              )) : <EmptyState label="No support tickets" detail="Tickets from users will appear here." />}
+            </div>
+          </main>
+
+          <aside className="admin-detail-panel">
+            {selectedSupportTicket ? (
+              <>
+                <div className="flex flex-wrap gap-2">
+                  <StatusBadge value={selectedSupportTicket.status} />
+                  <StatusBadge value={selectedSupportTicket.priority} />
+                </div>
+                <h2 className="mt-3 text-xl font-black text-[var(--text)]">{selectedSupportTicket.subject}</h2>
+                <p className="mt-2 text-sm text-[var(--muted-strong)]">{selectedSupportTicket.userEmail || 'Unknown user'}</p>
+                <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-[var(--text)]">{selectedSupportTicket.message}</p>
+
+                <div className="mt-6 grid gap-3">
+                  <p className="admin-eyebrow">Conversation</p>
+                  {data.adminSupportMessages.length ? data.adminSupportMessages.map((item) => (
+                    <article key={item.id} className={`rounded-lg border p-3 ${item.senderRole === 'admin' ? 'border-emerald-500/25 bg-emerald-500/10' : 'border-[var(--border)] bg-[var(--panel-soft)]'}`}>
+                      <div className="flex flex-wrap justify-between gap-2">
+                        <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--muted)]">{item.senderRole === 'admin' ? 'Admin' : item.senderEmail || 'User'}</p>
+                        <time className="text-xs font-semibold text-[var(--muted-strong)]">{formatDate(item.createdAt)}</time>
+                      </div>
+                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--text)]">{item.message}</p>
+                    </article>
+                  )) : <EmptyState label="No messages loaded" />}
+                </div>
+
+                <div className="mt-6 grid gap-3">
+                  <p className="admin-eyebrow">Reply</p>
+                  <textarea className="app-input min-h-28" value={supportReply} onChange={(event) => setSupportReply(event.target.value)} placeholder="Write an admin reply" />
+                  <button type="button" className="app-button w-fit" onClick={replyToSupportTicket} disabled={busyAction === 'support-reply'}>Send reply</button>
+                </div>
+
+                <div className="mt-6 grid gap-3">
+                  <p className="admin-eyebrow">Status control</p>
+                  <select className="app-input" value={supportUpdateForm.status} onChange={(event) => setSupportUpdateForm((form) => ({ ...form, status: event.target.value }))}>
+                    {SUPPORT_STATUSES.filter(Boolean).map((status) => <option key={status} value={status}>{humanize(status)}</option>)}
+                  </select>
+                  <select className="app-input" value={supportUpdateForm.priority} onChange={(event) => setSupportUpdateForm((form) => ({ ...form, priority: event.target.value }))}>
+                    {SUPPORT_PRIORITIES.filter(Boolean).map((priority) => <option key={priority} value={priority}>{humanize(priority)}</option>)}
+                  </select>
+                  <textarea className="app-input min-h-20" value={supportUpdateForm.reason} onChange={(event) => setSupportUpdateForm((form) => ({ ...form, reason: event.target.value }))} placeholder="Admin reason for ticket update" />
+                  <button type="button" className="app-button-secondary w-fit" onClick={updateSupportTicket} disabled={busyAction === 'support-update'}>Apply update</button>
+                </div>
+              </>
+            ) : (
+              <EmptyState label="Select a ticket" detail="Open a support ticket to reply or update its status." />
+            )}
           </aside>
         </div>
       ) : null}

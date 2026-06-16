@@ -1,7 +1,8 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
-import { refreshTokens } from '../../db/schema.js';
+import { refreshTokens, supportTicketMessages, supportTickets } from '../../db/schema.js';
 import { cleanupOldAnalyticsEvents, recordAdminAuditLog } from '../analytics/analytics.service.js';
+import { createNotification } from '../../shared/utils/notification-helper.js';
 import {
   applyContentAction,
   changeUserRole,
@@ -85,6 +86,20 @@ const contentActionSchema = z.object({
   confirmTarget: z.string().trim()
 });
 
+const supportParamsSchema = z.object({
+  ticketId: z.string().uuid()
+});
+
+const supportReplySchema = z.object({
+  message: z.string().trim().min(2).max(4000)
+});
+
+const supportUpdateSchema = z.object({
+  status: z.enum(['open', 'pending_admin', 'waiting_user', 'resolved', 'closed']).optional(),
+  priority: z.enum(['low', 'normal', 'high', 'urgent']).optional(),
+  reason: z.string().trim().min(6).max(1000)
+});
+
 const emailServiceBlockSchema = z.object({
   email: z.string().trim().email(),
   isBlocked: z.boolean(),
@@ -108,6 +123,121 @@ function wait(durationMs) {
 }
 
 export default async function adminRoutes(app) {
+  app.post('/support/:ticketId/reply', async (request, reply) => {
+    try {
+      const { ticketId } = supportParamsSchema.parse(request.params || {});
+      const body = supportReplySchema.parse(request.body || {});
+      const db = request.server.db;
+
+      if (!db) {
+        return reply.code(503).send({ success: false, error: 'Database is not configured yet.' });
+      }
+
+      const [ticket] = await db.select().from(supportTickets).where(eq(supportTickets.id, ticketId)).limit(1);
+      if (!ticket) {
+        return reply.code(404).send({ success: false, error: 'Support ticket was not found.' });
+      }
+
+      const [message] = await db
+        .insert(supportTicketMessages)
+        .values({
+          ticketId,
+          senderUserId: request.auth.userId,
+          senderRole: 'admin',
+          message: body.message
+        })
+        .returning();
+
+      await db
+        .update(supportTickets)
+        .set({
+          status: 'waiting_user',
+          updatedAt: new Date(),
+          lastAdminReplyAt: new Date()
+        })
+        .where(eq(supportTickets.id, ticketId));
+
+      createNotification(db, {
+        userId: ticket.userId,
+        type: 'support_ticket_reply',
+        actorId: request.auth.userId,
+        entityId: ticket.id,
+        entityType: 'support_ticket',
+        message: `Admin replied to your support ticket: ${ticket.subject}`
+      });
+
+      await recordAdminAuditLog({
+        db,
+        request,
+        adminUserId: request.auth.userId,
+        action: 'support_ticket_reply',
+        targetType: 'support_ticket',
+        targetId: ticket.id,
+        metadata: { subject: ticket.subject }
+      });
+
+      return reply.code(201).send({ success: true, data: message });
+    } catch (error) {
+      return sendAdminError(reply, error, 'Could not reply to support ticket.');
+    }
+  });
+
+  app.patch('/support/:ticketId', async (request, reply) => {
+    try {
+      const { ticketId } = supportParamsSchema.parse(request.params || {});
+      const body = supportUpdateSchema.parse(request.body || {});
+      const db = request.server.db;
+
+      if (!db) {
+        return reply.code(503).send({ success: false, error: 'Database is not configured yet.' });
+      }
+
+      const [ticket] = await db.select().from(supportTickets).where(eq(supportTickets.id, ticketId)).limit(1);
+      if (!ticket) {
+        return reply.code(404).send({ success: false, error: 'Support ticket was not found.' });
+      }
+
+      const updates = { updatedAt: new Date() };
+      if (body.status) updates.status = body.status;
+      if (body.priority) updates.priority = body.priority;
+
+      const [updated] = await db
+        .update(supportTickets)
+        .set(updates)
+        .where(eq(supportTickets.id, ticketId))
+        .returning();
+
+      if (body.status && body.status !== ticket.status) {
+        createNotification(db, {
+          userId: ticket.userId,
+          type: 'support_ticket_status',
+          actorId: request.auth.userId,
+          entityId: ticket.id,
+          entityType: 'support_ticket',
+          message: `Your support ticket "${ticket.subject}" is now ${body.status.replaceAll('_', ' ')}.`
+        });
+      }
+
+      await recordAdminAuditLog({
+        db,
+        request,
+        adminUserId: request.auth.userId,
+        action: 'support_ticket_update',
+        targetType: 'support_ticket',
+        targetId: ticket.id,
+        metadata: {
+          reason: body.reason,
+          status: body.status || ticket.status,
+          priority: body.priority || ticket.priority
+        }
+      });
+
+      return reply.send({ success: true, data: updated });
+    } catch (error) {
+      return sendAdminError(reply, error, 'Could not update support ticket.');
+    }
+  });
+
   app.post('/email-service/block', async (request, reply) => {
     try {
       const body = emailServiceBlockSchema.parse(request.body || {});

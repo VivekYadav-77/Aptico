@@ -111,7 +111,7 @@ const notificationTypeGroups = {
   social: ['new_follower', 'new_connection_request', 'connection_accepted', 'post_like', 'post_comment'],
   career: ['job_match_alert'],
   squad: ['squad_ping', 'squad_goal_reached', 'squad_synergy_burst'],
-  admin: ['admin_restriction_update', 'admin_account_status']
+  admin: ['admin_restriction_update', 'admin_account_status', 'support_ticket_reply', 'support_ticket_status']
 };
 
 const socialWriteRateLimit = {

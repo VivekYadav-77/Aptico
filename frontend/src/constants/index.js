@@ -31,6 +31,7 @@ export const NAV_ITEMS = [
   { to: '/saved-jobs', label: 'Saved Jobs', icon: 'bookmark', description: 'View and manage your bookmarked roles' },
   { to: '/analysis-history', label: 'Analysis History', icon: 'history', description: 'Review your past resume analyses' },
   { to: '/docs', label: 'Docs', icon: 'menu_book', description: 'Platform guides and feature documentation' },
+  { to: '/support', label: 'Support', icon: 'support_agent', description: 'Contact admin support for account and platform issues' },
   { to: '/profile', label: 'Profile', icon: 'person', description: 'Edit your professional profile' },
   { to: '/settings', label: 'Settings', icon: 'settings', description: 'Account, career, and theme settings' },
 ];
@@ -61,6 +62,8 @@ export const SEARCHABLE_INSIGHTS = [
   { label: 'High pay job search', icon: 'payments', to: '/jobs', category: 'Job Search' },
   { label: 'Verified listings only', icon: 'verified', to: '/jobs', category: 'Job Search' },
   { label: 'Read platform docs', icon: 'menu_book', to: '/docs', category: 'Docs' },
+  { label: 'Contact admin support', icon: 'support_agent', to: '/support', category: 'Support' },
+  { label: 'Appeal account restriction', icon: 'gavel', to: '/support', category: 'Support' },
   { label: 'Learn resume analysis', icon: 'analytics', to: '/docs/resume-analysis', category: 'Docs' },
   { label: 'Learn anonymous squads', icon: 'groups', to: '/docs/anonymous-squads', category: 'Docs' },
   { label: 'Understand dashboard widgets', icon: 'dashboard', to: '/docs/command-center-dashboard', category: 'Docs' },

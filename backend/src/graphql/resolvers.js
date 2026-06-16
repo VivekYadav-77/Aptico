@@ -12,6 +12,8 @@ import {
   posts,
   refreshTokens,
   savedJobs,
+  supportTicketMessages,
+  supportTickets,
   users,
   visitorSessions
 } from '../db/schema.js';
@@ -562,6 +564,77 @@ export const resolvers = {
       }
 
       return signals;
+    },
+    adminSupportTickets: async (_source, args, context) => {
+      const db = await requireDb(context);
+      const conditions = [];
+      const search = String(args.search || '').trim();
+
+      if (args.status) conditions.push(eq(supportTickets.status, args.status));
+      if (args.category) conditions.push(eq(supportTickets.category, args.category));
+      if (args.priority) conditions.push(eq(supportTickets.priority, args.priority));
+      if (search) {
+        conditions.push(
+          sql`(${supportTickets.subject} ilike ${`%${search}%`} or ${supportTickets.message} ilike ${`%${search}%`} or ${users.email} ilike ${`%${search}%`})`
+        );
+      }
+
+      const baseQuery = db
+        .select({
+          id: supportTickets.id,
+          userId: supportTickets.userId,
+          userEmail: users.email,
+          userName: users.name,
+          category: supportTickets.category,
+          subject: supportTickets.subject,
+          message: supportTickets.message,
+          status: supportTickets.status,
+          priority: supportTickets.priority,
+          relatedFeature: supportTickets.relatedFeature,
+          createdAt: supportTickets.createdAt,
+          updatedAt: supportTickets.updatedAt,
+          lastAdminReplyAt: supportTickets.lastAdminReplyAt,
+          lastUserReplyAt: supportTickets.lastUserReplyAt
+        })
+        .from(supportTickets)
+        .leftJoin(users, eq(supportTickets.userId, users.id));
+
+      const filteredQuery = conditions.length ? baseQuery.where(and(...conditions)) : baseQuery;
+      const rows = await filteredQuery
+        .orderBy(desc(supportTickets.updatedAt))
+        .limit(normalizeLimit(args.limit, 50, 100));
+
+      return rows.map((row) => ({
+        ...row,
+        createdAt: serializeDate(row.createdAt),
+        updatedAt: serializeDate(row.updatedAt),
+        lastAdminReplyAt: serializeDate(row.lastAdminReplyAt),
+        lastUserReplyAt: serializeDate(row.lastUserReplyAt)
+      }));
+    },
+    adminSupportMessages: async (_source, args, context) => {
+      const db = await requireDb(context);
+      const rows = await db
+        .select({
+          id: supportTicketMessages.id,
+          ticketId: supportTicketMessages.ticketId,
+          senderUserId: supportTicketMessages.senderUserId,
+          senderRole: supportTicketMessages.senderRole,
+          senderEmail: users.email,
+          senderName: users.name,
+          message: supportTicketMessages.message,
+          createdAt: supportTicketMessages.createdAt
+        })
+        .from(supportTicketMessages)
+        .leftJoin(users, eq(supportTicketMessages.senderUserId, users.id))
+        .where(eq(supportTicketMessages.ticketId, args.ticketId))
+        .orderBy(supportTicketMessages.createdAt)
+        .limit(normalizeLimit(args.limit, 100, 200));
+
+      return rows.map((row) => ({
+        ...row,
+        createdAt: serializeDate(row.createdAt)
+      }));
     }
   }
 };

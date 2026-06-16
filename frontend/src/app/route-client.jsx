@@ -29,6 +29,7 @@ import SettingsPage from '../screens/SettingsPage.jsx';
 import ShadowResume from '../screens/ShadowResume.jsx';
 import SquadDashboard from '../screens/SquadDashboard.jsx';
 import SquadLeaderboardPage from '../screens/SquadLeaderboardPage.jsx';
+import SupportCenter from '../screens/SupportCenter.jsx';
 import LegalPage from '../screens/LegalPage.jsx';
 import { selectAuth } from '../store/authSlice.js';
 import { trackEvent } from '../api/analyticsApi.js';
@@ -59,6 +60,7 @@ const routes = {
   shadowResume: ShadowResume,
   squadLeaderboard: SquadLeaderboardPage,
   squads: SquadDashboard,
+  support: SupportCenter,
   legal: LegalPage
 };
 

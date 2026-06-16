@@ -168,6 +168,34 @@ export const schema = /* GraphQL */ `
     lastSeenAt: String
   }
 
+  type AdminSupportTicket {
+    id: ID!
+    userId: ID!
+    userEmail: String
+    userName: String
+    category: String!
+    subject: String!
+    message: String!
+    status: String!
+    priority: String!
+    relatedFeature: String
+    createdAt: String!
+    updatedAt: String!
+    lastAdminReplyAt: String
+    lastUserReplyAt: String
+  }
+
+  type AdminSupportMessage {
+    id: ID!
+    ticketId: ID!
+    senderUserId: ID
+    senderRole: String!
+    senderEmail: String
+    senderName: String
+    message: String!
+    createdAt: String!
+  }
+
   type Query {
     adminOverview: AdminOverview!
     apiUsageMetrics: [ApiUsageMetric!]!
@@ -187,6 +215,8 @@ export const schema = /* GraphQL */ `
     adminModerationQueue(contentType: String = "post", limit: Int = 40, search: String): [AdminModerationItem!]!
     adminModerationActions(limit: Int = 40): [AdminModerationAction!]!
     suspiciousSignals: [AdminSuspiciousSignal!]!
+    adminSupportTickets(status: String, category: String, priority: String, search: String, limit: Int = 50): [AdminSupportTicket!]!
+    adminSupportMessages(ticketId: ID!, limit: Int = 100): [AdminSupportMessage!]!
   }
 `;
 

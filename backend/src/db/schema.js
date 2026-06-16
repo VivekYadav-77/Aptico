@@ -604,8 +604,53 @@ export const notifications = pgTable(
     userReadCreatedAtIdx: index('notifications_user_id_is_read_created_at_idx').on(table.userId, table.isRead, table.createdAt),
     typeCheck: check(
       'notifications_type_check',
-      sql`${table.type} in ('new_follower', 'new_connection_request', 'connection_accepted', 'post_like', 'post_comment', 'job_match_alert', 'squad_ping', 'squad_goal_reached', 'squad_synergy_burst', 'admin_restriction_update', 'admin_account_status')`
+      sql`${table.type} in ('new_follower', 'new_connection_request', 'connection_accepted', 'post_like', 'post_comment', 'job_match_alert', 'squad_ping', 'squad_goal_reached', 'squad_synergy_burst', 'admin_restriction_update', 'admin_account_status', 'support_ticket_reply', 'support_ticket_status')`
     )
+  })
+);
+
+export const supportTickets = pgTable(
+  'support_tickets',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    category: varchar('category', { length: 80 }).notNull(),
+    subject: varchar('subject', { length: 160 }).notNull(),
+    message: text('message').notNull(),
+    status: varchar('status', { length: 40 }).notNull().default('open'),
+    priority: varchar('priority', { length: 30 }).notNull().default('normal'),
+    relatedFeature: varchar('related_feature', { length: 100 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+    lastAdminReplyAt: timestamp('last_admin_reply_at', { withTimezone: true }),
+    lastUserReplyAt: timestamp('last_user_reply_at', { withTimezone: true })
+  },
+  (table) => ({
+    userStatusUpdatedIdx: index('support_tickets_user_status_updated_idx').on(table.userId, table.status, table.updatedAt),
+    statusPriorityUpdatedIdx: index('support_tickets_status_priority_updated_idx').on(table.status, table.priority, table.updatedAt),
+    categoryUpdatedIdx: index('support_tickets_category_updated_idx').on(table.category, table.updatedAt),
+    statusCheck: check('support_tickets_status_check', sql`${table.status} in ('open', 'pending_admin', 'waiting_user', 'resolved', 'closed')`),
+    priorityCheck: check('support_tickets_priority_check', sql`${table.priority} in ('low', 'normal', 'high', 'urgent')`)
+  })
+);
+
+export const supportTicketMessages = pgTable(
+  'support_ticket_messages',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    ticketId: uuid('ticket_id')
+      .notNull()
+      .references(() => supportTickets.id, { onDelete: 'cascade' }),
+    senderUserId: uuid('sender_user_id').references(() => users.id, { onDelete: 'set null' }),
+    senderRole: varchar('sender_role', { length: 20 }).notNull(),
+    message: text('message').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    ticketCreatedIdx: index('support_ticket_messages_ticket_created_idx').on(table.ticketId, table.createdAt),
+    senderRoleCheck: check('support_ticket_messages_sender_role_check', sql`${table.senderRole} in ('user', 'admin')`)
   })
 );
 
