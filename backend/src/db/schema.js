@@ -260,6 +260,33 @@ export const apiUsage = pgTable(
   })
 );
 
+export const emailDeliveryLogs = pgTable(
+  'email_delivery_logs',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    email: text('email').notNull(),
+    emailType: varchar('email_type', { length: 60 }).notNull(),
+    provider: varchar('provider', { length: 60 }).notNull().default('google_apps_script'),
+    status: varchar('status', { length: 30 }).notNull().default('pending'),
+    subject: text('subject'),
+    country: varchar('country', { length: 80 }),
+    region: varchar('region', { length: 120 }),
+    city: varchar('city', { length: 120 }),
+    errorCode: varchar('error_code', { length: 80 }),
+    errorMessage: text('error_message'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    deliveredAt: timestamp('delivered_at', { withTimezone: true })
+  },
+  (table) => ({
+    createdAtIdx: index('email_delivery_logs_created_at_idx').on(table.createdAt),
+    emailCreatedAtIdx: index('email_delivery_logs_email_created_at_idx').on(table.email, table.createdAt),
+    userCreatedAtIdx: index('email_delivery_logs_user_created_at_idx').on(table.userId, table.createdAt),
+    typeCreatedAtIdx: index('email_delivery_logs_type_created_at_idx').on(table.emailType, table.createdAt),
+    statusCreatedAtIdx: index('email_delivery_logs_status_created_at_idx').on(table.status, table.createdAt)
+  })
+);
+
 export const visitorSessions = pgTable(
   'visitor_sessions',
   {

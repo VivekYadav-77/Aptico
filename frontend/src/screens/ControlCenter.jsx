@@ -22,9 +22,11 @@ const STATUSES = ['active', 'restricted', 'blocked', 'deactivated'];
 const ROLES = ['user', 'admin'];
 const CONTENT_TYPES = ['post', 'comment', 'community_win'];
 const EVENT_TYPES = ['', 'page_view', 'signup', 'login', 'logout', 'analysis_created', 'job_saved', 'application_logged', 'rejection_logged', 'post_created', 'comment_created', 'squad_joined', 'admin_action', 'api_error'];
+const EMAIL_TYPES = ['', 'email_verification', 'password_reset', 'admin_invite_setup'];
+const EMAIL_STATUSES = ['', 'pending', 'sent', 'failed'];
 
 const ADMIN_CONTROL_CENTER_QUERY = `
-  query AdminControlCenter($eventType: String, $selectedUserId: ID!, $contentType: String!, $contentSearch: String) {
+  query AdminControlCenter($eventType: String, $selectedUserId: ID!, $contentType: String!, $contentSearch: String, $emailSearch: String, $emailType: String, $emailStatus: String) {
     adminOverview {
       totalUsers
       totalAnalyses
@@ -51,6 +53,32 @@ const ADMIN_CONTROL_CENTER_QUERY = `
       date
       requestCount
       last429At
+    }
+    emailUsageMetrics {
+      total
+      sent
+      failed
+      pending
+      failedLast24h
+      lastSentAt
+    }
+    emailDeliveryLogs(limit: 50, email: $emailSearch, emailType: $emailType, status: $emailStatus) {
+      id
+      userId
+      userEmail
+      userName
+      email
+      emailType
+      provider
+      status
+      subject
+      country
+      region
+      city
+      errorCode
+      errorMessage
+      createdAt
+      deliveredAt
     }
     adminUsers {
       id
@@ -119,6 +147,10 @@ function humanize(value) {
   return String(value || '').replaceAll('_', ' ');
 }
 
+function formatLocation(item) {
+  return [item.city, item.region, item.country].filter(Boolean).join(', ') || 'Unknown';
+}
+
 function AdminFeedbackToast({ message, error, onDismiss }) {
   const text = error || message;
   if (!text) return null;
@@ -169,9 +201,9 @@ function AdminFeedbackToast({ message, error, onDismiss }) {
 }
 
 function toneForStatus(status) {
-  if (status === 'blocked' || status === 'delete' || status === 'critical' || status === 'high') return 'danger';
-  if (status === 'restricted' || status === 'hidden' || status === 'watch' || status === 'medium') return 'warning';
-  if (status === 'active' || status === 'visible' || status === 'healthy') return 'success';
+  if (status === 'blocked' || status === 'delete' || status === 'critical' || status === 'high' || status === 'failed') return 'danger';
+  if (status === 'restricted' || status === 'hidden' || status === 'watch' || status === 'medium' || status === 'pending') return 'warning';
+  if (status === 'active' || status === 'visible' || status === 'healthy' || status === 'sent') return 'success';
   return 'neutral';
 }
 
@@ -449,6 +481,9 @@ export default function ControlCenter() {
   const [selectedUserId, setSelectedUserId] = useState('');
   const [contentType, setContentType] = useState('post');
   const [contentSearch, setContentSearch] = useState('');
+  const [emailSearch, setEmailSearch] = useState('');
+  const [emailType, setEmailType] = useState('');
+  const [emailStatus, setEmailStatus] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -462,6 +497,8 @@ export default function ControlCenter() {
   const [data, setData] = useState({
     adminOverview: null,
     apiUsageMetrics: [],
+    emailUsageMetrics: null,
+    emailDeliveryLogs: [],
     adminUsers: [],
     visitorTrends: [],
     topPages: [],
@@ -539,8 +576,11 @@ export default function ControlCenter() {
     eventType: eventType || null,
     selectedUserId: selectedUser?.id || '00000000-0000-0000-0000-000000000000',
     contentType,
-    contentSearch: contentSearch.trim() || null
-  }), [eventType, selectedUser?.id, contentType, contentSearch]);
+    contentSearch: contentSearch.trim() || null,
+    emailSearch: emailSearch.trim() || null,
+    emailType: emailType || null,
+    emailStatus: emailStatus || null
+  }), [eventType, selectedUser?.id, contentType, contentSearch, emailSearch, emailType, emailStatus]);
 
   async function loadDashboard({ silent = false, authRetried = false } = {}) {
     if (!isAuthorized) {
@@ -558,6 +598,8 @@ export default function ControlCenter() {
       setData({
         adminOverview: next.adminOverview || null,
         apiUsageMetrics: next.apiUsageMetrics || [],
+        emailUsageMetrics: next.emailUsageMetrics || null,
+        emailDeliveryLogs: next.emailDeliveryLogs || [],
         adminUsers: next.adminUsers || [],
         visitorTrends: next.visitorTrends || [],
         topPages: next.topPages || [],
@@ -739,6 +781,37 @@ export default function ControlCenter() {
       requests: metric.requestCount
     };
   });
+  const emailMetrics = data.emailUsageMetrics || {};
+  const emailMetricCards = [
+    {
+      icon: 'mark_email_read',
+      label: 'Email sends',
+      value: emailMetrics.total || 0,
+      detail: `${emailMetrics.sent || 0} sent successfully`,
+      tone: 'info'
+    },
+    {
+      icon: 'outgoing_mail',
+      label: 'Delivered',
+      value: emailMetrics.sent || 0,
+      detail: emailMetrics.lastSentAt ? `Last sent ${formatDate(emailMetrics.lastSentAt)}` : 'No successful sends yet',
+      tone: 'success'
+    },
+    {
+      icon: 'mark_email_unread',
+      label: 'Pending',
+      value: emailMetrics.pending || 0,
+      detail: 'Emails waiting for provider confirmation',
+      tone: emailMetrics.pending ? 'warning' : 'neutral'
+    },
+    {
+      icon: 'warning',
+      label: 'Failures',
+      value: emailMetrics.failed || 0,
+      detail: `${emailMetrics.failedLast24h || 0} failed in the last 24h`,
+      tone: emailMetrics.failed ? 'danger' : 'success'
+    }
+  ];
 
   return (
     <AppShell title="Admin Control Center" description="Professional operations workspace for analytics, people control, moderation, security, and system health.">
@@ -1022,21 +1095,87 @@ export default function ControlCenter() {
       ) : null}
 
       {!isLoading && activeSection === 'system' ? (
-        <section className="grid gap-6 xl:grid-cols-2">
-          {serviceCards.map((service) => (
-            <article key={service.name} className="admin-panel">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="admin-eyebrow">{service.name}</p>
-                  <h2 className="mt-3 text-2xl font-black text-[var(--text)]">{service.requests} requests</h2>
-                </div>
-                <StatusBadge value={service.status} />
-              </div>
-              <p className="mt-4 text-sm leading-7 text-[var(--muted-strong)]">{service.detail}</p>
-            </article>
-          ))}
-          {!serviceCards.length ? <div className="admin-panel"><EmptyState label="No API usage rows" detail="System usage data will appear after services record activity." /></div> : null}
-        </section>
+        <div className="space-y-6">
+          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {emailMetricCards.map((card) => (
+              <AdminCard key={card.label} icon={card.icon} label={card.label} value={card.value} detail={card.detail} tone={card.tone} />
+            ))}
+          </section>
+
+          <section className="admin-panel">
+            <div className="admin-panel-header">
+              <span className="material-symbols-outlined text-[18px] text-[var(--accent-strong)]">mail</span>
+              <h2>Recent email service usage</h2>
+            </div>
+            <div className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_180px_160px]">
+              <input
+                className="app-input"
+                value={emailSearch}
+                onChange={(event) => setEmailSearch(event.target.value)}
+                placeholder="Filter by recipient email"
+              />
+              <select className="app-input" value={emailType} onChange={(event) => setEmailType(event.target.value)}>
+                {EMAIL_TYPES.map((type) => (
+                  <option key={type || 'all'} value={type}>{type ? humanize(type) : 'All email types'}</option>
+                ))}
+              </select>
+              <select className="app-input" value={emailStatus} onChange={(event) => setEmailStatus(event.target.value)}>
+                {EMAIL_STATUSES.map((status) => (
+                  <option key={status || 'all'} value={status}>{status ? humanize(status) : 'All statuses'}</option>
+                ))}
+              </select>
+            </div>
+            <div className="mt-5 grid gap-3">
+              {data.emailDeliveryLogs.length ? data.emailDeliveryLogs.map((log) => (
+                <article key={log.id} className="admin-list-row">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap gap-2">
+                      <StatusBadge value={log.status} />
+                      <StatusBadge value={log.emailType} tone="info" />
+                      <span className="admin-chip truncate">{log.provider || 'unknown provider'}</span>
+                    </div>
+                    <p className="mt-3 break-words text-sm font-bold text-[var(--text)]">{log.email}</p>
+                    <p className="mt-1 text-xs text-[var(--muted-strong)]">
+                      {log.userEmail ? `Linked user: ${log.userName || log.userEmail}` : 'No linked user'} | {formatLocation(log)}
+                    </p>
+                    {log.subject ? <p className="mt-2 text-xs text-[var(--muted-strong)]">Subject: {log.subject}</p> : null}
+                    {log.errorMessage ? (
+                      <p className="mt-2 text-xs font-semibold text-red-500">
+                        {log.errorCode ? `${log.errorCode}: ` : ''}{log.errorMessage}
+                      </p>
+                    ) : null}
+                  </div>
+                  <div className="text-right">
+                    <time className="admin-time">{formatDate(log.createdAt)}</time>
+                    {log.deliveredAt ? <p className="mt-2 text-[11px] font-semibold text-[var(--muted)]">Sent {formatDate(log.deliveredAt)}</p> : null}
+                  </div>
+                </article>
+              )) : <EmptyState label="No email service logs" detail="Verification, reset, and invite setup emails will appear after the next send." />}
+            </div>
+          </section>
+
+          <section>
+            <div className="mb-3 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px] text-[var(--accent-strong)]">dns</span>
+              <h2 className="text-base font-black text-[var(--text)]">External API usage</h2>
+            </div>
+            <div className="grid gap-6 xl:grid-cols-2">
+              {serviceCards.map((service) => (
+                <article key={service.name} className="admin-panel">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="admin-eyebrow">{service.name}</p>
+                      <h2 className="mt-3 text-2xl font-black text-[var(--text)]">{service.requests} requests</h2>
+                    </div>
+                    <StatusBadge value={service.status} />
+                  </div>
+                  <p className="mt-4 text-sm leading-7 text-[var(--muted-strong)]">{service.detail}</p>
+                </article>
+              ))}
+              {!serviceCards.length ? <div className="admin-panel"><EmptyState label="No API usage rows" detail="System usage data will appear after services record activity." /></div> : null}
+            </div>
+          </section>
+        </div>
       ) : null}
 
       {!isLoading && activeSection === 'audit' ? (

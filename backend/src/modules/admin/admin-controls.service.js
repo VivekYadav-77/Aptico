@@ -167,7 +167,13 @@ export async function inviteUser({ db, request, adminUserId, payload }) {
       status: users.status
     });
 
-  await requestPasswordReset({ db, email });
+  await requestPasswordReset({
+    db,
+    email,
+    request,
+    userId: created[0].id,
+    logType: 'admin_invite_setup'
+  });
   await writeAdminAudit({
     db,
     request,

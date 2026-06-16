@@ -109,7 +109,8 @@ export async function registerController(request, reply) {
       db: request.server.db,
       email: body.email,
       password: body.password,
-      name: body.name
+      name: body.name,
+      request
     });
 
     await recordAnalyticsEvent({
@@ -184,7 +185,8 @@ export async function requestEmailVerificationController(request, reply) {
     const body = emailSchema.parse(request.body || {});
     const result = await sendEmailVerification({
       db: request.server.db,
-      email: body.email
+      email: body.email,
+      request
     });
 
     reply.code(202).send({
@@ -225,7 +227,8 @@ export async function forgotPasswordController(request, reply) {
     const body = emailSchema.parse(request.body || {});
     const result = await requestPasswordReset({
       db: request.server.db,
-      email: body.email
+      email: body.email,
+      request
     });
 
     reply.code(202).send({

@@ -28,6 +28,34 @@ export const schema = /* GraphQL */ `
     last429At: String
   }
 
+  type EmailUsageMetrics {
+    total: Int!
+    sent: Int!
+    failed: Int!
+    pending: Int!
+    failedLast24h: Int!
+    lastSentAt: String
+  }
+
+  type EmailDeliveryLog {
+    id: ID!
+    userId: ID
+    userEmail: String
+    userName: String
+    email: String!
+    emailType: String!
+    provider: String!
+    status: String!
+    subject: String
+    country: String
+    region: String
+    city: String
+    errorCode: String
+    errorMessage: String
+    createdAt: String!
+    deliveredAt: String
+  }
+
   type AdminUser {
     id: ID!
     email: String!
@@ -132,6 +160,8 @@ export const schema = /* GraphQL */ `
   type Query {
     adminOverview: AdminOverview!
     apiUsageMetrics: [ApiUsageMetric!]!
+    emailUsageMetrics: EmailUsageMetrics!
+    emailDeliveryLogs(limit: Int = 50, email: String, emailType: String, status: String): [EmailDeliveryLog!]!
     adminUsers: [AdminUser!]!
     visitorTrends(days: Int = 14): [AdminTrendPoint!]!
     topPages(limit: Int = 10): [AdminBreakdown!]!

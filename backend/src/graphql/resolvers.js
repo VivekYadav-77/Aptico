@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, ilike, isNull, sql } from 'drizzle-orm';
 import {
   adminAuditLogs,
   adminRestrictions,
@@ -6,6 +6,7 @@ import {
   analyticsEvents,
   apiUsage,
   communityWins,
+  emailDeliveryLogs,
   generatedContent,
   posts,
   refreshTokens,
@@ -154,6 +155,71 @@ export const resolvers = {
         date: row.date,
         requestCount: row.requestCount,
         last429At: serializeDate(row.last429At)
+      }));
+    },
+    emailUsageMetrics: async (_source, _args, context) => {
+      const db = await requireDb(context);
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      const [row] = await db
+        .select({
+          total: sql`cast(count(*) as integer)`,
+          sent: sql`cast(count(*) filter (where ${emailDeliveryLogs.status} = 'sent') as integer)`,
+          failed: sql`cast(count(*) filter (where ${emailDeliveryLogs.status} = 'failed') as integer)`,
+          pending: sql`cast(count(*) filter (where ${emailDeliveryLogs.status} = 'pending') as integer)`,
+          failedLast24h: sql`cast(count(*) filter (where ${emailDeliveryLogs.status} = 'failed' and ${emailDeliveryLogs.createdAt} >= ${oneDayAgo}) as integer)`,
+          lastSentAt: sql`max(${emailDeliveryLogs.deliveredAt})`
+        })
+        .from(emailDeliveryLogs);
+
+      return {
+        total: Number(row?.total || 0),
+        sent: Number(row?.sent || 0),
+        failed: Number(row?.failed || 0),
+        pending: Number(row?.pending || 0),
+        failedLast24h: Number(row?.failedLast24h || 0),
+        lastSentAt: serializeDate(row?.lastSentAt)
+      };
+    },
+    emailDeliveryLogs: async (_source, args, context) => {
+      const db = await requireDb(context);
+      const conditions = [];
+      const emailSearch = String(args.email || '').trim();
+
+      if (emailSearch) conditions.push(ilike(emailDeliveryLogs.email, `%${emailSearch}%`));
+      if (args.emailType) conditions.push(eq(emailDeliveryLogs.emailType, args.emailType));
+      if (args.status) conditions.push(eq(emailDeliveryLogs.status, args.status));
+
+      const baseQuery = db
+        .select({
+          id: emailDeliveryLogs.id,
+          userId: emailDeliveryLogs.userId,
+          userEmail: users.email,
+          userName: users.name,
+          email: emailDeliveryLogs.email,
+          emailType: emailDeliveryLogs.emailType,
+          provider: emailDeliveryLogs.provider,
+          status: emailDeliveryLogs.status,
+          subject: emailDeliveryLogs.subject,
+          country: emailDeliveryLogs.country,
+          region: emailDeliveryLogs.region,
+          city: emailDeliveryLogs.city,
+          errorCode: emailDeliveryLogs.errorCode,
+          errorMessage: emailDeliveryLogs.errorMessage,
+          createdAt: emailDeliveryLogs.createdAt,
+          deliveredAt: emailDeliveryLogs.deliveredAt
+        })
+        .from(emailDeliveryLogs)
+        .leftJoin(users, eq(emailDeliveryLogs.userId, users.id));
+
+      const filteredQuery = conditions.length ? baseQuery.where(and(...conditions)) : baseQuery;
+      const rows = await filteredQuery
+        .orderBy(desc(emailDeliveryLogs.createdAt))
+        .limit(normalizeLimit(args.limit, 50, 100));
+
+      return rows.map((row) => ({
+        ...row,
+        createdAt: serializeDate(row.createdAt),
+        deliveredAt: serializeDate(row.deliveredAt)
       }));
     },
     adminUsers: async (_source, _args, context) => {

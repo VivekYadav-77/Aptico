@@ -463,7 +463,7 @@ function ensureUserCanAuthenticate(user) {
   }
 }
 
-export async function registerWithPassword({ db, email, password, name }) {
+export async function registerWithPassword({ db, email, password, name, request = null }) {
   requireDatabase(db);
 
   const normalizedEmail = email.trim().toLowerCase();
@@ -479,7 +479,7 @@ export async function registerWithPassword({ db, email, password, name }) {
     name
   });
 
-  const verificationResult = await sendEmailVerification({ db, user });
+  const verificationResult = await sendEmailVerification({ db, user, request });
 
   return {
     user: normalizeUser(user),
@@ -543,7 +543,7 @@ export async function loginWithGoogle({ db, credential, request }) {
   return issueSession(db, user, request);
 }
 
-export async function sendEmailVerification({ db, email = null, user = null }) {
+export async function sendEmailVerification({ db, email = null, user = null, request = null }) {
   requireDatabase(db);
 
   const targetUser = user || (email ? await findUserByEmail(db, email.trim().toLowerCase()) : null);
@@ -573,7 +573,10 @@ export async function sendEmailVerification({ db, email = null, user = null }) {
     name: targetUser.name,
     link: buildFrontendActionUrl('verify-email', token.rawToken),
     expiresAt: token.expiresAt.toISOString(),
-    appName: 'Aptico'
+    appName: 'Aptico',
+    db,
+    request,
+    userId: targetUser.id
   });
 
   return {
@@ -603,7 +606,7 @@ export async function verifyEmailToken({ db, token, request }) {
   return issueSession(db, user, request);
 }
 
-export async function requestPasswordReset({ db, email }) {
+export async function requestPasswordReset({ db, email, request = null, userId = null, logType = null }) {
   requireDatabase(db);
 
   const user = await findUserByEmail(db, email.trim().toLowerCase());
@@ -626,7 +629,11 @@ export async function requestPasswordReset({ db, email }) {
     name: user.name,
     link: buildFrontendActionUrl('reset-password', token.rawToken),
     expiresAt: token.expiresAt.toISOString(),
-    appName: 'Aptico'
+    appName: 'Aptico',
+    db,
+    request,
+    userId: userId || user.id,
+    logType
   });
 
   return {
