@@ -1,156 +1,364 @@
 <div align="center">
-  <img src="https://via.placeholder.com/1200x400/0a0a0a/ffffff?text=APTICO+V3+SYSTEMS" alt="Aptico Banner" width="100%" />
 
-  # Aptico
-  ### The Enterprise-Grade Engine for Career Resilience & Gamified Progression
+<img src="frontend/public/aptico-logo.svg" alt="Aptico logo" width="96" height="96">
 
-  [![Version](https://img.shields.io/badge/Version-3.1.0--Stable-007ACC?style=for-the-badge&logo=github)](https://github.com/VivekYadav-77/Aptico)
-  [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-ff69b4.svg?style=for-the-badge)](https://www.gnu.org/licenses/agpl-3.0)
-  [![Stack](https://img.shields.io/badge/Architecture-Event--Driven-orange?style=for-the-badge)](https://github.com/VivekYadav-77/Aptico)
-  [![Powered By](https://img.shields.io/badge/Powered_By-Google_Gemini-4285F4?style=for-the-badge&logo=google-gemini)](https://deepmind.google/technologies/gemini/)
+# Aptico
 
-  **Aptico** is a high-performance ecosystem engineered to solve "Application Fatigue" through advanced behavioral psychology and data-driven resilience tracking.
+### 🚀 Career intelligence for smarter job searching, resume analysis, and application momentum.
+
+Aptico helps job seekers turn a messy job search into a structured workflow: analyze resumes, discover better-fit roles, save jobs, track applications and rejections, join anonymous accountability squads, and build a recruiter-friendly proof profile.
+
 </div>
 
----
+<p align="center">
+  <a href="#what-is-aptico">Product</a> |
+  <a href="#screenshots">Screenshots</a> |
+  <a href="#core-features">Features</a> |
+  <a href="#admin-control-center">Admin</a> |
+  <a href="#tech-stack">Tech Stack</a> |
+  <a href="#run-locally">Run Locally</a>
+</p>
 
-## 🎯 The Vision
-
-The modern job market is a marathon of attrition. **Aptico** transforms this quantitative "grind" into a qualitative "journey." By leveraging an event-driven XP engine, we help professionals maintain momentum, track their grit, and visualize the persistence behind every milestone.
-
-> "It's not about the destination; it's about the resilience built along the way."
-
----
-
-## 🚀 Core Features
-
-### 🎮 Psychological Gamification
-- **XP Integrity Engine (Core V3)**: A proprietary validation layer that calculates XP based on activity depth, streak consistency, and recovery speed from rejections.
-- **Dynamic Sticker System**: Unlockable achievements (SVG & CSS-driven rarity) that commemorate specific milestones, from "First Application" to "Resilience King."
-- **Leveling Hierarchy**: A multi-tier progression system that visualizes professional growth beyond the traditional resume.
-
-### 📊 Resilience Analytics (Grit Data)
-- **Dynamic Grit Heatmaps**: High-performance SVG rendering of 365-day application activity, turning "rejections" into a visual testament of effort.
-- **Shadow Resumes**: Automated secondary profiles that highlight the learning and persistence behind professional achievements.
-- **Momentum Tracking**: Real-time visualization of daily/weekly velocity to identify and prevent burnout before it happens.
-
-### 🤝 Collaborative Ecosystem
-- **Tactical Squad Systems**: Join or form squads to share momentum, aggregated metrics, and collective morale.
-- **Squad Momentum Hub**: Real-time WebSocket-backed coordination tools to keep the team motivated.
-- **Anonymous Squad Chat**: Low-friction, tactical communication for squad-level strategy and support.
+<p align="center">
+  <img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-blue">
+  <img alt="Frontend" src="https://img.shields.io/badge/frontend-Next.js-black">
+  <img alt="Backend" src="https://img.shields.io/badge/backend-Fastify-green">
+  <img alt="Database" src="https://img.shields.io/badge/database-Neon%20PostgreSQL-purple">
+  <img alt="AI" src="https://img.shields.io/badge/AI-Google%20Gemini-orange">
+</p>
 
 ---
 
-## 🏗 System Architecture
+## 🧭 What Is Aptico?
 
-Aptico is built on a distributed, event-driven architecture designed for zero-latency feedback and high data integrity.
+Aptico is built for people who are applying to jobs, improving their resume, preparing for interviews, and trying to stay consistent through a long hiring process.
+
+Instead of treating job search as random applications and scattered notes, Aptico gives users one place to:
+
+- 🎯 Understand how well their resume matches a role.
+- 🔎 Find and save relevant jobs.
+- 📌 Track applications, rejections, and progress.
+- 🤝 Stay accountable through anonymous squads.
+- 🧾 Build a public profile that shows effort, skills, and career momentum.
+- 🛟 Contact support when account, restriction, or platform issues appear.
+
+For a recruiter or engineering reviewer, Aptico also demonstrates a real-world product system: authentication, admin controls, analytics, support workflows, moderation, audit logs, email monitoring, security rules, and production deployment planning.
+
+---
+
+## 📸 Screenshots
+
+
+### 🧑‍💼 User Dashboard Preview
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/user-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/user-light.png">
+  <img alt="Aptico user dashboard showing career progress, activity, and job-search intelligence" src="docs/screenshots/user-light.png" width="100%">
+</picture>
+
+### 🛡️ Admin Operations Preview
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/admin-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/admin-light.png">
+  <img alt="Aptico admin control center showing analytics, user controls, moderation, security, and audit systems" src="docs/screenshots/admin-light.png" width="100%">
+</picture>
+
+### 🏆 Squad Leaderboard Preview
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/leaderboard-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/screenshots/leaderboard-light.png">
+  <img alt="Aptico squad leaderboard showing monthly squad rankings, progress, and rewards" src="docs/screenshots/leaderboard-light.png" width="100%">
+</picture>
+
+---
+
+## 💡 Why It Exists
+
+Job searching is often unstructured.
+
+People apply to many roles, lose track of where they applied, receive vague rejections, and do not always know how to improve their resume. Over time, that creates fatigue.
+
+Aptico turns that process into a guided system. It helps users understand their fit for a role, choose better applications, record progress, recover from rejection, and keep moving with support from small anonymous squads.
+
+---
+
+## ✨ Core Features
+
+### 🤖 AI Resume Analysis
+
+Users can upload a resume and compare it against a target job description. Aptico returns match signals, skill gaps, keyword mismatches, rewrite ideas, and practical next steps.
+
+### 🔎 Job Search Intelligence
+
+Users can search roles, filter opportunities, inspect job quality signals, and save jobs for later review.
+
+### 📌 Application And Rejection Tracking
+
+Aptico lets users log applications and rejections so progress does not disappear. The platform turns job-search activity into visible momentum.
+
+### 🤝 Anonymous Squads
+
+Users can join a squad to share progress without exposing personal identity. Squads help users stay consistent through weekly goals, pings, and shared accountability.
+
+### 📊 Career Dashboard
+
+The dashboard gives users a single overview of analysis results, activity, saved jobs, XP, progress, and recommended next actions.
+
+### 🧾 Public Profile And Badge
+
+Users can build a public profile and generate recruiter-friendly proof of their activity, projects, skills, and career resilience.
+
+### 🛟 Support Center
+
+Logged-in and public users can contact support for account access, restrictions, email issues, or platform problems.
+
+---
+
+## 🛡️ Admin Control Center
+
+Aptico includes a full admin workspace designed like a real operational product, not just a demo panel.
+
+Admins can monitor and manage:
+
+- 📈 Visitors and platform activity.
+- 👥 Users, roles, sessions, account status, and restrictions.
+- ⛔ Feature-level blocks such as posting, commenting, analysis, job search, job saving, squad actions, and login access.
+- 🧹 Content moderation and hidden content.
+- 🎫 Support tickets, internal notes, assignment, escalation, resolve, close, and reopen actions.
+- ✉️ Email service usage and email blocks.
+- 🔐 Security signals, suspicious activity, API errors, and admin audit logs.
+- 🩺 System health and production readiness.
+
+Sensitive admin actions require reasons, confirmations, and audit records.
+
+---
+
+## 🧰 Tech Stack
+
+| Layer | Technology |
+| --- | --- |
+| Frontend | Next.js, React, Tailwind CSS |
+| Backend | Node.js, Fastify |
+| Database | PostgreSQL, Drizzle ORM, Neon |
+| AI | Google Gemini |
+| Auth | JWT, refresh sessions, CSRF protection |
+| Media | Cloudinary |
+| Email | Google Apps Script email gateway |
+| Deployment | Vercel frontend, Render backend, Neon database |
+| Admin Data | REST APIs and admin GraphQL |
+
+---
+
+## 🏗️ Architecture
+
+### 🔄 Product Flow
 
 ```mermaid
-graph TD
-    User([User Action]) -->|Secure API| Gateway(Fastify API Gateway)
-    Gateway -->|Zod Validated| XPEngine{XP Integrity Engine}
-    XPEngine -->|Persistence| DB[(PostgreSQL / Neon)]
-    XPEngine -->|Real-time| Rewards[Sticker & Reward Registry]
-    XPEngine -->|Broadcast| Socket[WebSocket Comms]
-    Socket -->|Sync| Frontend[React 19 Dashboard]
-    Rewards -->|Generate| Profile[Public Shadow Resume]
+flowchart TD
+  User["User / Job Seeker"] --> Auth["Authentication"]
+  Auth --> Dashboard["Career Dashboard"]
+
+  Dashboard --> Analysis["AI Resume Analysis"]
+  Dashboard --> Jobs["Job Search"]
+  Dashboard --> Tracker["Application & Rejection Tracking"]
+  Dashboard --> Squads["Anonymous Squads"]
+  Dashboard --> Profile["Public Profile & Badge"]
+  Dashboard --> Support["Support Center"]
+
+  Analysis --> Gemini["Google Gemini AI"]
+  Gemini --> Insights["Match Score, Skill Gaps, Rewrite Suggestions"]
+
+  Jobs --> JobSources["Job APIs / Search Providers"]
+  Jobs --> SavedJobs["Saved Jobs"]
+
+  Tracker --> Activity["Career Activity Timeline"]
+  Activity --> XP["XP, Streaks, Rewards"]
+
+  Squads --> SquadProgress["Weekly Squad Progress"]
+  Squads --> Leaderboard["Squad Leaderboard"]
+  Squads --> Rewards["Digital Stickers & Recognition"]
+
+  Profile --> RecruiterView["Recruiter-Friendly Proof Profile"]
+
+  Support --> Tickets["Support Tickets"]
+  Tickets --> Admin["Admin Control Center"]
+
+  Admin --> Users["User Management"]
+  Admin --> Restrictions["Blocks & Feature Restrictions"]
+  Admin --> Moderation["Content Moderation"]
+  Admin --> Analytics["Visitor & Activity Analytics"]
+  Admin --> EmailLogs["Email Service Monitoring"]
+  Admin --> Audit["Audit Logs & Security"]
+
+  Auth --> Backend["Fastify Backend API"]
+  Dashboard --> Backend
+  Analysis --> Backend
+  Jobs --> Backend
+  Tracker --> Backend
+  Squads --> Backend
+  Profile --> Backend
+  Support --> Backend
+  Admin --> Backend
+
+  Backend --> Database["Neon PostgreSQL"]
+  Backend --> Cloudinary["Cloudinary Media Storage"]
+  Backend --> Email["Email Gateway"]
 ```
 
+### 🧱 System Architecture
+
+```mermaid
+flowchart LR
+  User["User / Admin"] --> Frontend["Vercel Frontend"]
+  Frontend --> Backend["Render Fastify Backend"]
+  Backend --> DB["Neon PostgreSQL"]
+  Backend --> AI["Google Gemini"]
+  Backend --> Media["Cloudinary"]
+  Backend --> Email["Email Gateway"]
+  Backend --> Admin["Admin GraphQL + REST Controls"]
+```
+
+The frontend uses Vercel rewrites for `/api/*` and `/admin/graphql`, keeping browser requests same-origin where possible. Production secrets stay on the backend.
+
 ---
 
-## 🧰 The Modern Tech Stack
+## 🔐 Security And Production Readiness
 
-| Layer | Technology | Rationale |
-| :--- | :--- | :--- |
-| **Frontend** | **Next.js + React 19** | App Router pages with server/client boundaries and production builds via `next build`. |
-| **Styling** | **Tailwind CSS 4** | Next-generation utility-first CSS with optimized engine. |
-| **State** | **TanStack Query v5** | Advanced server-state synchronization with optimistic updates. |
-| **Backend** | **Fastify** | 2x performance compared to Express with native schema validation. |
-| **Database** | **Drizzle + Neon** | Serverless, type-safe SQL with zero-overhead migrations. |
-| **AI Layer** | **Google Gemini** | LLM integration for resume optimization and resilience insights. |
-| **Comms** | **WebSockets (Fastify)** | Real-time squad coordination and state synchronization. |
+Aptico includes:
+
+- 🛡️ Admin-only route protection.
+- 🔑 CSRF protection for auth flows.
+- 🚦 Rate limiting.
+- 🌐 Strict CORS allowlists.
+- ✅ Secure production environment validation.
+- 🕵️ Privacy-safe analytics.
+- 🧾 Audit logs for sensitive admin actions.
+- 🔒 No raw IP display in admin analytics.
+- 🖼️ Cloudinary-backed permanent media storage.
+- ⏱️ Optional Render keep-alive workflow for normal usage hours.
+
+The app continues to work without the keep-alive workflow; only cold-start behavior changes.
 
 ---
 
-## 📂 Repository Standards
+## 📁 Repository Structure
 
-```bash
+```text
 backend/
-  scripts/        # Migration, verification, and integration utilities
-  src/app/        # Fastify server construction and route registration
-  src/config/     # Runtime environment and Drizzle configuration
-  src/modules/    # Feature modules with routes, controllers, and services
-  src/shared/     # Shared middleware, services, and utilities
+  scripts/              migration and integration utilities
+  src/app/              Fastify bootstrap and route registration
+  src/config/           environment and Drizzle config
+  src/db/               database schema
+  src/modules/          feature modules
+  src/shared/           middleware, security, services, utilities
+  test/                 backend tests
+
 frontend/
-  src/app/        # Next.js routes, layout, providers, and route adapters
-  src/api/        # API clients and server-state request helpers
-  src/components/ # Reusable UI components shared across screens
-  src/screens/    # Route-level product screens
-  src/store/      # Redux Toolkit local application state
-  src/utils/      # Browser-safe utilities and registries
+  public/               static assets
+  src/app/              Next.js routes and providers
+  src/api/              browser-safe API clients
+  src/components/       reusable UI components
+  src/features/         larger feature-owned areas
+  src/screens/          route-level product screens
+  src/store/            Redux state
+  src/utils/            browser utilities
 ```
-
-Cleanup standard: generated folders and logs such as `.next/`, `dist/`, and `*.log` stay out of source control. Keep one-off database repair scripts out of tracked source unless they are parameterized through environment variables, documented, and wired into `package.json`.
 
 ---
 
-## 🚦 Getting Started
+## ⚙️ Run Locally
 
-### 1. Prerequisites
-- Node.js (v20+ recommended)
-- A PostgreSQL instance (Neon.tech recommended)
-- Google Gemini API Key
+### Prerequisites
 
-### 2. Environment Setup
-Create a `.env` file in both `backend/` and `frontend/` directories.
+- 🟢 Node.js 20 or newer
+- 🗄️ PostgreSQL database, Neon recommended
+- 🤖 Google Gemini API key
+- 🖼️ Cloudinary account for profile banner uploads
 
-**Backend (`backend/.env`):**
-```env
-DATABASE_URL=your_postgres_url
-JWT_SECRET=your_secure_secret
-GEMINI_API_KEY=your_gemini_key
-SQUAD_COMMS_ENABLED=true
-```
+### Backend
 
-### 3. Installation & Boot
 ```bash
-# Install dependencies
-npm install
-
-# Initialize Database
 cd backend
-npm run db:push
-
-# Start Development Servers
-# Terminal 1: Backend
-npm run dev
-
-# Terminal 2: Frontend
-cd ../frontend
+npm install
+cp .env.example .env
+npm run db:setup
 npm run dev
 ```
 
----
+### Frontend
 
-## 🛡 Security & Performance
-- **Enterprise-Grade Protection**: Implements `Helmet` and `Fastify-Rate-Limit` for XSS and brute-force mitigation.
-- **Sub-50ms Latency**: Core XP endpoints are optimized for maximum throughput.
-- **Lighthouse Excellence**: Engineered for 95+ scores across Performance, SEO, and Accessibility.
+```bash
+cd frontend
+npm install
+cp .env.example .env
+npm run dev
+```
 
----
+Frontend runs on:
 
-## 🤝 Contributing
+```text
+http://localhost:3000
+```
 
-We welcome contributions from engineers who are passionate about behavioral psychology and career development.
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
+Backend runs on the configured backend port.
 
 ---
 
-<div align="center">
-  <sub>Developed with ❤️ by <a href="https://github.com/VivekYadav-77">Vivek Yadav</a> & the Aptico Engineering Team.</sub>
-</div>
+## 🚀 Key Environment Notes
+
+Backend production requires:
+
+```text
+DATABASE_URL
+JWT_SECRET
+FRONTEND_URL
+SECURITY_MODE=production
+```
+
+For deployment:
+
+```text
+FRONTEND_URL=https://your-vercel-domain.vercel.app
+ALLOWED_ORIGINS=https://your-custom-domain.com
+CLOUDINARY_CLOUD_NAME=...
+CLOUDINARY_API_KEY=...
+CLOUDINARY_API_SECRET=...
+```
+
+Recommended frontend production setup:
+
+```text
+API_PROXY_TARGET=https://your-render-service.onrender.com
+NEXT_PUBLIC_API_BASE_URL=/
+```
+
+More deployment details are available in `DEPLOYMENT.md`.
+
+---
+
+## 👥 Team
+
+### Vivek Yadav
+
+ Full-stack Product Engineer. Co-owner of the Aptico platform with focus on product architecture, AI workflows, backend systems, user experience, and recruiter-facing career intelligence.
+
+- GitHub: [VivekYadav-77](https://github.com/VivekYadav-77)
+- LinkedIn: [vivekyadav94](https://www.linkedin.com/in/vivekyadav94/)
+- Email: vivekyadav.dev007@gmail.com
+
+### Shivang Rai
+
+ Full-stack Product Engineer. Co-owner of the Aptico platform with focus on platform operations, admin control systems, support workflows, user safety, monitoring, and product quality.
+
+- GitHub: [shivangrai5143](https://github.com/shivangrai5143)
+- LinkedIn: [shivang-rai11](https://www.linkedin.com/in/shivang-rai11)
+- Email: raishivang69@gmail.com
+
+---
+
+## 📄 License
+
+This project is licensed under the AGPL-3.0 License. See `LICENSE` for details.

@@ -6,7 +6,13 @@ export const metadata = {
     default: 'Aptico',
     template: '%s | Aptico'
   },
-  description: 'Aptico helps job seekers analyze resumes, find jobs, build public profiles, and stay accountable with squads.'
+  description: 'Aptico helps job seekers analyze resumes, find jobs, build public profiles, and stay accountable with squads.',
+  icons: {
+    icon: [
+      { url: '/aptico-logo.svg', type: 'image/svg+xml' }
+    ],
+    shortcut: '/aptico-logo.svg'
+  }
 };
 
 export default function RootLayout({ children }) {

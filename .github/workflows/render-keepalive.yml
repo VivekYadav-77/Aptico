@@ -1,0 +1,43 @@
+name: Render backend keep-alive
+
+on:
+  schedule:
+    # IST is UTC+05:30. These three UTC schedules ping every 10 minutes
+    # from 06:00 IST through 01:00 IST the next day.
+    - cron: '30,40,50 0 * * *'
+    - cron: '*/10 1-18 * * *'
+    - cron: '0,10,20,30 19 * * *'
+
+permissions: {}
+
+concurrency:
+  group: render-backend-keepalive
+  cancel-in-progress: true
+
+jobs:
+  ping:
+    name: Ping backend health endpoint
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    env:
+      RENDER_HEALTHCHECK_URL: ${{ secrets.RENDER_HEALTHCHECK_URL }}
+    steps:
+      - name: Ping Render health endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -z "${RENDER_HEALTHCHECK_URL:-}" ]; then
+            echo "Keep-alive skipped because RENDER_HEALTHCHECK_URL is not configured."
+            exit 0
+          fi
+
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --max-time 20 \
+            --retry 2 \
+            --retry-delay 5 \
+            --output /dev/null \
+            "$RENDER_HEALTHCHECK_URL"

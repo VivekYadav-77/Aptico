@@ -31,6 +31,16 @@ function writeSSE(raw, event, data) {
   }
 }
 
+function getCorsOrigin(request) {
+  const requestOrigin = request.headers.origin;
+
+  if (requestOrigin && request.server.env.allowedOrigins.includes(requestOrigin)) {
+    return requestOrigin;
+  }
+
+  return env.frontendUrl;
+}
+
 export async function analyzeController(request, reply) {
   const incomingFile = request.body?.file;
 
@@ -89,8 +99,9 @@ export async function analyzeController(request, reply) {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     Connection: 'keep-alive',
-    'Access-Control-Allow-Origin': env.frontendUrl,
-    'Access-Control-Allow-Credentials': 'true'
+    'Access-Control-Allow-Origin': getCorsOrigin(request),
+    'Access-Control-Allow-Credentials': 'true',
+    Vary: 'Origin'
   });
 
   const resumeText = parsedPdf.text;

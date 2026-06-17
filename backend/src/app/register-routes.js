@@ -21,6 +21,7 @@ const require = createRequire(import.meta.url);
 const mercurius = require('mercurius');
 
 const publicRouteModules = [
+  { routes: healthRoutes, prefix: '/health' },
   { routes: authRoutes, prefix: '/api/auth' },
   { routes: analyticsRoutes, prefix: '/api/analytics' },
   { routes: healthRoutes, prefix: '/api/health' },
