@@ -18,7 +18,7 @@ import {
   getProfileConnections
 } from '../api/socialApi.js';
 import UserListModal from '../components/UserListModal.jsx';
-import { saveProfileSettings, fetchProfileSettings } from '../api/profileApi.js';
+import { deleteProfileBanner, fetchProfileSettings, saveProfileSettings, uploadProfileBanner } from '../api/profileApi.js';
 import { selectAuth } from '../store/authSlice.js';
 import ResumeTemplate from '../components/ResumeTemplate.jsx';
 import StickerShowcase from '../components/StickerShowcase.jsx';
@@ -353,28 +353,54 @@ export default function PublicProfile() {
     }
   }
 
-  async function handleCloudinaryMockUpload(e) {
+  async function handleBannerUpload(e) {
     const file = e.target.files?.[0];
     if(!file) return;
-    
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const uploadedUrl = event.target.result; // Use Base64 data URL so it persists for other users
 
-      try {
-        const fullSettings = await fetchProfileSettings();
-        const updatedBackendSettings = { ...fullSettings, banner_url: uploadedUrl };
-        await saveProfileSettings(updatedBackendSettings);
-        
-        const updatedSettings = { ...(profile.enriched_settings || {}), banner_url: uploadedUrl };
-        setProfile(p => ({ ...p, banner_url: uploadedUrl, enriched_settings: updatedSettings }));
-        setToast('Banner uploaded successfully!');
-      } catch (error) {
-        console.error(error);
-        setToast('Failed to upload banner.');
-      }
-    };
-    reader.readAsDataURL(file);
+    if (!file.type.startsWith('image/')) {
+      setToast('Upload an image file for your banner.');
+      setTimeout(() => setToast(''), 3000);
+      e.target.value = '';
+      return;
+    }
+
+    try {
+      const uploadedBanner = await uploadProfileBanner(file);
+      const updatedSettings = {
+        ...(profile.enriched_settings || {}),
+        banner_url: uploadedBanner.banner_url,
+        banner_public_id: uploadedBanner.banner_public_id,
+        banner_asset_id: uploadedBanner.banner_asset_id
+      };
+      setProfile(p => ({ ...p, banner_url: uploadedBanner.banner_url, enriched_settings: updatedSettings }));
+      setToast('Banner uploaded successfully!');
+    } catch (error) {
+      console.error(error);
+      setToast(error.response?.data?.error || 'Failed to upload banner.');
+    } finally {
+      setTimeout(() => setToast(''), 3000);
+      e.target.value = '';
+    }
+  }
+
+  async function handleBannerRemove() {
+    try {
+      await deleteProfileBanner();
+      const {
+        banner_url: _bannerUrl,
+        banner_public_id: _bannerPublicId,
+        banner_asset_id: _bannerAssetId,
+        ...updatedSettings
+      } = profile.enriched_settings || {};
+      setProfile(p => ({ ...p, banner_url: null, enriched_settings: updatedSettings }));
+      setActiveBannerView('badge');
+      setToast('Banner removed successfully.');
+    } catch (error) {
+      console.error(error);
+      setToast(error.response?.data?.error || 'Failed to remove banner.');
+    } finally {
+      setTimeout(() => setToast(''), 3000);
+    }
   }
 
   useEffect(() => {
@@ -1364,8 +1390,17 @@ export default function PublicProfile() {
               <div className="space-y-6">
                  <div>
                      <label className="block text-xs font-bold text-[var(--muted-strong)] uppercase tracking-wider mb-2">Upload Custom Banner</label>
-                     <input type="file" onChange={handleCloudinaryMockUpload} className="block w-full text-sm text-[var(--text)] file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-black file:bg-[var(--accent)] file:text-white cursor-pointer bg-[var(--panel-soft)] rounded-2xl border border-[var(--border)] p-2" />
+                     <input type="file" accept="image/*" onChange={handleBannerUpload} className="block w-full text-sm text-[var(--text)] file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-black file:bg-[var(--accent)] file:text-white cursor-pointer bg-[var(--panel-soft)] rounded-2xl border border-[var(--border)] p-2" />
                      <p className="text-[10px] font-semibold text-[var(--muted-strong)] mt-2 leading-tight">Images will be stored via Cloudinary backend integrations.</p>
+                     {profile?.banner_url ? (
+                        <button
+                          type="button"
+                          onClick={handleBannerRemove}
+                          className="mt-3 inline-flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-black uppercase tracking-wider text-red-500 transition-colors hover:bg-red-500/15"
+                        >
+                          Remove banner
+                        </button>
+                     ) : null}
                  </div>
 
                  <div>

@@ -6,6 +6,7 @@ import { drizzle as drizzleNeon } from 'drizzle-orm/neon-http';
 import { drizzle as drizzleNodePg } from 'drizzle-orm/node-postgres';
 import { env, hasDatabaseConfig, hasRedisConfig } from '../config/env.js';
 import * as dbSchema from '../db/schema.js';
+import { sendError } from '../shared/http/errors.js';
 import { createRedisService } from '../shared/utils/redis-service.js';
 import { registerRoutes } from './register-routes.js';
 
@@ -119,6 +120,20 @@ export function buildServer() {
   // }));
 
   registerRoutes(app);
+
+  app.setNotFoundHandler((request, reply) => {
+    return reply.code(404).send({
+      success: false,
+      code: 'NOT_FOUND',
+      message: 'Route not found.',
+      requestId: request.id
+    });
+  });
+
+  app.setErrorHandler((error, request, reply) => {
+    request.log.error({ err: error }, 'Unhandled request error.');
+    return sendError(reply, request, error);
+  });
 
   app.addHook('onReady', async () => {
     if (!hasDatabaseConfig()) {

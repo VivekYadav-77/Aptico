@@ -9,6 +9,7 @@
     "test": "node --test test/*.test.js",
     "check": "node --check src/server.js",
     "db:push": "drizzle-kit push --config=src/config/drizzle.config.js",
+    "db:setup": "npm run db:push && npm run db:migrate:comms && npm run db:migrate:social-scheduling && npm run db:migrate:admin-notifications && npm run db:migrate:email-logs && npm run db:migrate:email-blocks && npm run db:migrate:support && npm run db:migrate:support-v2",
     "db:migrate:comms": "node scripts/migrations/apply-squad-comms-migration.js",
     "db:migrate:social-scheduling": "node scripts/migrations/apply-social-scheduling-migration.js",
     "db:migrate:admin-notifications": "node scripts/migrations/apply-admin-notifications-migration.js",

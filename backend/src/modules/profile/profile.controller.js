@@ -4,6 +4,7 @@ import { analyses, applicationLogs, connections, follows, generatedContent, prof
 import { env } from '../../config/env.js';
 import { generatePortfolioReadme } from '../analysis/gemini.service.js';
 import { ensureUserProfile } from './profile.service.js';
+import { deleteCloudinaryAsset, uploadProfileBannerToCloudinary } from '../../shared/services/cloudinary.service.js';
 
 const profileSettingsSchema = z.object({
   firstName: z.string().trim().max(100),
@@ -46,6 +47,8 @@ const profileSettingsSchema = z.object({
   notificationOpportunityNudges: z.boolean(),
   notificationSecurityAlerts: z.boolean(),
   banner_url: z.string().optional(),
+  banner_public_id: z.string().optional(),
+  banner_asset_id: z.string().optional(),
   banner_preference: z.string().optional(),
 
   // Section visibility map (everyone / connections / only_me)
@@ -133,6 +136,14 @@ const userExperienceSchema = z.object({
   isCurrent: z.boolean().default(false),
   description: z.string().trim().max(3000).default('')
 });
+
+const profileBannerUploadSchema = z.object({
+  fileName: z.string().trim().max(180).optional().default('profile-banner'),
+  contentType: z.string().trim().regex(/^image\/(png|jpe?g|webp|gif)$/i, 'Upload a PNG, JPG, WEBP, or GIF banner image.'),
+  contentBase64: z.string().trim().min(1, 'Banner image data is required.')
+});
+
+const MAX_BANNER_BYTES = 4 * 1024 * 1024;
 
 function formatExperienceRow(row) {
   return {
@@ -401,6 +412,7 @@ async function getPortfolioReadmePayload(db, userId) {
 async function getStoredProfileSettings(db, userId) {
   const rows = await db
     .select({
+      id: profileSettings.id,
       settingsJson: profileSettings.settingsJson
     })
     .from(profileSettings)
@@ -408,6 +420,54 @@ async function getStoredProfileSettings(db, userId) {
     .limit(1);
 
   return rows[0]?.settingsJson || null;
+}
+
+async function getStoredProfileSettingsRow(db, userId) {
+  const rows = await db
+    .select({
+      id: profileSettings.id,
+      settingsJson: profileSettings.settingsJson
+    })
+    .from(profileSettings)
+    .where(eq(profileSettings.userId, userId))
+    .limit(1);
+
+  return rows[0] || null;
+}
+
+async function saveStoredProfileSettings(db, userId, settingsJson) {
+  const existing = await getStoredProfileSettingsRow(db, userId);
+
+  if (existing) {
+    await db
+      .update(profileSettings)
+      .set({
+        settingsJson,
+        updatedAt: new Date()
+      })
+      .where(eq(profileSettings.id, existing.id));
+    return settingsJson;
+  }
+
+  await db.insert(profileSettings).values({
+    userId,
+    settingsJson
+  });
+
+  return settingsJson;
+}
+
+function decodeBannerImage(contentBase64) {
+  const normalized = String(contentBase64 || '').replace(/^data:image\/[a-z0-9.+-]+;base64,/i, '');
+  const buffer = Buffer.from(normalized, 'base64');
+
+  if (!buffer.length || buffer.length > MAX_BANNER_BYTES) {
+    const error = new Error('Banner image must be smaller than 4 MB.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return buffer;
 }
 
 export async function calculateMonthlySquadRewardReadiness(db, userId, rewardRank = null) {
@@ -582,6 +642,87 @@ export async function upsertProfileSettingsController(request, reply) {
     return reply.code(statusCode).send({
       success: false,
       error: error.message || 'Could not save profile settings.'
+    });
+  }
+}
+
+export async function uploadProfileBannerController(request, reply) {
+  try {
+    requireDatabase(request.server.db);
+
+    const body = profileBannerUploadSchema.parse(request.body || {});
+    const buffer = decodeBannerImage(body.contentBase64);
+    const userId = request.auth.userId;
+    const settingsRow = await getStoredProfileSettingsRow(request.server.db, userId);
+    const currentSettings = settingsRow?.settingsJson || {};
+    const previousPublicId = currentSettings.banner_public_id || null;
+    const uploadedBanner = await uploadProfileBannerToCloudinary({
+      userId,
+      buffer,
+      contentType: body.contentType,
+      fileName: body.fileName
+    });
+    const nextSettings = {
+      ...currentSettings,
+      ...uploadedBanner
+    };
+
+    await saveStoredProfileSettings(request.server.db, userId, nextSettings);
+
+    if (previousPublicId && previousPublicId !== uploadedBanner.banner_public_id) {
+      try {
+        await deleteCloudinaryAsset(previousPublicId);
+      } catch (cleanupError) {
+        request.log.warn({ err: cleanupError, previousPublicId }, 'Previous profile banner cleanup failed.');
+      }
+    }
+
+    return reply.send({
+      success: true,
+      data: uploadedBanner
+    });
+  } catch (error) {
+    return reply.code(error.statusCode || 500).send({
+      success: false,
+      error: error.message || 'Could not upload profile banner.'
+    });
+  }
+}
+
+export async function deleteProfileBannerController(request, reply) {
+  try {
+    requireDatabase(request.server.db);
+
+    const userId = request.auth.userId;
+    const settingsRow = await getStoredProfileSettingsRow(request.server.db, userId);
+    const currentSettings = settingsRow?.settingsJson || {};
+    const previousPublicId = currentSettings.banner_public_id || null;
+
+    if (previousPublicId) {
+      await deleteCloudinaryAsset(previousPublicId);
+    }
+
+    const {
+      banner_url: _bannerUrl,
+      banner_public_id: _bannerPublicId,
+      banner_asset_id: _bannerAssetId,
+      ...nextSettings
+    } = currentSettings;
+
+    await saveStoredProfileSettings(request.server.db, userId, nextSettings);
+
+    return reply.send({
+      success: true,
+      data: {
+        banner_url: null,
+        banner_public_id: null,
+        banner_asset_id: null
+      }
+    });
+  } catch (error) {
+    return reply.code(error.statusCode || 500).send({
+      success: false,
+      error: error.message || 'Could not remove profile banner.'
     });
   }
 }

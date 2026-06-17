@@ -20,21 +20,27 @@ import { authenticateAdminRequest } from '../shared/middleware/auth.middleware.j
 const require = createRequire(import.meta.url);
 const mercurius = require('mercurius');
 
+const publicRouteModules = [
+  { routes: authRoutes, prefix: '/api/auth' },
+  { routes: analyticsRoutes, prefix: '/api/analytics' },
+  { routes: healthRoutes, prefix: '/api/health' },
+  { routes: analyzeRoutes, prefix: '/api/analyze' },
+  { routes: jobRoutes, prefix: '/api/jobs' },
+  { routes: profileRoutes, prefix: '/api' },
+  { routes: socialRoutes, prefix: '/api/social' },
+  { routes: activityRoutes, prefix: '/api/users/activity' },
+  { routes: rejectionRoutes, prefix: '/api' },
+  { routes: shadowResumeRoutes, prefix: '/api/shadow-resume' },
+  { routes: squadRoutes, prefix: '/api/squads' },
+  { routes: supportRoutes, prefix: '/api/support' },
+  { routes: badgeRoutes, prefix: '/api/badge' }
+];
+
 // Route registration lives here so URL prefixes remain auditable during refactors.
 export function registerRoutes(app) {
-  app.register(authRoutes, { prefix: '/api/auth' });
-  app.register(analyticsRoutes, { prefix: '/api/analytics' });
-  app.register(healthRoutes, { prefix: '/api/health' });
-  app.register(analyzeRoutes, { prefix: '/api/analyze' });
-  app.register(jobRoutes, { prefix: '/api/jobs' });
-  app.register(profileRoutes, { prefix: '/api' });
-  app.register(socialRoutes, { prefix: '/api/social' });
-  app.register(activityRoutes, { prefix: '/api/users/activity' });
-  app.register(rejectionRoutes, { prefix: '/api' });
-  app.register(shadowResumeRoutes, { prefix: '/api/shadow-resume' });
-  app.register(squadRoutes, { prefix: '/api/squads' });
-  app.register(supportRoutes, { prefix: '/api/support' });
-  app.register(badgeRoutes, { prefix: '/api/badge' });
+  for (const routeModule of publicRouteModules) {
+    app.register(routeModule.routes, { prefix: routeModule.prefix });
+  }
 
   app.register(async function adminScope(adminApp) {
     adminApp.addHook('onRequest', authenticateAdminRequest);

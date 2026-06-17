@@ -14,6 +14,7 @@ import StickerShowcase from '../components/StickerShowcase.jsx';
 import StickerInventoryModal from '../components/StickerInventoryModal.jsx';
 import TopProjectDetailsModal from '../components/TopProjectDetailsModal.jsx';
 import SquadProofCard from '../components/SquadProofCard.jsx';
+import { deleteProfileBanner, uploadProfileBanner } from '../api/profileApi.js';
 
 function initials(name) {
   return String(name || 'A').trim().charAt(0).toUpperCase() || 'A';
@@ -368,18 +369,46 @@ export default function ProfilePage() {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async (loadEvent) => {
-      try {
-        await saveProfile({ ...profile, banner_url: loadEvent.target?.result });
-        setToast('Banner uploaded!');
-        setTimeout(() => setToast(''), 3000);
-      } catch (error) {
-        setToast('Upload failed.');
-        setTimeout(() => setToast(''), 3000);
-      }
-    };
-    reader.readAsDataURL(file);
+    if (!file.type.startsWith('image/')) {
+      setToast('Upload an image file for your banner.');
+      setTimeout(() => setToast(''), 3000);
+      event.target.value = '';
+      return;
+    }
+
+    try {
+      const uploadedBanner = await uploadProfileBanner(file);
+      await saveProfile({
+        ...profile,
+        banner_url: uploadedBanner.banner_url,
+        banner_public_id: uploadedBanner.banner_public_id,
+        banner_asset_id: uploadedBanner.banner_asset_id
+      });
+      setToast('Banner uploaded!');
+    } catch (error) {
+      setToast(error.response?.data?.error || 'Upload failed.');
+    } finally {
+      setTimeout(() => setToast(''), 3000);
+      event.target.value = '';
+    }
+  }
+
+  async function handleBannerRemove() {
+    try {
+      await deleteProfileBanner();
+      await saveProfile({
+        ...profile,
+        banner_url: '',
+        banner_public_id: '',
+        banner_asset_id: ''
+      });
+      setActiveBannerView('badge');
+      setToast('Banner removed.');
+    } catch (error) {
+      setToast(error.response?.data?.error || 'Could not remove banner.');
+    } finally {
+      setTimeout(() => setToast(''), 3000);
+    }
   }
 
   return (
@@ -1172,10 +1201,21 @@ export default function ProfilePage() {
                 <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-[var(--muted-strong)]">Upload Custom Banner</label>
                 <input
                   type="file"
+                  accept="image/*"
                   onChange={handleBannerUpload}
                   className="block w-full cursor-pointer rounded-2xl border border-[var(--border)] bg-[var(--panel-soft)] p-2 text-sm text-[var(--text)] file:mr-4 file:rounded-xl file:border-0 file:bg-[var(--accent)] file:px-4 file:py-2.5 file:text-sm file:font-black file:text-white"
                 />
                 <p className="mt-2 text-[10px] font-semibold leading-tight text-[var(--muted-strong)]">Upload a banner image to personalize your profile header.</p>
+                {bannerUrl ? (
+                  <button
+                    type="button"
+                    onClick={handleBannerRemove}
+                    className="mt-3 inline-flex items-center gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-black uppercase tracking-wider text-red-500 transition-colors hover:bg-red-500/15"
+                  >
+                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                    Remove banner
+                  </button>
+                ) : null}
               </div>
 
               <div>

@@ -15,6 +15,36 @@ export async function saveProfileSettings(profile) {
   return response.data.data;
 }
 
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      const result = String(reader.result || '');
+      resolve(result.includes(',') ? result.split(',').pop() : result);
+    };
+    reader.onerror = () => reject(new Error('Could not read selected banner image.'));
+    reader.readAsDataURL(file);
+  });
+}
+
+export async function uploadProfileBanner(file) {
+  const contentBase64 = await readFileAsBase64(file);
+  const response = await api.post('/api/profile/banner', {
+    fileName: file.name,
+    contentType: file.type,
+    contentBase64
+  });
+  invalidateReadmeCache();
+  return response.data.data;
+}
+
+export async function deleteProfileBanner() {
+  const response = await api.delete('/api/profile/banner');
+  invalidateReadmeCache();
+  return response.data.data;
+}
+
 export async function saveExperience(experience) {
   const response = await api.post('/api/settings/experience', experience);
   invalidateReadmeCache();

@@ -1,8 +1,10 @@
 import {
   deleteExperienceController,
+  deleteProfileBannerController,
   getDashboardSummaryController,
   getProfileSettingsController,
   generatePortfolioReadmeController,
+  uploadProfileBannerController,
   upsertExperienceController,
   upsertProfileSettingsController,
   unlockStickerController,
@@ -14,6 +16,8 @@ import { authenticateRequest, requireFeatureAccess } from '../../shared/middlewa
 export default async function profileRoutes(app) {
   app.get('/profile', { preHandler: authenticateRequest }, getProfileSettingsController);
   app.put('/profile', { preHandler: [authenticateRequest, requireFeatureAccess('profile_visibility')] }, upsertProfileSettingsController);
+  app.post('/profile/banner', { bodyLimit: 6 * 1024 * 1024, preHandler: [authenticateRequest, requireFeatureAccess('profile_visibility')] }, uploadProfileBannerController);
+  app.delete('/profile/banner', { preHandler: [authenticateRequest, requireFeatureAccess('profile_visibility')] }, deleteProfileBannerController);
   app.post('/settings/experience', { preHandler: [authenticateRequest, requireFeatureAccess('profile_visibility')] }, upsertExperienceController);
   app.delete('/settings/experience/:id', { preHandler: authenticateRequest }, deleteExperienceController);
   app.get('/dashboard', { preHandler: authenticateRequest }, getDashboardSummaryController);
