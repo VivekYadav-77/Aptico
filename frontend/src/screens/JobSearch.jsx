@@ -6,6 +6,7 @@ import JobCard from '../components/JobCard.jsx';
 import { selectAuth } from '../store/authSlice.js';
 import { selectCurrentAnalysis } from '../store/historySlice.js';
 import { saveSavedJobDetails } from '../utils/savedJobsStorage.js';
+import { getRequestErrorMessage } from '../utils/requestError.js';
 
 const FILTER_OPTIONS = ['All', 'Full Time', 'Contract', 'Internship'];
 
@@ -51,7 +52,7 @@ export default function JobSearch() {
     } catch (requestError) {
       setJobs([]);
       setMeta(null);
-      setError(requestError.response?.data?.error || 'Could not load jobs.');
+      setError(getRequestErrorMessage(requestError, 'Could not load jobs.'));
     } finally {
       setIsLoading(false);
     }
@@ -85,7 +86,7 @@ export default function JobSearch() {
 
       setStatus(`Bookmarked ${job.title}.`);
     } catch (requestError) {
-      setError(requestError.response?.data?.error || 'Could not save job.');
+      setError(getRequestErrorMessage(requestError, 'Could not save job.'));
     } finally {
       setSavingUrl('');
     }

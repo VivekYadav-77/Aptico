@@ -15,6 +15,7 @@ import {
   LANDING_CORE_PILLARS,
   LANDING_COMPARISON,
   LANDING_FAQ,
+  TEAM_MEMBERS,
   NAVBAR_HEIGHT,
 } from '../constants/index.js';
 
@@ -63,6 +64,129 @@ function initials(name) {
 }
 
 // ── UI PREVIEWS ──────────────────────────────────────────────
+function TeamEmailModal({ member, onClose }) {
+  const [copied, setCopied] = useState(false);
+
+  if (!member?.email) {
+    return null;
+  }
+
+  async function copyEmail() {
+    try {
+      await navigator.clipboard.writeText(member.email);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/55 px-4 py-6 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="team-email-title">
+      <div className="w-full max-w-md rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="app-kicker">Developer email</p>
+            <h2 id="team-email-title" className="mt-2 text-2xl font-black text-[var(--text)]">{member.name}</h2>
+            <p className="mt-1 text-sm font-bold text-[var(--accent-strong)]">{member.role}</p>
+          </div>
+          <button type="button" className="app-icon-button" onClick={onClose} aria-label="Close email popup">
+            <span className="material-symbols-outlined text-[18px]">close</span>
+          </button>
+        </div>
+
+        <div className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--muted)]">Email address</p>
+          <p className="mt-2 break-all text-base font-black text-[var(--text)]">{member.email}</p>
+        </div>
+
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <button type="button" className="app-button flex-1 justify-center" onClick={copyEmail}>
+            <span className="material-symbols-outlined text-[18px]">{copied ? 'check' : 'content_copy'}</span>
+            {copied ? 'Copied' : 'Copy email'}
+          </button>
+          <button type="button" className="app-button-secondary flex-1 justify-center" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TeamMemberCard({ member, onEmailClick }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const visibleLinks = (member.links || []).filter((link) => Boolean(link.href));
+  const fallbackInitials = member.initials || String(member.name || '')
+    .split(' ')
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+  return (
+    <article className="group overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel)] shadow-sm transition-all duration-300 hover:border-[var(--accent)]/35 hover:shadow-xl">
+      <div className="grid gap-0 sm:grid-cols-[13rem_1fr]">
+        <div className="relative aspect-[4/3] overflow-hidden bg-[var(--panel-soft)] sm:aspect-auto sm:min-h-[18rem]">
+          {!imageFailed && member.image ? (
+            <img
+              src={member.image}
+              alt={`${member.name} portrait`}
+              className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+              onError={() => setImageFailed(true)}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,var(--accent-soft),var(--panel-strong))]">
+              <span className="text-5xl font-black tracking-tight text-[var(--accent-strong)]">{fallbackInitials}</span>
+            </div>
+          )}
+          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/35 to-transparent" />
+        </div>
+        <div className="flex min-w-0 flex-col justify-between p-6">
+          <div>
+            <p className="app-kicker">Aptico Team</p>
+            <h3 className="mt-3 text-2xl font-black tracking-tight text-[var(--text)]">{member.name}</h3>
+            <p className="mt-1 text-sm font-bold text-[var(--accent-strong)]">{member.role}</p>
+            {member.designation ? <p className="mt-2 text-xs font-black uppercase tracking-[0.16em] text-[var(--muted)]">{member.designation}</p> : null}
+            <p className="mt-4 text-sm leading-7 text-[var(--muted-strong)]">{member.focus}</p>
+          </div>
+          {visibleLinks.length ? (
+            <div className="mt-6 flex flex-wrap gap-2">
+              {visibleLinks.map((link) => {
+                const isEmailLink = link.label.toLowerCase() === 'email';
+                const className = 'inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] px-3 py-2 text-xs font-bold text-[var(--muted-strong)] transition hover:border-[var(--accent)] hover:text-[var(--text)]';
+
+                return isEmailLink ? (
+                  <button
+                    key={link.label}
+                    type="button"
+                    className={className}
+                    onClick={() => onEmailClick(member)}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">{link.icon}</span>
+                    {link.label}
+                  </button>
+                ) : (
+                  <a
+                    key={link.label}
+                    href={link.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={className}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">{link.icon}</span>
+                    {link.label}
+                  </a>
+                );
+              })}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function UIPreview({ type }) {
   if (type === 'analysis') {
     return (
@@ -153,6 +277,7 @@ export default function GuestDashboard() {
   const [jobs, setJobs] = useState(null);
   const [wins, setWins] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [emailContact, setEmailContact] = useState(null);
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -215,6 +340,7 @@ export default function GuestDashboard() {
           <div className="flex flex-1 items-center justify-end gap-6">
             <nav className="hidden items-center gap-6 md:flex">
               <a href="#features" className="text-sm font-bold text-[var(--muted-strong)] transition hover:text-[var(--text)]">Features</a>
+              <a href="#team" className="text-sm font-bold text-[var(--muted-strong)] transition hover:text-[var(--text)]">Team</a>
               <Link to="/docs" className="text-sm font-bold text-[var(--muted-strong)] transition hover:text-[var(--text)]">Docs</Link>
               <Link to="/login" className="text-sm font-bold text-[var(--muted-strong)] transition hover:text-[var(--text)]">Log in</Link>
             </nav>
@@ -237,7 +363,7 @@ export default function GuestDashboard() {
         {mobileMenuOpen && (
           <div className="border-t border-[var(--border)] bg-[var(--shell)] px-6 py-5 md:hidden">
             <nav className="flex flex-col gap-1">
-              {[ ['Intelligence', '#pillars'], ['Method', '#comparison'], ['Features', '#features'], ].map(([label, href]) => (
+              {[ ['Intelligence', '#pillars'], ['Method', '#comparison'], ['Features', '#features'], ['Team', '#team'], ].map(([label, href]) => (
                 <a key={label} href={href} onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-3 text-sm font-semibold text-[var(--muted-strong)] transition hover:bg-[var(--panel-soft)] hover:text-[var(--text)]">
                   {label}
                 </a>
@@ -419,6 +545,36 @@ export default function GuestDashboard() {
             </div>
           </div>
         </section>
+
+        <section id="team" className="border-y border-[var(--border)] bg-[var(--panel-soft)] py-20 md:py-28">
+          <div className="app-container">
+            <Reveal className="mx-auto max-w-3xl text-center mb-14">
+              <p className="app-kicker">Built by developers</p>
+              <h2 className="mt-3 text-3xl font-black tracking-[-0.03em] text-[var(--text)] sm:text-4xl md:text-5xl">
+                The people behind Aptico.
+              </h2>
+              <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-[var(--muted-strong)]">
+                Aptico is built as a real product: user workflows, admin controls, privacy-safe analytics, support systems, and recruiter-friendly proof all working together.
+              </p>
+            </Reveal>
+
+            <div className="grid gap-5 lg:grid-cols-2">
+              {TEAM_MEMBERS.map((member) => (
+                <Reveal key={member.name}>
+                  <TeamMemberCard member={member} onEmailClick={setEmailContact} />
+                </Reveal>
+              ))}
+            </div>
+
+            <Reveal className="mt-8 rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-5 text-center">
+              <p className="text-sm font-bold leading-7 text-[var(--muted-strong)]">
+                Built with full-stack ownership across product design, backend systems, admin operations, and user-facing workflows.
+              </p>
+            </Reveal>
+          </div>
+        </section>
+
+        {emailContact ? <TeamEmailModal member={emailContact} onClose={() => setEmailContact(null)} /> : null}
 
         {/* ── FAQ SECTION ─────────────────────────────────── */}
         <section className="bg-[var(--panel-soft)] py-20 md:py-32 border-y border-[var(--border)]">

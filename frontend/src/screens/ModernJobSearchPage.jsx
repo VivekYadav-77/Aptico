@@ -9,6 +9,7 @@ import ContainedSelect from '../components/ContainedSelect.jsx';
 import { selectAuth } from '../store/authSlice.js';
 import { clearJobSearchState, selectCurrentAnalysis, selectJobSearchState, setJobSearchState } from '../store/historySlice.js';
 import { saveSavedJobDetails } from '../utils/savedJobsStorage.js';
+import { getRequestErrorMessage, isRestrictionMessage } from '../utils/requestError.js';
 
 const JOB_TYPE_OPTIONS = [
   { label: 'Remote', value: 'remote', icon: 'wifi' },
@@ -435,7 +436,7 @@ export default function ModernJobSearchPage() {
 
       setStatusMessage(`${job.title} was saved to your pipeline.`);
     } catch (requestError) {
-      setActionError(requestError.response?.data?.error || 'Could not save job.');
+      setActionError(getRequestErrorMessage(requestError, 'Could not save job.'));
     } finally {
       setSavingJobId(null);
     }
@@ -599,14 +600,18 @@ export default function ModernJobSearchPage() {
           ) : null}
 
           {actionError ? (
-            <div className="rounded-[1.25rem] border border-[var(--danger-border)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-rose-300">
-              {actionError}
+            <div className="rounded-[1.25rem] border border-[var(--danger-border)] bg-[var(--danger-soft)] px-4 py-3 text-sm font-semibold leading-6 text-rose-300">
+              {isRestrictionMessage(actionError) ? <span className="mb-1 block text-xs font-black uppercase tracking-[0.18em]">Access policy</span> : null}
+              <span>{actionError}</span>
             </div>
           ) : null}
 
           {jobsQuery.error ? (
-            <div className="rounded-[1.25rem] border border-[var(--danger-border)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-rose-300">
-              {jobsQuery.error.response?.data?.error || 'Could not load jobs.'}
+            <div className="rounded-[1.25rem] border border-[var(--danger-border)] bg-[var(--danger-soft)] px-4 py-3 text-sm font-semibold leading-6 text-rose-300">
+              <span className="mb-1 block text-xs font-black uppercase tracking-[0.18em]">
+                {isRestrictionMessage(getRequestErrorMessage(jobsQuery.error, '')) ? 'Access policy' : 'Search error'}
+              </span>
+              <span>{getRequestErrorMessage(jobsQuery.error, 'Could not load jobs.')}</span>
             </div>
           ) : null}
 
@@ -947,6 +952,12 @@ export default function ModernJobSearchPage() {
                             {savingJobId === selectedJob.id ? 'Saving...' : savedJobIds.has(selectedJob.id) ? 'Saved' : 'Save'}
                           </button>
                         </div>
+                        {actionError && isRestrictionMessage(actionError) ? (
+                          <div className="rounded-[1.25rem] border border-[var(--danger-border)] bg-[var(--danger-soft)] px-4 py-3 text-sm font-semibold leading-6 text-rose-300">
+                            <span className="mb-1 block text-xs font-black uppercase tracking-[0.18em]">Access policy</span>
+                            {actionError}
+                          </div>
+                        ) : null}
                       </div>
                     </div>
                   </div>

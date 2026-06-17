@@ -5,6 +5,7 @@ import { useSelector } from 'react-redux';
 import { fetchJobs } from '../api/jobsApi.js';
 import JobSearchResultCard from '../components/JobSearchResultCard.jsx';
 import { selectCurrentAnalysis } from '../store/historySlice.js';
+import { getRequestErrorMessage } from '../utils/requestError.js';
 
 const JOB_TYPE_OPTIONS = [
   { label: 'Remote', value: 'remote' },
@@ -229,7 +230,7 @@ export default function JobSearchPage() {
 
         {jobsQuery.error ? (
           <div className="rounded-3xl border border-rose-500/30 bg-rose-500/10 px-5 py-4 text-sm text-rose-200">
-            {jobsQuery.error.response?.data?.error || 'Could not load jobs.'}
+            {getRequestErrorMessage(jobsQuery.error, 'Could not load jobs.')}
           </div>
         ) : null}
 

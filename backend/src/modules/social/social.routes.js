@@ -1,7 +1,7 @@
 import { and, desc, eq, ilike, inArray, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { analyses, communityWins, connections, notifications, publicJobCache, userProfiles, users } from '../../db/schema.js';
-import { authenticateRequest, optionalAuthenticateRequest } from '../../shared/middleware/auth.middleware.js';
+import { authenticateRequest, optionalAuthenticateRequest, requireFeatureAccess } from '../../shared/middleware/auth.middleware.js';
 import {
   createOrUpdateProfile,
   followUser,
@@ -37,6 +37,7 @@ import {
 } from './post.service.js';
 import { deleteWin, getMyWins, getPublicJobsFeed, getWinById, getWinsFeed, likeWin, getWinLikers, postWin, updateWin } from './social.service.js';
 import { getUnreadCount } from '../../shared/utils/notification-helper.js';
+import { recordAnalyticsEvent } from '../analytics/analytics.service.js';
 
 const USERNAME_PATTERN = /^[a-z0-9_-]{3,30}$/;
 
@@ -91,13 +92,27 @@ const connectionResponseSchema = z.object({
 });
 
 const notificationQuerySchema = paginationSchema.extend({
-  unreadOnly: z.coerce.boolean().default(false)
+  unreadOnly: z.coerce.boolean().default(false),
+  readStatus: z.enum(['all', 'read', 'unread']).default('all'),
+  type: z.string().trim().max(80).optional(),
+  category: z.enum(['social', 'career', 'squad', 'admin']).optional()
 });
 
 const notificationReadSchema = z.object({
   notificationIds: z.array(z.string().uuid()).optional(),
   markAllRead: z.boolean().optional()
 });
+
+const notificationParamsSchema = z.object({
+  notificationId: z.string().uuid()
+});
+
+const notificationTypeGroups = {
+  social: ['new_follower', 'new_connection_request', 'connection_accepted', 'post_like', 'post_comment'],
+  career: ['job_match_alert'],
+  squad: ['squad_ping', 'squad_goal_reached', 'squad_synergy_burst'],
+  admin: ['admin_restriction_update', 'admin_account_status', 'support_ticket_reply', 'support_ticket_status']
+};
 
 const socialWriteRateLimit = {
   rateLimit: {
@@ -185,6 +200,7 @@ export default async function socialRoutes(app) {
 
   app.get('/profile/:username/is-following', { preHandler: authenticateRequest }, async (request, reply) => {
     try {
+      await getPublicProfile(request.server.db, request.params.username, request.auth.userId);
       const target = await getProfileByUsername(request.server.db, request.params.username);
 
       if (!target) {
@@ -200,6 +216,7 @@ export default async function socialRoutes(app) {
 
   app.get('/profile/:username/followers', { preHandler: optionalAuthenticateRequest }, async (request, reply) => {
     try {
+      await getPublicProfile(request.server.db, request.params.username, request.auth?.userId || null);
       const followers = await getFollowers(request.server.db, request.params.username);
       return reply.send({ followers });
     } catch (error) {
@@ -209,6 +226,7 @@ export default async function socialRoutes(app) {
 
   app.get('/profile/:username/following', { preHandler: optionalAuthenticateRequest }, async (request, reply) => {
     try {
+      await getPublicProfile(request.server.db, request.params.username, request.auth?.userId || null);
       const following = await getFollowing(request.server.db, request.params.username);
       return reply.send({ following });
     } catch (error) {
@@ -218,6 +236,7 @@ export default async function socialRoutes(app) {
 
   app.get('/profile/:username/connections', { preHandler: optionalAuthenticateRequest }, async (request, reply) => {
     try {
+      await getPublicProfile(request.server.db, request.params.username, request.auth?.userId || null);
       const userConnections = await getPublicConnections(request.server.db, request.params.username);
       return reply.send({ connections: userConnections });
     } catch (error) {
@@ -269,22 +288,6 @@ export default async function socialRoutes(app) {
     try {
       const username = String(request.params.username || '').trim();
       const viewerId = request.auth?.userId || null;
-      const redis = request.server.services?.redis;
-
-      // Authenticated viewers always get fresh data (settings changes, visibility updates)
-      // Only anonymous visitors use cache
-      if (!viewerId) {
-        const cacheKey = `profile:username:${username}`;
-        const cached = parseCachedJson(await redis?.get(cacheKey));
-        if (cached) {
-          return reply.send(cached);
-        }
-
-        const profile = await getPublicProfile(request.server.db, username, null);
-        await redis?.set(cacheKey, JSON.stringify(profile), 120);
-        return reply.send(profile);
-      }
-
       const profile = await getPublicProfile(request.server.db, username, viewerId);
       return reply.send(profile);
     } catch (error) {
@@ -296,7 +299,7 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.put('/profile', { preHandler: authenticateRequest }, async (request, reply) => {
+  app.put('/profile', { preHandler: [authenticateRequest, requireFeatureAccess('profile_visibility')] }, async (request, reply) => {
     try {
       const body = profileBodySchema.parse(request.body || {});
       const oldProfileRows = await request.server.db
@@ -320,7 +323,7 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.post('/follow/:username', { preHandler: authenticateRequest, config: socialStrictRateLimit }, async (request, reply) => {
+  app.post('/follow/:username', { preHandler: [authenticateRequest, requireFeatureAccess('squad_actions')], config: socialStrictRateLimit }, async (request, reply) => {
     try {
       const result = await followUser(request.server.db, request.auth.userId, request.params.username);
       return reply.send(result);
@@ -338,7 +341,7 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.post('/wins', { preHandler: authenticateRequest, config: socialStrictRateLimit }, async (request, reply) => {
+  app.post('/wins', { preHandler: [authenticateRequest, requireFeatureAccess('posting')], config: socialStrictRateLimit }, async (request, reply) => {
     try {
       const body = winBodySchema.parse(request.body || {});
       const win = await postWin(request.server.db, request.auth.userId, body);
@@ -368,7 +371,7 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.put('/wins/:winId', { preHandler: authenticateRequest, config: socialWriteRateLimit }, async (request, reply) => {
+  app.put('/wins/:winId', { preHandler: [authenticateRequest, requireFeatureAccess('posting')], config: socialWriteRateLimit }, async (request, reply) => {
     try {
       const body = winBodySchema.parse(request.body || {});
       const win = await updateWin(request.server.db, request.auth.userId, request.params.winId, body);
@@ -439,7 +442,7 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.post('/wins/:winId/like', { preHandler: authenticateRequest, config: socialWriteRateLimit }, async (request, reply) => {
+  app.post('/wins/:winId/like', { preHandler: [authenticateRequest, requireFeatureAccess('squad_actions')], config: socialWriteRateLimit }, async (request, reply) => {
     try {
       const result = await likeWin(request.server.db, request.auth.userId, request.params.winId);
       return reply.send(result);
@@ -508,10 +511,21 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.post('/posts', { preHandler: authenticateRequest, config: socialStrictRateLimit }, async (request, reply) => {
+  app.post('/posts', { preHandler: [authenticateRequest, requireFeatureAccess('posting')], config: socialStrictRateLimit }, async (request, reply) => {
     try {
       const body = postBodySchema.parse(request.body || {});
       const post = await createPost(request.server.db, request.auth.userId, body);
+      await recordAnalyticsEvent({
+        db: request.server.db,
+        request,
+        eventType: 'post_created',
+        userId: request.auth.userId,
+        metadata: {
+          postId: post?.id || null,
+          postType: body.post_type,
+          scheduled: Boolean(body.scheduled_at)
+        }
+      });
       return reply.code(201).send(post);
     } catch (error) {
       return sendError(reply, error, 'Could not create post.');
@@ -528,7 +542,7 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.put('/posts/:postId', { preHandler: authenticateRequest, config: socialWriteRateLimit }, async (request, reply) => {
+  app.put('/posts/:postId', { preHandler: [authenticateRequest, requireFeatureAccess('posting')], config: socialWriteRateLimit }, async (request, reply) => {
     try {
       const body = postBodySchema.parse(request.body || {});
       const post = await updatePost(request.server.db, request.auth.userId, request.params.postId, body);
@@ -579,7 +593,7 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.post('/posts/:postId/like', { preHandler: authenticateRequest, config: socialWriteRateLimit }, async (request, reply) => {
+  app.post('/posts/:postId/like', { preHandler: [authenticateRequest, requireFeatureAccess('squad_actions')], config: socialWriteRateLimit }, async (request, reply) => {
     try {
       const result = await likePost(request.server.db, request.auth.userId, request.params.postId);
       return reply.send(result);
@@ -598,17 +612,28 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.post('/posts/:postId/comments', { preHandler: authenticateRequest, config: socialStrictRateLimit }, async (request, reply) => {
+  app.post('/posts/:postId/comments', { preHandler: [authenticateRequest, requireFeatureAccess('commenting')], config: socialStrictRateLimit }, async (request, reply) => {
     try {
       const body = commentBodySchema.parse(request.body || {});
       const comment = await addComment(request.server.db, request.auth.userId, request.params.postId, body.content, body.parent_id || null);
+      await recordAnalyticsEvent({
+        db: request.server.db,
+        request,
+        eventType: 'comment_created',
+        userId: request.auth.userId,
+        metadata: {
+          postId: request.params.postId,
+          commentId: comment?.id || null,
+          reply: Boolean(body.parent_id)
+        }
+      });
       return reply.code(201).send(comment);
     } catch (error) {
       return sendError(reply, error, 'Could not add comment.');
     }
   });
 
-  app.post('/comments/:commentId/like', { preHandler: authenticateRequest, config: socialStrictRateLimit }, async (request, reply) => {
+  app.post('/comments/:commentId/like', { preHandler: [authenticateRequest, requireFeatureAccess('commenting')], config: socialStrictRateLimit }, async (request, reply) => {
     try {
       const result = await toggleCommentLike(request.server.db, request.auth.userId, request.params.commentId);
       return reply.send(result);
@@ -646,7 +671,7 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.post('/connections/request/:username', { preHandler: authenticateRequest, config: socialStrictRateLimit }, async (request, reply) => {
+  app.post('/connections/request/:username', { preHandler: [authenticateRequest, requireFeatureAccess('squad_actions')], config: socialStrictRateLimit }, async (request, reply) => {
     try {
       const body = connectionRequestSchema.parse(request.body || {});
       const connection = await sendConnectionRequest(request.server.db, request.auth.userId, request.params.username, body.note);
@@ -656,7 +681,7 @@ export default async function socialRoutes(app) {
     }
   });
 
-  app.put('/connections/:connectionId', { preHandler: authenticateRequest, config: socialWriteRateLimit }, async (request, reply) => {
+  app.put('/connections/:connectionId', { preHandler: [authenticateRequest, requireFeatureAccess('squad_actions')], config: socialWriteRateLimit }, async (request, reply) => {
     try {
       const body = connectionResponseSchema.parse(request.body || {});
       const result = await respondToRequest(request.server.db, request.auth.userId, request.params.connectionId, body.action);
@@ -703,8 +728,16 @@ export default async function socialRoutes(app) {
       const query = notificationQuerySchema.parse(request.query || {});
       const filters = [eq(notifications.userId, request.auth.userId)];
 
-      if (query.unreadOnly) {
+      if (query.unreadOnly || query.readStatus === 'unread') {
         filters.push(eq(notifications.isRead, false));
+      } else if (query.readStatus === 'read') {
+        filters.push(eq(notifications.isRead, true));
+      }
+
+      if (query.type) {
+        filters.push(eq(notifications.type, query.type));
+      } else if (query.category) {
+        filters.push(inArray(notifications.type, notificationTypeGroups[query.category]));
       }
 
       const rows = await request.server.db
@@ -763,24 +796,19 @@ export default async function socialRoutes(app) {
     }
   });
 
-  // app.get('/notifications/count', { preHandler: authenticateRequest }, async (request, reply) => {
-  //   try {
-  //     const cacheKey = `notif:count:${request.auth.userId}`;
-  //     const redis = request.server.services?.redis;
-  //     const cached = parseCachedJson(await redis?.get(cacheKey));
+  app.delete('/notifications/:notificationId', { preHandler: authenticateRequest }, async (request, reply) => {
+    try {
+      const { notificationId } = notificationParamsSchema.parse(request.params || {});
+      const deleted = await request.server.db
+        .delete(notifications)
+        .where(and(eq(notifications.userId, request.auth.userId), eq(notifications.id, notificationId)))
+        .returning({ id: notifications.id });
 
-  //     if (cached) {
-  //       return reply.send(cached);
-  //     }
-
-  //     const unreadCount = await getUnreadCount(request.server.db, request.auth.userId);
-  //     const payload = { unreadCount };
-  //     await redis?.set(cacheKey, JSON.stringify(payload), 30);
-  //     return reply.send(payload);
-  //   } catch (error) {
-  //     return sendError(reply, error, 'Could not load notification count.');
-  //   }
-  // });
+      return reply.send({ success: true, deletedCount: deleted.length });
+    } catch (error) {
+      return sendError(reply, error, 'Could not delete notification.');
+    }
+  });
 
   app.get('/people/search', { preHandler: authenticateRequest }, async (request, reply) => {
     try {

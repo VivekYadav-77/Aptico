@@ -1,4 +1,4 @@
-const backendTarget = process.env.API_PROXY_TARGET || process.env.NEXT_PUBLIC_API_PROXY_TARGET || 'http://localhost:5000';
+const backendTarget = process.env.API_PROXY_TARGET || process.env.NEXT_PUBLIC_API_PROXY_TARGET || 'http://localhost:5001';
 
 const securityHeaders = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
@@ -13,7 +13,7 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com data:",
       "img-src 'self' data: blob: https:",
-      "connect-src 'self' http://localhost:5000 https://accounts.google.com https://oauth2.googleapis.com",
+      "connect-src 'self' http://localhost:5000 http://localhost:5001 https://accounts.google.com https://oauth2.googleapis.com",
       "frame-src 'self' https://accounts.google.com",
       "frame-ancestors 'none'",
       "base-uri 'self'",

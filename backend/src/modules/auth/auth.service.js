@@ -3,7 +3,7 @@ import util from 'node:util';
 import jwt from 'jsonwebtoken';
 import { and, eq, gt, isNull, sql } from 'drizzle-orm';
 import { env } from '../../config/env.js';
-import { authTokens, refreshTokens, users } from '../../db/schema.js';
+import { authTokens, emailServiceBlocks, refreshTokens, users } from '../../db/schema.js';
 import { ensureUserProfile } from '../profile/profile.service.js';
 import { sendAuthEmail } from '../../shared/services/email.service.js';
 
@@ -30,6 +30,7 @@ const AUTH_USER_FIELDS = {
   passwordHash: users.passwordHash,
   googleSubject: users.googleSubject,
   role: users.role,
+  status: users.status,
   emailVerifiedAt: users.emailVerifiedAt,
   createdAt: users.createdAt,
   lastLogin: users.lastLogin,
@@ -43,6 +44,12 @@ function createAuthError(message, statusCode, code = null) {
   error.statusCode = statusCode;
   error.code = code;
   return error;
+}
+
+function dispatchAuthEmailInBackground(emailPromise, label) {
+  void emailPromise.catch((error) => {
+    console.error(`[authService] Background ${label} email dispatch failed:`, error?.message || error);
+  });
 }
 
 function requireDatabase(db) {
@@ -167,6 +174,41 @@ function resolveAuthProvider(existingUser, nextProvider) {
   return 'hybrid';
 }
 
+async function assertEmailServiceAllowed(db, email) {
+  const normalizedEmail = String(email || '').trim().toLowerCase();
+  if (!normalizedEmail) return;
+
+  const [block] = await db
+    .select({
+      reason: emailServiceBlocks.reason
+    })
+    .from(emailServiceBlocks)
+    .where(and(eq(emailServiceBlocks.email, normalizedEmail), eq(emailServiceBlocks.isBlocked, true)))
+    .limit(1);
+
+  if (block) {
+    const reason = block.reason ? ` Reason: ${block.reason}` : '';
+    throw createAuthError(
+      `Email service is currently blocked for this address by an administrator.${reason}`,
+      403,
+      'EMAIL_SERVICE_BLOCKED'
+    );
+  }
+}
+
+function shouldVerifyInvitePasswordSetup(user) {
+  if (user.emailVerifiedAt) {
+    return false;
+  }
+
+  if (user.authProvider === 'admin_invite') {
+    return true;
+  }
+
+  // Older invite resets converted admin-invited users to hybrid before verifying.
+  return user.authProvider === 'hybrid' && Boolean(user.passwordHash);
+}
+
 async function upsertGoogleUser(db, payload) {
   const now = new Date();
   const existingUser = await findUserByEmail(db, payload.email);
@@ -197,6 +239,7 @@ async function upsertGoogleUser(db, payload) {
       googleSubject: payload.googleSubject || null,
       authProvider: 'google',
       role: 'user',
+      status: 'active',
       emailVerifiedAt: now,
       lastLogin: now
     })
@@ -214,7 +257,8 @@ async function createPasswordUser(db, { email, password, name }) {
       name: name || null,
       authProvider: 'password',
       passwordHash,
-      role: 'user'
+      role: 'user',
+      status: 'active'
     })
     .returning(AUTH_USER_FIELDS);
 
@@ -301,6 +345,7 @@ function normalizeUser(user) {
     avatarUrl: user.avatarUrl,
     authProvider: user.authProvider,
     role: user.role,
+    status: user.status || 'active',
     resilienceXp: user.resilienceXp || 0,
     emailVerified: Boolean(user.emailVerifiedAt)
   };
@@ -436,10 +481,21 @@ function requireVerifiedEmail(user) {
   }
 }
 
-export async function registerWithPassword({ db, email, password, name }) {
+function ensureUserCanAuthenticate(user) {
+  if (user?.status === 'blocked') {
+    throw createAuthError('This account has been blocked by an administrator.', 403, 'ACCOUNT_BLOCKED');
+  }
+
+  if (user?.status === 'deactivated') {
+    throw createAuthError('This account has been deactivated by an administrator.', 403, 'ACCOUNT_DEACTIVATED');
+  }
+}
+
+export async function registerWithPassword({ db, email, password, name, request = null }) {
   requireDatabase(db);
 
   const normalizedEmail = email.trim().toLowerCase();
+  await assertEmailServiceAllowed(db, normalizedEmail);
   const existingUser = await findUserByEmail(db, normalizedEmail);
 
   if (existingUser) {
@@ -452,7 +508,7 @@ export async function registerWithPassword({ db, email, password, name }) {
     name
   });
 
-  const verificationResult = await sendEmailVerification({ db, user });
+  const verificationResult = await sendEmailVerification({ db, user, request });
 
   return {
     user: normalizeUser(user),
@@ -476,6 +532,7 @@ export async function loginWithPassword({ db, email, password, request }) {
   }
 
   requireVerifiedEmail(user);
+  ensureUserCanAuthenticate(user);
   return issueSession(db, user, request);
 }
 
@@ -511,10 +568,11 @@ export async function loginWithGoogle({ db, credential, request }) {
     googleSubject: payload.sub || null
   });
 
+  ensureUserCanAuthenticate(user);
   return issueSession(db, user, request);
 }
 
-export async function sendEmailVerification({ db, email = null, user = null }) {
+export async function sendEmailVerification({ db, email = null, user = null, request = null }) {
   requireDatabase(db);
 
   const targetUser = user || (email ? await findUserByEmail(db, email.trim().toLowerCase()) : null);
@@ -532,6 +590,8 @@ export async function sendEmailVerification({ db, email = null, user = null }) {
     };
   }
 
+  await assertEmailServiceAllowed(db, targetUser.email);
+
   const token = await createOneTimeToken(db, {
     userId: targetUser.id,
     tokenType: AUTH_TOKEN_TYPES.emailVerification,
@@ -544,7 +604,10 @@ export async function sendEmailVerification({ db, email = null, user = null }) {
     name: targetUser.name,
     link: buildFrontendActionUrl('verify-email', token.rawToken),
     expiresAt: token.expiresAt.toISOString(),
-    appName: 'Aptico'
+    appName: 'Aptico',
+    db,
+    request,
+    userId: targetUser.id
   });
 
   return {
@@ -570,13 +633,17 @@ export async function verifyEmailToken({ db, token, request }) {
     throw createAuthError('User for verification token was not found.', 404, 'USER_NOT_FOUND');
   }
 
+  ensureUserCanAuthenticate(user);
   return issueSession(db, user, request);
 }
 
-export async function requestPasswordReset({ db, email }) {
+export async function requestPasswordReset({ db, email, request = null, userId = null, logType = null }) {
   requireDatabase(db);
 
-  const user = await findUserByEmail(db, email.trim().toLowerCase());
+  const normalizedEmail = email.trim().toLowerCase();
+  await assertEmailServiceAllowed(db, normalizedEmail);
+
+  const user = await findUserByEmail(db, normalizedEmail);
 
   if (!user) {
     return {
@@ -590,14 +657,21 @@ export async function requestPasswordReset({ db, email }) {
     ttlSeconds: PASSWORD_RESET_TTL_SECONDS
   });
 
-  await sendAuthEmail({
-    type: 'password_reset',
-    email: user.email,
-    name: user.name,
-    link: buildFrontendActionUrl('reset-password', token.rawToken),
-    expiresAt: token.expiresAt.toISOString(),
-    appName: 'Aptico'
-  });
+  dispatchAuthEmailInBackground(
+    sendAuthEmail({
+      type: 'password_reset',
+      email: user.email,
+      name: user.name,
+      link: buildFrontendActionUrl('reset-password', token.rawToken),
+      expiresAt: token.expiresAt.toISOString(),
+      appName: 'Aptico',
+      db,
+      request,
+      userId: userId || user.id,
+      logType
+    }),
+    logType || 'password_reset'
+  );
 
   return {
     sent: true
@@ -619,13 +693,18 @@ export async function resetPassword({ db, token, password }) {
   }
 
   const passwordHash = await createPasswordHash(password);
+  const updates = {
+    passwordHash,
+    authProvider: resolveAuthProvider(user, 'password')
+  };
+
+  if (shouldVerifyInvitePasswordSetup(user)) {
+    updates.emailVerifiedAt = new Date();
+  }
 
   await db
     .update(users)
-    .set({
-      passwordHash,
-      authProvider: resolveAuthProvider(user, 'password')
-    })
+    .set(updates)
     .where(eq(users.id, user.id));
 
   await revokeAllRefreshTokensForUser(db, user.id);
@@ -697,6 +776,7 @@ export async function refreshSession({ db, refreshToken, request }) {
     throw createAuthError('User for refresh token was not found.', 401, 'USER_NOT_FOUND');
   }
 
+  ensureUserCanAuthenticate(user);
   await revokeRefreshTokenRecord(db, refreshToken);
   return issueSession(db, user, request);
 }

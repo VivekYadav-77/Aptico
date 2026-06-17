@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
-import { Navigate } from '@/lib/router-compat.jsx';
+import { Navigate, useLocation } from '@/lib/router-compat.jsx';
 import { AdminRoute, ProtectedRoute } from '../components/ProtectedRoute.jsx';
 import AnalysisHistoryPage from '../screens/AnalysisHistoryPage.jsx';
 import AnalysisWorkspace from '../screens/AnalysisWorkspace.jsx';
 import AuthPermanent from '../screens/AuthPermanent.jsx';
 import CommunityWins from '../screens/CommunityWins.jsx';
 import ControlCenter from '../screens/ControlCenter.jsx';
+import ContactSupport from '../screens/ContactSupport.jsx';
 import DocArticlePage from '../features/docs/pages/DocArticlePage.jsx';
 import DocsHubPage from '../features/docs/pages/DocsHubPage.jsx';
 import GuestDashboard from '../screens/GuestDashboard.jsx';
@@ -29,8 +30,10 @@ import SettingsPage from '../screens/SettingsPage.jsx';
 import ShadowResume from '../screens/ShadowResume.jsx';
 import SquadDashboard from '../screens/SquadDashboard.jsx';
 import SquadLeaderboardPage from '../screens/SquadLeaderboardPage.jsx';
+import SupportCenter from '../screens/SupportCenter.jsx';
 import LegalPage from '../screens/LegalPage.jsx';
 import { selectAuth } from '../store/authSlice.js';
+import { trackEvent } from '../api/analyticsApi.js';
 
 const routes = {
   analysis: AnalysisWorkspace,
@@ -38,6 +41,7 @@ const routes = {
   auth: AuthPermanent,
   communityWins: CommunityWins,
   controlCenter: ControlCenter,
+  contactSupport: ContactSupport,
   docArticle: DocArticlePage,
   docsHub: DocsHubPage,
   guest: GuestDashboard,
@@ -58,6 +62,7 @@ const routes = {
   shadowResume: ShadowResume,
   squadLeaderboard: SquadLeaderboardPage,
   squads: SquadDashboard,
+  support: SupportCenter,
   legal: LegalPage
 };
 
@@ -77,12 +82,41 @@ function RootRoute() {
     return <LoadingShell />;
   }
 
-  return auth.isAuthenticated ? <Navigate replace to="/squads" /> : <GuestDashboard />;
+  if (auth.isAuthenticated) {
+    return <Navigate replace to={auth.user?.role === 'admin' ? '/admin' : '/squads'} />;
+  }
+
+  return <GuestDashboard />;
+}
+
+function AnalyticsRouteTracker() {
+  const location = useLocation();
+  const auth = useSelector(selectAuth);
+
+  useEffect(() => {
+    if (!auth.authReady) {
+      return;
+    }
+
+    void trackEvent('page_view', {
+      authenticated: auth.isAuthenticated,
+      route: location.pathname
+    }, {
+      path: `${location.pathname}${location.search}`
+    });
+  }, [auth.authReady, auth.isAuthenticated, location.pathname, location.search]);
+
+  return null;
 }
 
 export default function RouteClient({ name, guard = 'public' }) {
   if (name === 'root') {
-    return <RootRoute />;
+    return (
+      <>
+        <AnalyticsRouteTracker />
+        <RootRoute />
+      </>
+    );
   }
 
   const Component = routes[name];
@@ -94,6 +128,7 @@ export default function RouteClient({ name, guard = 'public' }) {
   if (guard === 'admin') {
     return (
       <AdminRoute>
+        <AnalyticsRouteTracker />
         <Component />
       </AdminRoute>
     );
@@ -102,10 +137,16 @@ export default function RouteClient({ name, guard = 'public' }) {
   if (guard === 'protected') {
     return (
       <ProtectedRoute>
+        <AnalyticsRouteTracker />
         <Component />
       </ProtectedRoute>
     );
   }
 
-  return <Component />;
+  return (
+    <>
+      <AnalyticsRouteTracker />
+      <Component />
+    </>
+  );
 }

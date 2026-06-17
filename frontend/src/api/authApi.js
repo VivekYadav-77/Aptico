@@ -1,6 +1,7 @@
 import api from './axios.js';
 import { clearAuthSession, setAuthReady, setAuthSession } from '../store/authSlice.js';
 import { invalidateReadmeCache } from './profileApi.js';
+import { trackEvent } from './analyticsApi.js';
 
 let interceptorsReady = false;
 let activeStore = null;
@@ -140,6 +141,7 @@ function applySessionToStore(store, session) {
 
 export async function registerRequest(payload) {
   const response = await api.post('/api/auth/register', payload);
+  void trackEvent('signup', { method: 'password' });
   return response.data.data;
 }
 
@@ -147,6 +149,7 @@ export async function loginRequest(payload, store) {
   const response = await api.post('/api/auth/login', payload);
   const session = response.data.data;
   applySessionToStore(store, session);
+  void trackEvent('login', { method: 'password' });
   return session;
 }
 
@@ -154,6 +157,7 @@ export async function loginWithGoogleRequest(credential, store) {
   const response = await api.post('/api/auth/google', { credential });
   const session = response.data.data;
   applySessionToStore(store, session);
+  void trackEvent('login', { method: 'google' });
   return session;
 }
 
@@ -161,6 +165,7 @@ export async function verifyEmailRequest(token, store) {
   const response = await api.post('/api/auth/verify-email/confirm', { token });
   const session = response.data.data;
   applySessionToStore(store, session);
+  void trackEvent('login', { method: 'email_verification' });
   return session;
 }
 
@@ -206,6 +211,7 @@ export async function logoutRequest(store) {
       headers: token ? { 'X-CSRF-Token': token } : undefined
     });
   } finally {
+    void trackEvent('logout', { method: 'session' });
     csrfToken = null;
     invalidateReadmeCache();
     store.dispatch(clearAuthSession());

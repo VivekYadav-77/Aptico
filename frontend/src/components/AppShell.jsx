@@ -72,10 +72,11 @@ function Navigation({ mobile = false, onNavigate, showAdmin }) {
 }
 
 // ── Search Dropdown ──────────────────────────────────────────
-function SearchDropdown({ query, onClose, navigate }) {
+function SearchDropdown({ query, onClose, navigate, showAdmin = false }) {
   const trimmed = query.trim().toLowerCase();
+  const navItems = showAdmin ? [...NAV_ITEMS, ADMIN_NAV_ITEM] : NAV_ITEMS;
 
-  const navResults = NAV_ITEMS.filter(
+  const navResults = navItems.filter(
     (item) =>
       item.label.toLowerCase().includes(trimmed) ||
       item.description.toLowerCase().includes(trimmed)
@@ -96,77 +97,79 @@ function SearchDropdown({ query, onClose, navigate }) {
 
   return (
     <div
-      className="search-dropdown absolute left-0 top-[calc(100%+8px)] z-[200] w-[min(24rem,calc(100vw-2rem))] max-w-sm overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel)] shadow-[0_24px_48px_rgba(0,0,0,0.18)]"
+      className="search-dropdown absolute left-0 top-[calc(100%+8px)] z-[200] flex max-h-[calc(100vh-5rem)] w-[min(24rem,calc(100vw-2rem))] max-w-sm flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel)] shadow-[0_24px_48px_rgba(0,0,0,0.18)] md:max-h-[min(34rem,calc(100vh-5.5rem))]"
       style={{ backdropFilter: 'blur(20px)' }}
     >
-      {!trimmed ? (
-        <div className="px-5 py-8 text-center">
-           <span className="material-symbols-outlined text-[32px] text-[var(--muted)] mb-3">manage_search</span>
-           <p className="text-sm font-medium text-[var(--text)]">Type to search insights</p>
-           <p className="mt-1 text-xs text-[var(--muted-strong)]">Find pages, squad info, and settings quickly.</p>
-           <div className="mt-5 flex flex-wrap justify-center gap-2">
-             {['/dashboard', '/analysis', '/jobs'].map(path => {
-               const item = NAV_ITEMS.find(n => n.to === path);
-               return item ? (
-                 <button key={path} onClick={() => handleSelect(path)} className="flex items-center gap-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] px-3 py-1.5 text-xs font-semibold text-[var(--text)] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all duration-200">
-                   <span className="material-symbols-outlined text-[14px] text-[var(--accent)] drop-shadow-[0_0_4px_rgba(78,222,163,0.4)]">{item.icon}</span>
-                   {item.label}
-                 </button>
-               ) : null;
-             })}
-           </div>
-        </div>
-      ) : hasResults ? (
-        <div className="py-3">
-          {navResults.length > 0 && (
-            <div className="px-5 pb-2">
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Pages</p>
-              {navResults.map((item) => (
-                <button
-                  key={item.to}
-                  type="button"
-                  onClick={() => handleSelect(item.to)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition hover:bg-[var(--panel-soft)]"
-                >
-                  <span className="material-symbols-outlined text-[18px] text-[var(--accent-strong)]">{item.icon}</span>
-                  <div>
-                    <p className="font-semibold text-[var(--text)]">{item.label}</p>
-                    <p className="text-xs text-[var(--muted-strong)]">{item.description}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-          {insightResults.length > 0 && (
-            <div className="px-5 pt-1">
-              {navResults.length > 0 && <div className="mb-2 border-t border-[var(--border)]" />}
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Insights</p>
-              {insightResults.slice(0, 5).map((item, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => handleSelect(item.to)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition hover:bg-[var(--panel-soft)]"
-                >
-                  <span className="material-symbols-outlined text-[18px] text-[var(--muted)]">{item.icon}</span>
-                  <div>
-                    <p className="font-medium text-[var(--text)]">{item.label}</p>
-                    <p className="text-xs text-[var(--muted-strong)]">{item.category}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="px-5 py-8 text-center">
-          <span className="material-symbols-outlined text-[32px] text-[var(--muted)]">search_off</span>
-          <p className="mt-2 text-sm font-medium text-[var(--text)]">No results for &ldquo;{query}&rdquo;</p>
-          <p className="mt-1 text-xs text-[var(--muted-strong)]">Try searching for a page, feature, or setting</p>
-        </div>
-      )}
+      <div className="search-dropdown-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        {!trimmed ? (
+          <div className="px-5 py-8 text-center">
+             <span className="material-symbols-outlined text-[32px] text-[var(--muted)] mb-3">manage_search</span>
+             <p className="text-sm font-medium text-[var(--text)]">Type to search insights</p>
+             <p className="mt-1 text-xs text-[var(--muted-strong)]">Find pages, squad info, and settings quickly.</p>
+             <div className="mt-5 flex flex-wrap justify-center gap-2">
+               {['/dashboard', '/analysis', '/jobs'].map(path => {
+                 const item = NAV_ITEMS.find(n => n.to === path);
+                 return item ? (
+                   <button key={path} onClick={() => handleSelect(path)} className="flex items-center gap-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] px-3 py-1.5 text-xs font-semibold text-[var(--text)] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all duration-200">
+                     <span className="material-symbols-outlined text-[14px] text-[var(--accent)] drop-shadow-[0_0_4px_rgba(78,222,163,0.4)]">{item.icon}</span>
+                     {item.label}
+                   </button>
+                 ) : null;
+               })}
+             </div>
+          </div>
+        ) : hasResults ? (
+          <div className="py-3">
+            {navResults.length > 0 && (
+              <div className="px-4 pb-2">
+                <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Pages</p>
+                {navResults.map((item) => (
+                  <button
+                    key={item.to}
+                    type="button"
+                    onClick={() => handleSelect(item.to)}
+                    className="search-result-row flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                  >
+                    <span className="material-symbols-outlined text-[20px] text-[var(--accent-strong)]">{item.icon}</span>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-[var(--text)]">{item.label}</p>
+                      <p className="line-clamp-2 text-xs leading-5 text-[var(--muted-strong)]">{item.description}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            {insightResults.length > 0 && (
+              <div className="px-4 pt-1">
+                {navResults.length > 0 && <div className="mb-2 border-t border-[var(--border)]" />}
+                <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Insights</p>
+                {insightResults.slice(0, 5).map((item, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => handleSelect(item.to)}
+                    className="search-result-row flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                  >
+                    <span className="material-symbols-outlined text-[20px] text-[var(--muted)]">{item.icon}</span>
+                    <div className="min-w-0">
+                      <p className="font-medium text-[var(--text)]">{item.label}</p>
+                      <p className="text-xs text-[var(--muted-strong)]">{item.category}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="px-5 py-8 text-center">
+            <span className="material-symbols-outlined text-[32px] text-[var(--muted)]">search_off</span>
+            <p className="mt-2 text-sm font-medium text-[var(--text)]">No results for &ldquo;{query}&rdquo;</p>
+            <p className="mt-1 text-xs text-[var(--muted-strong)]">Try searching for a page, feature, or setting</p>
+          </div>
+        )}
+      </div>
 
-      <div className="border-t border-[var(--border)] px-5 py-2.5">
+      <div className="shrink-0 border-t border-[var(--border)] bg-[var(--panel)] px-5 py-2.5">
         <p className="text-[10px] text-[var(--muted)]">Press <kbd className="rounded border border-[var(--border)] px-1 py-0.5 font-mono text-[10px]">Esc</kbd> to close</p>
       </div>
     </div>
@@ -188,6 +191,8 @@ export default function AppShell({ title, description, actions, children, banner
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const profileDropdownRef = useRef(null);
   const [hubDropdownOpen, setHubDropdownOpen] = useState(false);
+  const isAdmin = auth.user?.role === 'admin';
+  const navItems = isAdmin ? [...NAV_ITEMS, ADMIN_NAV_ITEM] : NAV_ITEMS;
 
   const userLabel = useMemo(() => {
     if (auth.user?.name) return auth.user.name;
@@ -297,6 +302,20 @@ export default function AppShell({ title, description, actions, children, banner
                 );
               })}
 
+              {isAdmin ? (
+                <Link
+                  to="/admin"
+                  className={`group relative flex items-center gap-2 px-3.5 py-1.5 text-[13px] font-medium rounded-lg transition-all duration-200 ${
+                    location.pathname === '/admin'
+                      ? 'bg-[var(--accent)]/15 text-[var(--accent-strong)] shadow-sm'
+                      : 'text-[var(--muted-strong)] hover:text-[var(--text)] hover:bg-white/[0.04]'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[16px]">admin_panel_settings</span>
+                  <span className="relative z-10 tracking-wide">Admin</span>
+                </Link>
+              ) : null}
+
               {/* Apps Dropdown containing the remaining page routes */}
               <div 
                 className="relative"
@@ -375,6 +394,7 @@ export default function AppShell({ title, description, actions, children, banner
                     query={searchQuery}
                     onClose={() => { setSearchOpen(false); setSearchQuery(''); }}
                     navigate={navigate}
+                    showAdmin={isAdmin}
                   />
                 )}
               </div>
@@ -410,6 +430,7 @@ export default function AppShell({ title, description, actions, children, banner
                       <div className="min-w-0">
                         <p className="truncate text-sm font-black text-[var(--text)]">{userLabel}</p>
                         <p className="truncate text-xs text-[var(--muted-strong)]">{auth.user?.email || 'authenticated user'}</p>
+                        {isAdmin ? <p className="mt-1 text-[10px] font-black uppercase tracking-[0.18em] text-[var(--accent-strong)]">Admin access</p> : null}
                       </div>
                     </div>
 
@@ -448,6 +469,14 @@ export default function AppShell({ title, description, actions, children, banner
                       >
                         <span className="material-symbols-outlined text-[16px] text-[var(--accent-strong)] transition-transform duration-200 group-hover:scale-110 drop-shadow-[0_0_4px_rgba(78,222,163,0.3)]">person</span>
                         <span className="transition-transform duration-200 group-hover:translate-x-1">View Profile</span>
+                      </Link>
+                      <Link
+                        to="/admin"
+                        onClick={() => setProfileDropdownOpen(false)}
+                        className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-[var(--muted-strong)] hover:bg-white/[0.06] hover:text-[var(--text)] transition-all duration-200 ${isAdmin ? '' : 'hidden'}`}
+                      >
+                        <span className="material-symbols-outlined text-[16px] text-[var(--accent-strong)] transition-transform duration-200 group-hover:scale-110">admin_panel_settings</span>
+                        <span className="transition-transform duration-200 group-hover:translate-x-1">Admin Control</span>
                       </Link>
                       <Link
                         to="/settings"
@@ -539,7 +568,7 @@ export default function AppShell({ title, description, actions, children, banner
             <div className="mt-2 rounded-xl border border-[var(--border)] bg-[var(--panel)] py-2">
               {(() => {
                 const trimmed = searchQuery.trim().toLowerCase();
-                const navRes = NAV_ITEMS.filter(i => i.label.toLowerCase().includes(trimmed) || i.description.toLowerCase().includes(trimmed));
+                const navRes = navItems.filter(i => i.label.toLowerCase().includes(trimmed) || i.description.toLowerCase().includes(trimmed));
                 const insRes = SEARCHABLE_INSIGHTS.filter(i => i.label.toLowerCase().includes(trimmed) || i.category.toLowerCase().includes(trimmed));
                 const hasAny = navRes.length > 0 || insRes.length > 0;
                 if (!hasAny) {

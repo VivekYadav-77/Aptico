@@ -95,18 +95,29 @@ function sortJobs(jobs) {
 
 async function runSource(sourceName, sourceFn, sharedArgs, sourceState) {
   sourceState.sourcesUsed.push(sourceName);
-  const jobs = await sourceFn(sharedArgs);
-  const meta = getSourceMeta(jobs);
 
-  if (meta.cached) {
-    sourceState.cachedSources.push(sourceName);
+  try {
+    const jobs = await sourceFn(sharedArgs);
+    const meta = getSourceMeta(jobs);
+
+    if (meta.cached) {
+      sourceState.cachedSources.push(sourceName);
+    }
+
+    if (meta.rateLimited) {
+      sourceState.rateLimited = true;
+    }
+
+    if (meta.error) {
+      sourceState.failedSources.push(sourceName);
+    }
+
+    return Array.isArray(jobs) ? jobs : [];
+  } catch (error) {
+    sourceState.failedSources.push(sourceName);
+    sharedArgs.logger?.warn?.(`[${sourceName}] job source crashed: ${error.message}`);
+    return [];
   }
-
-  if (meta.rateLimited) {
-    sourceState.rateLimited = true;
-  }
-
-  return Array.isArray(jobs) ? jobs : [];
 }
 
 async function runDuckDuckGoFallbackSearch({ query, location, jobType, sourceState, logger = console }) {
@@ -153,6 +164,7 @@ export async function searchJobs({ query, location, jobType, role, analysisData,
   const sourceState = {
     sourcesUsed: [],
     cachedSources: [],
+    failedSources: [],
     rateLimited: false
   };
 
@@ -277,6 +289,7 @@ export async function searchJobs({ query, location, jobType, role, analysisData,
       message: 'All job sources are currently at their rate limits. Please try again in a few minutes.',
       sourcesUsed: [...new Set(sourceState.sourcesUsed)],
       cachedSources: [...new Set(sourceState.cachedSources)],
+      failedSources: [...new Set(sourceState.failedSources)],
       matchedSkills
     };
   }
@@ -292,6 +305,7 @@ export async function searchJobs({ query, location, jobType, role, analysisData,
       : null,
     sourcesUsed: [...new Set(sourceState.sourcesUsed)],
     cachedSources: [...new Set(sourceState.cachedSources)],
+    failedSources: [...new Set(sourceState.failedSources)],
     dashboardStats,
     matchedSkills
   };

@@ -21,6 +21,7 @@ import {
   createCsrfToken,
   verifyCsrfRequest
 } from '../../shared/security/csrf.js';
+import { recordAnalyticsEvent } from '../analytics/analytics.service.js';
 
 const googleSchema = z.object({
   credential: z.string().trim().min(1)
@@ -108,7 +109,17 @@ export async function registerController(request, reply) {
       db: request.server.db,
       email: body.email,
       password: body.password,
-      name: body.name
+      name: body.name,
+      request
+    });
+
+    await recordAnalyticsEvent({
+      db: request.server.db,
+      request,
+      eventType: 'signup',
+      userId: result.user?.id || null,
+      metadata: { method: 'password' },
+      force: true
     });
 
     reply.code(201).send({
@@ -130,6 +141,15 @@ export async function loginController(request, reply) {
       request
     });
 
+    await recordAnalyticsEvent({
+      db: request.server.db,
+      request,
+      eventType: 'login',
+      userId: session.user.id,
+      metadata: { method: 'password' },
+      force: true
+    });
+
     await sendSessionReply(request, reply, session);
   } catch (error) {
     sendError(reply, error);
@@ -145,6 +165,15 @@ export async function googleAuthController(request, reply) {
       request
     });
 
+    await recordAnalyticsEvent({
+      db: request.server.db,
+      request,
+      eventType: 'login',
+      userId: session.user.id,
+      metadata: { method: 'google' },
+      force: true
+    });
+
     await sendSessionReply(request, reply, session);
   } catch (error) {
     sendError(reply, error);
@@ -156,7 +185,8 @@ export async function requestEmailVerificationController(request, reply) {
     const body = emailSchema.parse(request.body || {});
     const result = await sendEmailVerification({
       db: request.server.db,
-      email: body.email
+      email: body.email,
+      request
     });
 
     reply.code(202).send({
@@ -177,6 +207,15 @@ export async function verifyEmailController(request, reply) {
       request
     });
 
+    await recordAnalyticsEvent({
+      db: request.server.db,
+      request,
+      eventType: 'login',
+      userId: session.user.id,
+      metadata: { method: 'email_verification' },
+      force: true
+    });
+
     await sendSessionReply(request, reply, session);
   } catch (error) {
     sendError(reply, error);
@@ -188,7 +227,8 @@ export async function forgotPasswordController(request, reply) {
     const body = emailSchema.parse(request.body || {});
     const result = await requestPasswordReset({
       db: request.server.db,
-      email: body.email
+      email: body.email,
+      request
     });
 
     reply.code(202).send({
@@ -262,6 +302,15 @@ export async function logoutController(request, reply) {
         15 * 60
       );
     }
+
+    await recordAnalyticsEvent({
+      db: request.server.db,
+      request,
+      eventType: 'logout',
+      userId: result.revoked?.userId || null,
+      metadata: { method: 'session' },
+      force: true
+    });
 
     reply.header('Set-Cookie', [
       buildClearedRefreshCookie(),

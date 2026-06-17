@@ -7,6 +7,18 @@ export const schema = /* GraphQL */ `
     totalApiRequests: Int!
     activeRefreshTokens: Int!
     revokedRefreshTokens: Int!
+    totalVisits: Int!
+    uniqueVisitors: Int!
+    activeVisitors: Int!
+    totalEvents: Int!
+    apiErrors: Int!
+    adminActions: Int!
+    restrictedUsers: Int!
+    blockedUsers: Int!
+    deactivatedUsers: Int!
+    hiddenPosts: Int!
+    hiddenWins: Int!
+    pendingModeration: Int!
   }
 
   type ApiUsageMetric {
@@ -16,23 +28,226 @@ export const schema = /* GraphQL */ `
     last429At: String
   }
 
+  type EmailUsageMetrics {
+    total: Int!
+    sent: Int!
+    failed: Int!
+    pending: Int!
+    failedLast24h: Int!
+    lastSentAt: String
+  }
+
+  type EmailDeliveryLog {
+    id: ID!
+    userId: ID
+    userEmail: String
+    userName: String
+    email: String!
+    emailType: String!
+    provider: String!
+    status: String!
+    subject: String
+    country: String
+    region: String
+    city: String
+    errorCode: String
+    errorMessage: String
+    createdAt: String!
+    deliveredAt: String
+  }
+
+  type EmailServiceBlock {
+    id: ID!
+    email: String!
+    isBlocked: Boolean!
+    reason: String!
+    createdBy: ID
+    createdByEmail: String
+    createdAt: String!
+    updatedAt: String!
+  }
+
   type AdminUser {
     id: ID!
     email: String!
     name: String
     avatarUrl: String
     role: String!
+    status: String!
     createdAt: String!
     lastLogin: String
     activeSessionCount: Int!
     analysesCount: Int!
     savedJobsCount: Int!
+    eventCount: Int!
+    restrictionCount: Int!
+    lastSeenAt: String
+  }
+
+  type AdminRestriction {
+    id: ID!
+    userId: ID!
+    feature: String!
+    isRestricted: Boolean!
+    reason: String
+    expiresAt: String
+    createdBy: ID
+    createdAt: String!
+    updatedAt: String!
+  }
+
+  type AdminModerationItem {
+    id: ID!
+    ownerId: ID
+    ownerEmail: String
+    type: String!
+    title: String
+    body: String
+    status: String!
+    createdAt: String
+  }
+
+  type AdminModerationAction {
+    id: ID!
+    adminUserId: ID
+    adminEmail: String
+    action: String!
+    targetType: String!
+    targetId: String!
+    reason: String!
+    metadata: String!
+    createdAt: String!
+  }
+
+  type AdminTrendPoint {
+    date: String!
+    visits: Int!
+    uniqueVisitors: Int!
+    events: Int!
+  }
+
+  type AdminBreakdown {
+    label: String!
+    value: Int!
+  }
+
+  type AdminEvent {
+    id: ID!
+    eventType: String!
+    userId: ID
+    userEmail: String
+    visitorId: String
+    path: String
+    referrer: String
+    source: String
+    deviceCategory: String
+    browserName: String
+    country: String
+    region: String
+    city: String
+    metadata: String!
+    createdAt: String!
+  }
+
+  type AdminAuditLog {
+    id: ID!
+    adminUserId: ID
+    adminEmail: String
+    action: String!
+    targetType: String
+    targetId: String
+    metadata: String!
+    createdAt: String!
+  }
+
+  type AdminSuspiciousSignal {
+    label: String!
+    severity: String!
+    detail: String!
+    count: Int!
+    lastSeenAt: String
+  }
+
+  type AdminSupportTicket {
+    id: ID!
+    userId: ID
+    userEmail: String
+    userName: String
+    contactEmail: String
+    isPublic: Boolean!
+    assignedAdminId: ID
+    assignedAdminEmail: String
+    category: String!
+    subject: String!
+    message: String!
+    status: String!
+    priority: String!
+    relatedFeature: String
+    createdAt: String!
+    updatedAt: String!
+    assignedAt: String
+    resolvedAt: String
+    closedAt: String
+    escalatedAt: String
+    emailServiceBlockedAtSubmit: String
+    emailServiceBlocked: Boolean!
+    lastAdminReplyAt: String
+    lastUserReplyAt: String
+  }
+
+  type AdminSupportMessage {
+    id: ID!
+    ticketId: ID!
+    senderUserId: ID
+    senderRole: String!
+    senderEmail: String
+    senderName: String
+    message: String!
+    createdAt: String!
+  }
+
+  type AdminSupportInternalNote {
+    id: ID!
+    ticketId: ID!
+    adminUserId: ID
+    adminEmail: String
+    adminName: String
+    note: String!
+    createdAt: String!
+  }
+
+  type AdminSupportContext {
+    userStatus: String
+    activeRestrictions: [AdminRestriction!]!
+    recentAuditLogs: [AdminAuditLog!]!
+    recentEmailLogs: [EmailDeliveryLog!]!
+    emailServiceBlocked: Boolean!
+    emailServiceBlockReason: String
   }
 
   type Query {
     adminOverview: AdminOverview!
     apiUsageMetrics: [ApiUsageMetric!]!
+    emailUsageMetrics: EmailUsageMetrics!
+    emailDeliveryLogs(limit: Int = 50, email: String, emailType: String, status: String): [EmailDeliveryLog!]!
+    emailServiceBlocks(limit: Int = 50, email: String): [EmailServiceBlock!]!
     adminUsers: [AdminUser!]!
+    visitorTrends(days: Int = 14): [AdminTrendPoint!]!
+    topPages(limit: Int = 10): [AdminBreakdown!]!
+    trafficSources(limit: Int = 10): [AdminBreakdown!]!
+    geoBreakdown(limit: Int = 10): [AdminBreakdown!]!
+    deviceBreakdown: [AdminBreakdown!]!
+    recentEvents(limit: Int = 30, eventType: String, userId: ID): [AdminEvent!]!
+    userActivity(userId: ID!, limit: Int = 30): [AdminEvent!]!
+    adminAuditLogs(limit: Int = 30): [AdminAuditLog!]!
+    adminRestrictions(userId: ID): [AdminRestriction!]!
+    adminModerationQueue(contentType: String = "post", limit: Int = 40, search: String): [AdminModerationItem!]!
+    adminModerationActions(limit: Int = 40): [AdminModerationAction!]!
+    suspiciousSignals: [AdminSuspiciousSignal!]!
+    adminSupportTickets(status: String, category: String, priority: String, assigned: String, search: String, limit: Int = 50): [AdminSupportTicket!]!
+    adminSupportMessages(ticketId: ID!, limit: Int = 100): [AdminSupportMessage!]!
+    adminSupportInternalNotes(ticketId: ID!, limit: Int = 50): [AdminSupportInternalNote!]!
+    adminSupportContext(ticketId: ID!): AdminSupportContext!
   }
 `;
 

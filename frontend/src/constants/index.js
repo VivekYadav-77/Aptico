@@ -31,6 +31,7 @@ export const NAV_ITEMS = [
   { to: '/saved-jobs', label: 'Saved Jobs', icon: 'bookmark', description: 'View and manage your bookmarked roles' },
   { to: '/analysis-history', label: 'Analysis History', icon: 'history', description: 'Review your past resume analyses' },
   { to: '/docs', label: 'Docs', icon: 'menu_book', description: 'Platform guides and feature documentation' },
+  { to: '/support', label: 'Support', icon: 'support_agent', description: 'Contact admin support for account and platform issues' },
   { to: '/profile', label: 'Profile', icon: 'person', description: 'Edit your professional profile' },
   { to: '/settings', label: 'Settings', icon: 'settings', description: 'Account, career, and theme settings' },
 ];
@@ -61,11 +62,19 @@ export const SEARCHABLE_INSIGHTS = [
   { label: 'High pay job search', icon: 'payments', to: '/jobs', category: 'Job Search' },
   { label: 'Verified listings only', icon: 'verified', to: '/jobs', category: 'Job Search' },
   { label: 'Read platform docs', icon: 'menu_book', to: '/docs', category: 'Docs' },
+  { label: 'Contact admin support', icon: 'support_agent', to: '/support', category: 'Support' },
+  { label: 'Contact support without login', icon: 'contact_support', to: '/contact-support', category: 'Support' },
+  { label: 'Appeal account restriction', icon: 'gavel', to: '/support', category: 'Support' },
   { label: 'Learn resume analysis', icon: 'analytics', to: '/docs/resume-analysis', category: 'Docs' },
   { label: 'Learn anonymous squads', icon: 'groups', to: '/docs/anonymous-squads', category: 'Docs' },
   { label: 'Understand dashboard widgets', icon: 'dashboard', to: '/docs/command-center-dashboard', category: 'Docs' },
   { label: 'Learn rejection logging', icon: 'military_tech', to: '/docs/rejection-logging', category: 'Docs' },
   { label: 'Understand stickers and streaks', icon: 'token', to: '/docs/rewards-stickers', category: 'Docs' },
+  { label: 'Learn saved jobs pipeline', icon: 'bookmark', to: '/docs/saved-jobs-pipeline', category: 'Docs' },
+  { label: 'Manage notifications', icon: 'notifications', to: '/docs/notifications', category: 'Docs' },
+  { label: 'Learn support center', icon: 'support_agent', to: '/docs/support-center', category: 'Docs' },
+  { label: 'Fix account email access', icon: 'mark_email_read', to: '/docs/account-access-email', category: 'Docs' },
+  { label: 'Understand admin restrictions', icon: 'admin_panel_settings', to: '/docs/admin-restrictions-and-safety', category: 'Docs' },
 ];
 
 // ── Landing page content ─────────────────────────────────────
@@ -147,7 +156,7 @@ export const FOOTER_LINKS = {
     { label: 'Squads', to: '/squads' },
   ],
   company: [
-    { label: 'About', href: '#' },
+    { label: 'Team', href: '/#team' },
     { label: 'Blog', to: '/docs' },
   ],
   legal: [
@@ -197,6 +206,41 @@ export const LANDING_FAQ = [
 ];
 
 // ── Social links ─────────────────────────────────────────────
+export const TEAM_MEMBERS = [
+  {
+    name: 'Vivek Yadav',
+    role: 'Co-founder and Full-stack Product Engineer',
+    designation: 'Co-owner, Aptico Platform',
+    focus: 'Co-owns Aptico end to end, with deep focus on product architecture, AI workflows, backend systems, user experience, and recruiter-facing career intelligence.',
+    image: '/team/Vivek.jpeg',
+    initials: 'VY',
+    email: 'vivekyadav.dev007@gmail.com',
+    linkedin: 'https://www.linkedin.com/in/vivekyadav94/',
+    github: 'https://github.com/VivekYadav-77',
+    links: [
+      { label: 'Email', href: 'contact:vivek', icon: 'mail' },
+      { label: 'LinkedIn', href: 'https://www.linkedin.com/in/vivekyadav94', icon: 'business_center' },
+      { label: 'GitHub', href: 'https://github.com/VivekYadav-77', icon: 'code' },
+    ],
+  },
+  {
+    name: 'Shivang Rai',
+    role: 'Co-founder and Full-stack Product Engineer',
+    designation: 'Co-owner, Aptico Platform',
+    focus: 'Co-owns Aptico end to end, with deep focus on platform operations, admin control systems, support workflows, user safety, monitoring, and product quality.',
+    image: '/team/Shivang.png',
+    initials: 'SR',
+    email: 'raishivang69@gmail.com',
+    linkedin: 'https://www.linkedin.com/in/shivang-rai11',
+    github: 'https://github.com/shivangrai5143',
+    links: [
+      { label: 'Email', href: 'contact:shivang', icon: 'mail' },
+      { label: 'LinkedIn', href: 'https://www.linkedin.com/in/shivang-rai11', icon: 'business_center' },
+      { label: 'GitHub', href: 'https://github.com/shivangrai5143', icon: 'code' },
+    ],
+  },
+];
+
 export const SOCIAL_LINKS = [
   { label: 'GitHub', href: 'https://github.com/VivekYadav-77/Aptico', icon: 'code' },
 ];

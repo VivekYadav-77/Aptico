@@ -1,4 +1,4 @@
-export const DOC_CATEGORIES = ['All', 'Core', 'Dashboard', 'Jobs', 'Community', 'Profile', 'Settings'];
+export const DOC_CATEGORIES = ['All', 'Core', 'Dashboard', 'Jobs', 'Community', 'Profile', 'Settings', 'Support', 'Admin'];
 
 export const DOCS = [
   {
@@ -926,6 +926,324 @@ export const DOCS = [
           'Do not forget to review what is public.',
           'Do not use a theme that makes long reading uncomfortable for you.',
           'Do not set preferences once and forget them if your goals change.',
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'saved-jobs-pipeline',
+    title: 'Saved Jobs Pipeline',
+    category: 'Jobs',
+    icon: 'bookmark',
+    featured: false,
+    readTime: '7 min read',
+    excerpt: 'Use Saved Jobs as a focused pipeline for roles you actually want to review, analyze, apply to, and follow up on.',
+    intro:
+      'Saved Jobs is the place where promising roles stop being random search results and become a practical application pipeline.',
+    overview: {
+      bestFor: 'Users who find good roles during search but need a cleaner way to revisit and act on them later.',
+      plainSummary:
+        'Save useful jobs from Job Search, review them from Saved Jobs or the dashboard, and remove roles that no longer fit your target.',
+      outcome:
+        'By the end, your saved list should be short, intentional, and ready for analysis or application work.',
+    },
+    sections: [
+      {
+        id: 'what-it-does',
+        title: 'What Saved Jobs does',
+        body: [
+          'Saved Jobs keeps roles you marked as worth returning to. It stores the role title, company, source, apply link, location, compensation signal, and match context when available.',
+          'The feature is designed to stop tab overload. Instead of keeping many browser tabs open, save the jobs that deserve a second look and clear the rest.',
+        ],
+      },
+      {
+        id: 'how-to-use',
+        title: 'How to use it',
+        steps: [
+          'Open Job Search and run a focused search for your target role.',
+          'Open a job card and check whether the role, company, source, and location make sense.',
+          'Save only the jobs that you would realistically analyze or apply to.',
+          'Open Saved Jobs from the sidebar to review your shortlist.',
+          'Remove jobs that are stale, duplicate, suspicious, or no longer aligned with your goal.',
+        ],
+      },
+      {
+        id: 'pipeline-habits',
+        title: 'Healthy pipeline habits',
+        body: [
+          'A useful saved list is not huge. It is a working shortlist. If a job sits there for days and you never plan to analyze or apply, remove it.',
+          'Use Saved Jobs together with Resume Analysis. A saved role becomes more useful when you check how your resume fits it before applying.',
+        ],
+        callout: {
+          type: 'tip',
+          title: 'Good rule',
+          text: 'If you would not spend ten minutes customizing your resume for the job, it probably does not belong in Saved Jobs.',
+        },
+      },
+      {
+        id: 'common-mistakes',
+        title: 'Common mistakes to avoid',
+        steps: [
+          'Do not save every result from a search page.',
+          'Do not keep jobs that have broken or suspicious apply links.',
+          'Do not let Saved Jobs replace applying. It is a pipeline, not a storage box.',
+          'Do not ignore old saved jobs if your target role changes.',
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'notifications',
+    title: 'Notifications',
+    category: 'Support',
+    icon: 'notifications',
+    featured: false,
+    readTime: '8 min read',
+    excerpt: 'Learn how Aptico notifications help you track support replies, restrictions, account changes, squad activity, and important platform updates.',
+    intro:
+      'Notifications keep important platform updates visible without forcing you to constantly refresh pages or guess what changed.',
+    overview: {
+      bestFor: 'Users who want one place to review account, support, squad, and platform updates.',
+      plainSummary:
+        'Aptico shows notifications for useful events such as support replies, admin restriction updates, account status changes, squad activity, and other platform alerts.',
+      outcome:
+        'By the end, you should know how to filter, read, mark, and delete notifications without losing track of important updates.',
+    },
+    sections: [
+      {
+        id: 'what-it-does',
+        title: 'What notifications do',
+        body: [
+          'Notifications are short updates tied to something that happened on your account or inside the platform. They can point you toward support tickets, account status changes, restriction updates, squad activity, or other actions that need attention.',
+          'The system is request-and-response focused where possible. It should update around real user actions rather than making the app feel noisy.',
+        ],
+      },
+      {
+        id: 'filters',
+        title: 'How filters help',
+        body: [
+          'The Notifications page lets you narrow updates by read status, category, or type. This is useful when you only want unread items, support updates, or account-related messages.',
+        ],
+        steps: [
+          'Open Notifications from the bell or sidebar.',
+          'Use the read-status filter to show unread or all notifications.',
+          'Use category/type filters when you want a specific kind of update.',
+          'Open the related page if the notification needs action.',
+          'Delete old notifications when they are no longer useful.',
+        ],
+      },
+      {
+        id: 'admin-updates',
+        title: 'Restriction and admin-action notifications',
+        body: [
+          'If an administrator restricts a feature, changes account access, or replies to support, Aptico can create a notification with a clear reason. This matters because a blocked action should not feel broken.',
+          'For example, if analysis is restricted, the related warning should explain the restriction and provide a way to contact support.',
+        ],
+      },
+      {
+        id: 'common-mistakes',
+        title: 'Common mistakes to avoid',
+        steps: [
+          'Do not ignore account or restriction notifications.',
+          'Do not delete a support notification until you have read the related ticket.',
+          'Do not assume every notification requires action. Some are only confirmations.',
+          'Do not share notification screenshots if they include private account details.',
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'support-center',
+    title: 'Support Center',
+    category: 'Support',
+    icon: 'support_agent',
+    featured: true,
+    readTime: '10 min read',
+    excerpt: 'Contact Aptico support for account access, feature restrictions, email issues, bugs, feedback, and platform questions.',
+    intro:
+      'Support Center gives users a direct way to contact admin support when something needs human review.',
+    overview: {
+      bestFor: 'Users facing account access problems, restrictions, email issues, bugs, or unclear platform behavior.',
+      plainSummary:
+        'Logged-in users can create support tickets, reply to admin messages, and track ticket status. Users who cannot log in can use the public contact-support page.',
+      outcome:
+        'By the end, you should know which support path to use and what information to include so admin can help faster.',
+    },
+    sections: [
+      {
+        id: 'two-ways',
+        title: 'Two ways to contact support',
+        body: [
+          'Use Support Center when you can sign in. It keeps your ticket connected to your account so admin can see context and reply inside the platform.',
+          'Use Contact Support when you cannot sign in because of account block, email verification, password reset, or access issues. That public form is submit-only for safety.',
+        ],
+        code: {
+          title: 'Support routes',
+          lines: [
+            '/support: for logged-in users',
+            '/contact-support: for users who cannot sign in',
+          ],
+        },
+      },
+      {
+        id: 'what-to-send',
+        title: 'What to include in a support ticket',
+        steps: [
+          'Choose the closest category, such as account restriction, email access, job search, analysis, squad community, bug report, or feedback.',
+          'Write a short subject that explains the problem.',
+          'Describe what you tried and what happened.',
+          'Include the feature name if the issue is related to a restriction or blocked action.',
+          'Do not include passwords, reset links, auth tokens, or private secrets.',
+        ],
+      },
+      {
+        id: 'email-blocks',
+        title: 'What happens if email service is blocked',
+        body: [
+          'Support still works even if outbound email is blocked for your address. Email blocking only prevents Aptico from sending email updates to that address.',
+          'If your email is blocked, admin can still see your ticket, reply internally, update status, and keep in-app support history for linked accounts.',
+        ],
+        callout: {
+          type: 'important',
+          title: 'Important',
+          text: 'If email updates are disabled for your address, use the app or wait for admin follow-up instead of expecting an email reply.',
+        },
+      },
+      {
+        id: 'ticket-status',
+        title: 'Ticket status meaning',
+        code: {
+          title: 'Support status glossary',
+          lines: [
+            'Open: ticket is active and visible to admin.',
+            'Pending admin: user has sent information and admin needs to review.',
+            'Waiting user: admin needs more information from the user.',
+            'Resolved: issue appears handled but can still be reviewed.',
+            'Closed: conversation is finished; create a new ticket for a new issue.',
+          ],
+        },
+      },
+    ],
+  },
+  {
+    slug: 'account-access-email',
+    title: 'Account Access and Email',
+    category: 'Support',
+    icon: 'mark_email_read',
+    featured: false,
+    readTime: '9 min read',
+    excerpt: 'Understand email verification, password reset, invite setup links, blocked email service, and what to do when account access fails.',
+    intro:
+      'Aptico uses email for important account flows such as verification, password reset, and admin invite setup.',
+    overview: {
+      bestFor: 'Users who are signing up, resetting a password, accepting an admin invite, or troubleshooting email access.',
+      plainSummary:
+        'Email links help confirm identity and recover accounts. If email delivery is blocked or delayed, public support remains available.',
+      outcome:
+        'By the end, you should know why email verification exists and what to do if an email link does not arrive or cannot be used.',
+    },
+    sections: [
+      {
+        id: 'verification',
+        title: 'Why email verification exists',
+        body: [
+          'Email verification proves that you control the email address on the account. This protects account recovery, support, notifications, and admin-created invite flows.',
+          'If you reset a password for an invited account, the account may still need a verified email before normal sign-in, depending on how the account was created.',
+        ],
+      },
+      {
+        id: 'reset-invite',
+        title: 'Password reset and invite setup links',
+        body: [
+          'Password reset links are for existing accounts. Invite setup links are used when admin creates or invites a user and the user needs to set their own password.',
+          'For security, Aptico should never ask an admin to set a user password directly. The invited user should control their own password through a setup or reset flow.',
+        ],
+      },
+      {
+        id: 'email-blocked',
+        title: 'When email service is blocked',
+        body: [
+          'Admins can block outbound email service for a specific email address. This prevents Aptico from sending verification, reset, invite, or support emails to that address.',
+          'Email blocking does not delete the account, erase support tickets, or prevent public support submission. It only stops outbound email delivery.',
+        ],
+      },
+      {
+        id: 'what-to-do',
+        title: 'What to do if email access fails',
+        steps: [
+          'Check that the email address is typed correctly.',
+          'Check spam, promotions, and other filtered inbox tabs.',
+          'Wait a short time if the provider is slow.',
+          'Use Contact Support if you cannot sign in or receive account emails.',
+          'Do not share reset links, verification links, passwords, or tokens in a support ticket.',
+        ],
+      },
+    ],
+  },
+  {
+    slug: 'admin-restrictions-and-safety',
+    title: 'Admin Restrictions and Safety',
+    category: 'Admin',
+    icon: 'admin_panel_settings',
+    featured: false,
+    readTime: '11 min read',
+    excerpt: 'Understand how Aptico handles account status, feature restrictions, support escalation, audit trails, and user-facing feedback.',
+    intro:
+      'Aptico includes admin controls so a platform owner can manage abuse, access issues, support requests, and operational safety.',
+    overview: {
+      bestFor: 'Platform owners, testers, and users who want to understand how restrictions and admin actions work.',
+      plainSummary:
+        'Admins can monitor platform activity, manage users, apply feature restrictions, block accounts, review support tickets, and audit sensitive actions.',
+      outcome:
+        'By the end, you should understand why restrictions exist, what users see, and how support can help resolve access issues.',
+    },
+    sections: [
+      {
+        id: 'admin-control-center',
+        title: 'What the Admin Control Center monitors',
+        body: [
+          'The Admin Control Center shows operational data such as visitors, user activity, feature events, system health, security signals, audit logs, support tickets, and email service usage.',
+          'Analytics are privacy-safe by design. Raw IP addresses should not appear in the dashboard. Location is approximate and based on safe request headers when available.',
+        ],
+      },
+      {
+        id: 'account-status',
+        title: 'Account status controls',
+        code: {
+          title: 'Status glossary',
+          lines: [
+            'Active: user can use the platform normally.',
+            'Restricted: specific features may be blocked.',
+            'Blocked: user loses platform access.',
+            'Deactivated: account access is turned off without permanent deletion.',
+          ],
+        },
+      },
+      {
+        id: 'feature-restrictions',
+        title: 'Feature-level restrictions',
+        body: [
+          'Admins can restrict features such as posting, commenting, squad actions, analysis, job search, job saving, profile visibility, activity logging, and login access.',
+          'When a user hits a restricted feature, Aptico should show a clear 403-style message with the blocked feature and admin reason. A restricted action should feel explained, not broken.',
+        ],
+      },
+      {
+        id: 'audit-support',
+        title: 'Audit logs and support context',
+        body: [
+          'Sensitive admin actions should write audit logs. These include role changes, status changes, restrictions, session revokes, moderation actions, email service blocks, support replies, and ticket status updates.',
+          'Support tickets can include admin context such as user status, active restrictions, recent audit logs, recent email delivery logs, and whether email service is blocked for the address.',
+        ],
+      },
+      {
+        id: 'safe-actions',
+        title: 'Safe action principles',
+        steps: [
+          'Prefer deactivate, restrict, hide, and revoke before permanent deletion.',
+          'Require clear admin reasons for sensitive actions.',
+          'Require typed confirmation for dangerous actions.',
+          'Do not allow an admin to block, delete, or demote themselves.',
+          'Notify the affected user when account access or feature restrictions change.',
         ],
       },
     ],

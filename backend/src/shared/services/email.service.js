@@ -16,6 +16,8 @@
  */
 
 import { env } from '../../config/env.js';
+import { emailDeliveryLogs } from '../../db/schema.js';
+import { eq } from 'drizzle-orm';
 
 // ── Error factory ──────────────────────────────────────────────────────────────
 
@@ -37,6 +39,74 @@ function escapeHtml(unsafe) {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
+}
+
+function decodeHeaderValue(value) {
+  if (!value) return null;
+  try {
+    return decodeURIComponent(String(value));
+  } catch {
+    return String(value);
+  }
+}
+
+function deriveRequestLocation(request) {
+  const headers = request?.headers || {};
+  return {
+    country: decodeHeaderValue(headers['cf-ipcountry'] || headers['x-vercel-ip-country']) || 'Unknown',
+    region: decodeHeaderValue(headers['x-vercel-ip-country-region'] || headers['cf-region']) || null,
+    city: decodeHeaderValue(headers['x-vercel-ip-city'] || headers['cf-ipcity']) || null
+  };
+}
+
+function sanitizeErrorMessage(error) {
+  const message = String(error?.message || 'Email dispatch failed.').replace(/\s+/g, ' ').trim();
+  return message.slice(0, 240);
+}
+
+async function createEmailDeliveryLog({ db, request, email, userId, emailType, provider, subject }) {
+  if (!db) return null;
+
+  try {
+    const location = deriveRequestLocation(request);
+    const [row] = await db
+      .insert(emailDeliveryLogs)
+      .values({
+        email,
+        userId: userId || null,
+        emailType,
+        provider,
+        status: 'pending',
+        subject,
+        country: location.country,
+        region: location.region,
+        city: location.city
+      })
+      .returning({ id: emailDeliveryLogs.id });
+
+    return row?.id || null;
+  } catch (error) {
+    console.warn('[emailService] Could not create email delivery log:', error?.message || error);
+    return null;
+  }
+}
+
+async function updateEmailDeliveryLog({ db, id, status, error = null }) {
+  if (!db || !id) return;
+
+  try {
+    await db
+      .update(emailDeliveryLogs)
+      .set({
+        status,
+        deliveredAt: status === 'sent' ? new Date() : null,
+        errorCode: error?.code || null,
+        errorMessage: error ? sanitizeErrorMessage(error) : null
+      })
+      .where(eq(emailDeliveryLogs.id, id));
+  } catch (updateError) {
+    console.warn('[emailService] Could not update email delivery log:', updateError?.message || updateError);
+  }
 }
 
 // ── HTML template builders ─────────────────────────────────────────────────────
@@ -185,6 +255,38 @@ function buildPasswordResetEmailHtml({ name, appName, resetLink, expiryMinutes =
   });
 }
 
+function buildSupportNotificationHtml({ name, appName, title, message, ticketSubject }) {
+  const safeName = escapeHtml(name);
+  const greeting = safeName ? `Hi ${safeName},` : 'Hi there,';
+  const safeTitle = escapeHtml(title);
+  const safeTicketSubject = escapeHtml(ticketSubject);
+  const safeMessage = escapeHtml(message).replace(/\n/g, '<br/>');
+
+  return buildEmailShell({
+    appName,
+    previewText: `${appName} support update: ${safeTicketSubject}`,
+    innerHtml: `
+      <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#f9fafb;letter-spacing:-0.03em;">
+        ${safeTitle}
+      </h1>
+      <p style="margin:0 0 20px;font-size:14px;color:#9ca3af;line-height:1.7;">
+        ${greeting} There is an update on your Aptico support ticket.
+      </p>
+      <p style="margin:0 0 10px;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.14em;">
+        Ticket
+      </p>
+      <p style="margin:0 0 24px;font-size:15px;color:#f9fafb;font-weight:700;line-height:1.6;">
+        ${safeTicketSubject}
+      </p>
+      <div style="margin:0 0 24px;padding:18px 20px;border:1px solid #1f2937;border-radius:14px;background-color:#0b1220;color:#d1d5db;font-size:14px;line-height:1.7;">
+        ${safeMessage}
+      </div>
+      <p style="margin:0;font-size:12px;color:#6b7280;border-top:1px solid #1f2937;padding-top:20px;">
+        Sign in to Aptico and open Support Center to continue the conversation.
+      </p>`
+  });
+}
+
 // ── GAS HTTP transport ─────────────────────────────────────────────────────────
 
 /**
@@ -305,10 +407,25 @@ async function dispatchViaGas({ to, subject, htmlBody, emailType }) {
  *   name?: string | null,
  *   link: string,
  *   expiresAt: string,  // ISO date string
- *   appName?: string
+ *   appName?: string,
+ *   db?: import('drizzle-orm').NodePgDatabase,
+ *   request?: import('fastify').FastifyRequest,
+ *   userId?: string | null,
+ *   logType?: string | null
  * }} payload
  */
-export async function sendAuthEmail({ type, email, name, link, expiresAt, appName = 'Aptico' }) {
+export async function sendAuthEmail({
+  type,
+  email,
+  name,
+  link,
+  expiresAt,
+  appName = 'Aptico',
+  db = null,
+  request = null,
+  userId = null,
+  logType = null
+}) {
   if (!email || !link) {
     throw createEmailError('email and link are required to send an auth email.', 400, 'EMAIL_INVALID_PAYLOAD');
   }
@@ -316,22 +433,86 @@ export async function sendAuthEmail({ type, email, name, link, expiresAt, appNam
   const expiresAtDate = new Date(expiresAt);
   const nowMs = Date.now();
   const diffMs = expiresAtDate.getTime() - nowMs;
+  const provider = 'google_apps_script';
+  const deliveryEmailType = logType || type;
+
+  let subject = '';
+  let htmlBody = '';
 
   if (type === 'email_verification') {
     const expiryHours = Math.max(1, Math.round(diffMs / (1000 * 60 * 60)));
-    const subject = `Verify your ${appName} email address`;
-    const htmlBody = buildVerificationEmailHtml({ name, appName, verificationLink: link, expiryHours });
-
-    return dispatchViaGas({ to: email, subject, htmlBody, emailType: type });
-  }
-
-  if (type === 'password_reset') {
+    subject = `Verify your ${appName} email address`;
+    htmlBody = buildVerificationEmailHtml({ name, appName, verificationLink: link, expiryHours });
+  } else if (type === 'password_reset') {
     const expiryMinutes = Math.max(5, Math.round(diffMs / (1000 * 60)));
-    const subject = `Reset your ${appName} password`;
-    const htmlBody = buildPasswordResetEmailHtml({ name, appName, resetLink: link, expiryMinutes });
-
-    return dispatchViaGas({ to: email, subject, htmlBody, emailType: type });
+    subject = `Reset your ${appName} password`;
+    htmlBody = buildPasswordResetEmailHtml({ name, appName, resetLink: link, expiryMinutes });
+  } else {
+    throw createEmailError(`Unknown email type: "${type}".`, 400, 'EMAIL_UNKNOWN_TYPE');
   }
 
-  throw createEmailError(`Unknown email type: "${type}".`, 400, 'EMAIL_UNKNOWN_TYPE');
+  const logId = await createEmailDeliveryLog({
+    db,
+    request,
+    email,
+    userId,
+    emailType: deliveryEmailType,
+    provider,
+    subject
+  });
+
+  try {
+    const result = await dispatchViaGas({ to: email, subject, htmlBody, emailType: type });
+    await updateEmailDeliveryLog({ db, id: logId, status: 'sent' });
+    return result;
+  } catch (error) {
+    await updateEmailDeliveryLog({ db, id: logId, status: 'failed', error });
+    throw error;
+  }
+}
+
+export async function sendSupportEmail({
+  email,
+  name,
+  subject,
+  title,
+  message,
+  ticketSubject,
+  appName = 'Aptico',
+  db = null,
+  request = null,
+  userId = null,
+  logType = 'support_ticket_update'
+}) {
+  if (!email || !subject || !message || !ticketSubject) {
+    throw createEmailError('email, subject, message, and ticketSubject are required to send a support email.', 400, 'EMAIL_INVALID_PAYLOAD');
+  }
+
+  const provider = 'google_apps_script';
+  const htmlBody = buildSupportNotificationHtml({
+    name,
+    appName,
+    title: title || 'Support ticket update',
+    message,
+    ticketSubject
+  });
+
+  const logId = await createEmailDeliveryLog({
+    db,
+    request,
+    email,
+    userId,
+    emailType: logType,
+    provider,
+    subject
+  });
+
+  try {
+    const result = await dispatchViaGas({ to: email, subject, htmlBody, emailType: 'support' });
+    await updateEmailDeliveryLog({ db, id: logId, status: 'sent' });
+    return result;
+  } catch (error) {
+    await updateEmailDeliveryLog({ db, id: logId, status: 'failed', error });
+    throw error;
+  }
 }

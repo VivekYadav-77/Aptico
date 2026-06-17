@@ -23,12 +23,54 @@ export const users = pgTable('users', {
   passwordHash: text('password_hash'),
   googleSubject: text('google_subject'),
   role: text('role').notNull().default('user'),
+  status: varchar('status', { length: 30 }).notNull().default('active'),
   resilienceXp: integer('resilience_xp').notNull().default(0),
   lastXpDecayAt: timestamp('last_xp_decay_at', { withTimezone: true }),
   emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   lastLogin: timestamp('last_login', { withTimezone: true })
 });
+
+export const adminRestrictions = pgTable(
+  'admin_restrictions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    feature: varchar('feature', { length: 50 }).notNull(),
+    isRestricted: boolean('is_restricted').notNull().default(true),
+    reason: text('reason'),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    userFeatureIdx: uniqueIndex('admin_restrictions_user_feature_idx').on(table.userId, table.feature),
+    userActiveIdx: index('admin_restrictions_user_active_idx').on(table.userId, table.isRestricted),
+    featureIdx: index('admin_restrictions_feature_idx').on(table.feature)
+  })
+);
+
+export const adminModerationActions = pgTable(
+  'admin_moderation_actions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    adminUserId: uuid('admin_user_id').references(() => users.id, { onDelete: 'set null' }),
+    action: varchar('action', { length: 80 }).notNull(),
+    targetType: varchar('target_type', { length: 80 }).notNull(),
+    targetId: text('target_id').notNull(),
+    reason: text('reason').notNull(),
+    metadata: jsonb('metadata').notNull().default({}),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    targetIdx: index('admin_moderation_actions_target_idx').on(table.targetType, table.targetId),
+    adminCreatedAtIdx: index('admin_moderation_actions_admin_created_at_idx').on(table.adminUserId, table.createdAt),
+    actionCreatedAtIdx: index('admin_moderation_actions_action_created_at_idx').on(table.action, table.createdAt)
+  })
+);
 
 export const refreshTokens = pgTable(
   'refresh_tokens',
@@ -215,6 +257,144 @@ export const apiUsage = pgTable(
   },
   (table) => ({
     sourceDateIdx: uniqueIndex('api_usage_source_name_date_idx').on(table.sourceName, table.date)
+  })
+);
+
+export const emailDeliveryLogs = pgTable(
+  'email_delivery_logs',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    email: text('email').notNull(),
+    emailType: varchar('email_type', { length: 60 }).notNull(),
+    provider: varchar('provider', { length: 60 }).notNull().default('google_apps_script'),
+    status: varchar('status', { length: 30 }).notNull().default('pending'),
+    subject: text('subject'),
+    country: varchar('country', { length: 80 }),
+    region: varchar('region', { length: 120 }),
+    city: varchar('city', { length: 120 }),
+    errorCode: varchar('error_code', { length: 80 }),
+    errorMessage: text('error_message'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    deliveredAt: timestamp('delivered_at', { withTimezone: true })
+  },
+  (table) => ({
+    createdAtIdx: index('email_delivery_logs_created_at_idx').on(table.createdAt),
+    emailCreatedAtIdx: index('email_delivery_logs_email_created_at_idx').on(table.email, table.createdAt),
+    userCreatedAtIdx: index('email_delivery_logs_user_created_at_idx').on(table.userId, table.createdAt),
+    typeCreatedAtIdx: index('email_delivery_logs_type_created_at_idx').on(table.emailType, table.createdAt),
+    statusCreatedAtIdx: index('email_delivery_logs_status_created_at_idx').on(table.status, table.createdAt)
+  })
+);
+
+export const emailServiceBlocks = pgTable(
+  'email_service_blocks',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    email: text('email').notNull(),
+    isBlocked: boolean('is_blocked').notNull().default(true),
+    reason: text('reason').notNull(),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    emailIdx: uniqueIndex('email_service_blocks_email_idx').on(table.email),
+    activeIdx: index('email_service_blocks_active_idx').on(table.isBlocked),
+    updatedAtIdx: index('email_service_blocks_updated_at_idx').on(table.updatedAt)
+  })
+);
+
+export const visitorSessions = pgTable(
+  'visitor_sessions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    visitorId: varchar('visitor_id', { length: 80 }).notNull(),
+    sessionKey: varchar('session_key', { length: 80 }).notNull(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    firstSeenAt: timestamp('first_seen_at', { withTimezone: true }).defaultNow().notNull(),
+    lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).defaultNow().notNull(),
+    ipHash: text('ip_hash'),
+    userAgentHash: text('user_agent_hash'),
+    deviceCategory: varchar('device_category', { length: 30 }),
+    browserName: varchar('browser_name', { length: 60 }),
+    country: varchar('country', { length: 80 }),
+    region: varchar('region', { length: 120 }),
+    city: varchar('city', { length: 120 }),
+    analyticsOptOut: boolean('analytics_opt_out').notNull().default(false)
+  },
+  (table) => ({
+    visitorIdIdx: index('visitor_sessions_visitor_id_idx').on(table.visitorId),
+    sessionKeyIdx: uniqueIndex('visitor_sessions_session_key_idx').on(table.sessionKey),
+    userIdIdx: index('visitor_sessions_user_id_idx').on(table.userId),
+    lastSeenIdx: index('visitor_sessions_last_seen_at_idx').on(table.lastSeenAt)
+  })
+);
+
+export const analyticsEvents = pgTable(
+  'analytics_events',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    eventType: varchar('event_type', { length: 60 }).notNull(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    visitorId: varchar('visitor_id', { length: 80 }),
+    sessionKey: varchar('session_key', { length: 80 }),
+    path: text('path'),
+    referrer: text('referrer'),
+    source: varchar('source', { length: 120 }),
+    deviceCategory: varchar('device_category', { length: 30 }),
+    browserName: varchar('browser_name', { length: 60 }),
+    country: varchar('country', { length: 80 }),
+    region: varchar('region', { length: 120 }),
+    city: varchar('city', { length: 120 }),
+    metadata: jsonb('metadata').notNull().default({}),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    eventTypeCreatedAtIdx: index('analytics_events_event_type_created_at_idx').on(table.eventType, table.createdAt),
+    userCreatedAtIdx: index('analytics_events_user_id_created_at_idx').on(table.userId, table.createdAt),
+    visitorCreatedAtIdx: index('analytics_events_visitor_id_created_at_idx').on(table.visitorId, table.createdAt),
+    createdAtIdx: index('analytics_events_created_at_idx').on(table.createdAt)
+  })
+);
+
+export const analyticsDailyAggregates = pgTable(
+  'analytics_daily_aggregates',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    date: date('date').notNull(),
+    eventType: varchar('event_type', { length: 60 }).notNull(),
+    path: text('path').notNull().default(''),
+    country: varchar('country', { length: 80 }).notNull().default('Unknown'),
+    eventCount: integer('event_count').notNull().default(0),
+    uniqueVisitors: integer('unique_visitors').notNull().default(0),
+    uniqueUsers: integer('unique_users').notNull().default(0),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    dateEventPathCountryIdx: uniqueIndex('analytics_daily_aggregates_unique_idx').on(
+      table.date,
+      table.eventType,
+      table.path,
+      table.country
+    )
+  })
+);
+
+export const adminAuditLogs = pgTable(
+  'admin_audit_logs',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    adminUserId: uuid('admin_user_id').references(() => users.id, { onDelete: 'set null' }),
+    action: varchar('action', { length: 80 }).notNull(),
+    targetType: varchar('target_type', { length: 80 }),
+    targetId: text('target_id'),
+    metadata: jsonb('metadata').notNull().default({}),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    adminCreatedAtIdx: index('admin_audit_logs_admin_user_id_created_at_idx').on(table.adminUserId, table.createdAt),
+    actionCreatedAtIdx: index('admin_audit_logs_action_created_at_idx').on(table.action, table.createdAt)
   })
 );
 
@@ -424,8 +604,77 @@ export const notifications = pgTable(
     userReadCreatedAtIdx: index('notifications_user_id_is_read_created_at_idx').on(table.userId, table.isRead, table.createdAt),
     typeCheck: check(
       'notifications_type_check',
-      sql`${table.type} in ('new_follower', 'new_connection_request', 'connection_accepted', 'post_like', 'post_comment', 'job_match_alert', 'squad_ping', 'squad_goal_reached', 'squad_synergy_burst')`
+      sql`${table.type} in ('new_follower', 'new_connection_request', 'connection_accepted', 'post_like', 'post_comment', 'job_match_alert', 'squad_ping', 'squad_goal_reached', 'squad_synergy_burst', 'admin_restriction_update', 'admin_account_status', 'support_ticket_reply', 'support_ticket_status')`
     )
+  })
+);
+
+export const supportTickets = pgTable(
+  'support_tickets',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    contactEmail: text('contact_email'),
+    isPublic: boolean('is_public').notNull().default(false),
+    assignedAdminId: uuid('assigned_admin_id').references(() => users.id, { onDelete: 'set null' }),
+    category: varchar('category', { length: 80 }).notNull(),
+    subject: varchar('subject', { length: 160 }).notNull(),
+    message: text('message').notNull(),
+    status: varchar('status', { length: 40 }).notNull().default('open'),
+    priority: varchar('priority', { length: 30 }).notNull().default('normal'),
+    relatedFeature: varchar('related_feature', { length: 100 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+    assignedAt: timestamp('assigned_at', { withTimezone: true }),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+    escalatedAt: timestamp('escalated_at', { withTimezone: true }),
+    emailServiceBlockedAtSubmit: timestamp('email_service_blocked_at_submit', { withTimezone: true }),
+    lastAdminReplyAt: timestamp('last_admin_reply_at', { withTimezone: true }),
+    lastUserReplyAt: timestamp('last_user_reply_at', { withTimezone: true })
+  },
+  (table) => ({
+    userStatusUpdatedIdx: index('support_tickets_user_status_updated_idx').on(table.userId, table.status, table.updatedAt),
+    contactEmailIdx: index('support_tickets_contact_email_idx').on(table.contactEmail),
+    assignedStatusIdx: index('support_tickets_assigned_status_idx').on(table.assignedAdminId, table.status),
+    statusPriorityUpdatedIdx: index('support_tickets_status_priority_updated_idx').on(table.status, table.priority, table.updatedAt),
+    categoryUpdatedIdx: index('support_tickets_category_updated_idx').on(table.category, table.updatedAt),
+    statusCheck: check('support_tickets_status_check', sql`${table.status} in ('open', 'pending_admin', 'waiting_user', 'resolved', 'closed')`),
+    priorityCheck: check('support_tickets_priority_check', sql`${table.priority} in ('low', 'normal', 'high', 'urgent')`)
+  })
+);
+
+export const supportTicketInternalNotes = pgTable(
+  'support_ticket_internal_notes',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    ticketId: uuid('ticket_id')
+      .notNull()
+      .references(() => supportTickets.id, { onDelete: 'cascade' }),
+    adminUserId: uuid('admin_user_id').references(() => users.id, { onDelete: 'set null' }),
+    note: text('note').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    ticketCreatedIdx: index('support_ticket_internal_notes_ticket_created_idx').on(table.ticketId, table.createdAt)
+  })
+);
+
+export const supportTicketMessages = pgTable(
+  'support_ticket_messages',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    ticketId: uuid('ticket_id')
+      .notNull()
+      .references(() => supportTickets.id, { onDelete: 'cascade' }),
+    senderUserId: uuid('sender_user_id').references(() => users.id, { onDelete: 'set null' }),
+    senderRole: varchar('sender_role', { length: 20 }).notNull(),
+    message: text('message').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    ticketCreatedIdx: index('support_ticket_messages_ticket_created_idx').on(table.ticketId, table.createdAt),
+    senderRoleCheck: check('support_ticket_messages_sender_role_check', sql`${table.senderRole} in ('user', 'admin')`)
   })
 );
 

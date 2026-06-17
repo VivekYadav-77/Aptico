@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 import { and, asc, desc, eq, gte, inArray, ne, or, sql } from 'drizzle-orm';
-import { analyses, applicationLogs, connections, follows, profileSettings, rejectionLogs, squadMembers, squadMonthlyScores, squads, userProfiles, users } from '../../db/schema.js';
+import { adminRestrictions, analyses, applicationLogs, connections, follows, profileSettings, rejectionLogs, squadMembers, squadMonthlyScores, squads, userProfiles, users } from '../../db/schema.js';
 import { createNotification } from '../../shared/utils/notification-helper.js';
 
 const USERNAME_PATTERN = /^[a-z0-9_-]{3,30}$/;
@@ -726,6 +726,7 @@ export async function getPublicProfile(db, username, viewerId = null) {
       follower_count: userProfiles.followerCount,
       following_count: userProfiles.followingCount,
       name: users.name,
+      status: users.status,
       avatar_url: users.avatarUrl,
       created_at: userProfiles.createdAt
     })
@@ -739,6 +740,28 @@ export async function getPublicProfile(db, username, viewerId = null) {
   }
 
   const profileOwnerId = rows[0].user_id;
+  const isSelf = viewerId && viewerId === profileOwnerId;
+
+  if (['blocked', 'deactivated'].includes(rows[0].status) && !isSelf) {
+    throw serviceError('Profile not found', 404);
+  }
+
+  if (!isSelf) {
+    const activeProfileRestriction = await db
+      .select({ id: adminRestrictions.id })
+      .from(adminRestrictions)
+      .where(and(
+        eq(adminRestrictions.userId, profileOwnerId),
+        eq(adminRestrictions.feature, 'profile_visibility'),
+        eq(adminRestrictions.isRestricted, true),
+        or(sql`${adminRestrictions.expiresAt} is null`, sql`${adminRestrictions.expiresAt} > now()`)
+      ))
+      .limit(1);
+
+    if (activeProfileRestriction[0]) {
+      throw serviceError('This profile is currently unavailable.', 403);
+    }
+  }
 
   // Fetch profile_settings for enriched sections
   const settingsRows = await db
@@ -750,7 +773,6 @@ export async function getPublicProfile(db, username, viewerId = null) {
   const rawSettings = settingsRows[0]?.settingsJson || {};
 
   // Determine viewer relationship
-  const isSelf = viewerId && viewerId === profileOwnerId;
   let isConnected = false;
   const effectiveIsPublic = typeof rawSettings.publicProfile === 'boolean'
     ? rawSettings.publicProfile

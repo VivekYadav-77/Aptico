@@ -168,6 +168,10 @@ const TITLES = {
   verify: 'Verify your email'
 };
 
+function getPostAuthPath(user) {
+  return user?.role === 'admin' ? '/admin' : '/dashboard';
+}
+
 export default function AuthPermanent() {
   const auth = useSelector(selectAuth);
   const dispatch = useDispatch();
@@ -204,13 +208,13 @@ export default function AuthPermanent() {
 
   useEffect(() => {
     if (auth.isAuthenticated) {
-      navigate('/dashboard', { replace: true });
+      navigate(getPostAuthPath(auth.user), { replace: true });
     }
 
     if (auth.guestMode) {
       navigate('/guest', { replace: true });
     }
-  }, [auth.guestMode, auth.isAuthenticated, navigate]);
+  }, [auth.guestMode, auth.isAuthenticated, auth.user, navigate]);
 
   useEffect(() => {
     if (screenMode !== 'verify' || !actionToken) {
@@ -225,13 +229,13 @@ export default function AuthPermanent() {
       setStatusMessage('Verifying your email...');
 
       try {
-        await verifyEmailRequest(actionToken, store);
+        const session = await verifyEmailRequest(actionToken, store);
         if (!isActive) {
           return;
         }
 
         setSearchParams({}, { replace: true });
-        navigate('/dashboard', { replace: true });
+        navigate(getPostAuthPath(session.user), { replace: true });
       } catch (error) {
         if (isActive) {
           setErrorMessage(error.response?.data?.message || 'Email verification failed.');
@@ -295,14 +299,14 @@ export default function AuthPermanent() {
         );
         setActiveTab('login');
       } else if (screenMode === 'login') {
-        await loginRequest(
+        const session = await loginRequest(
           {
             email: formState.email.trim(),
             password: formState.password
           },
           store
         );
-        navigate('/dashboard', { replace: true });
+        navigate(getPostAuthPath(session.user), { replace: true });
       } else if (screenMode === 'forgot') {
         await forgotPasswordRequest(formState.email.trim());
         setStatusMessage('If the account exists, a password reset link has been sent.');
@@ -345,8 +349,8 @@ export default function AuthPermanent() {
     dispatch(exitGuestMode());
 
     try {
-      await loginWithGoogleRequest(credential, store);
-      navigate('/dashboard', { replace: true });
+      const session = await loginWithGoogleRequest(credential, store);
+      navigate(getPostAuthPath(session.user), { replace: true });
     } catch (error) {
       setErrorMessage(error.response?.data?.message || error.message || 'Google login failed.');
     } finally {
@@ -613,6 +617,13 @@ export default function AuthPermanent() {
                      </button>
                    </>
                  )}
+               </div>
+
+               <div className="mt-3 text-center text-xs text-[var(--muted-strong)]">
+                 Cannot sign in or receive email?{' '}
+                 <Link href="/contact-support" className="font-bold text-[var(--accent-strong)] hover:underline">
+                   Contact support
+                 </Link>
                </div>
 
                <div className="pt-6 text-center">

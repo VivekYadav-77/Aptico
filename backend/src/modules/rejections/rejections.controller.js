@@ -2,6 +2,7 @@ import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { rejectionLogs, squadActivities, squadMembers, squads, users } from '../../db/schema.js';
 import { applyXpDecayIfNeeded, calculateRejectionXp, grantXp, shouldShadowban } from '../../shared/services/xp-engine.service.js';
+import { recordAnalyticsEvent } from '../analytics/analytics.service.js';
 
 const rejectionSchema = z.object({
   companyName: z.string().trim().min(1).max(160),
@@ -183,6 +184,17 @@ export async function createRejectionController(request, reply) {
       jobUrl: body.jobUrl || null,
       stageRejected: body.stageRejected,
       isShadowbanned: shadowbanDecision.shadowbanned
+    });
+
+    await recordAnalyticsEvent({
+      db: request.server.db,
+      request,
+      eventType: 'rejection_logged',
+      userId: request.auth.userId,
+      metadata: {
+        stageRejected: body.stageRejected,
+        shadowbanned: shadowbanDecision.shadowbanned
+      }
     });
 
     if (!shadowbanDecision.shadowbanned) {

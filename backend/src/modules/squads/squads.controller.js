@@ -8,6 +8,7 @@ import {
   injectDailyBriefingController,
   injectMissionSecuredCommsEvent
 } from './squad-comms.controller.js';
+import { recordAnalyticsEvent } from '../analytics/analytics.service.js';
 
 const joinSquadSchema = z.object({
   weeklyGoal: z.coerce.number().int().min(4).max(500).optional()
@@ -773,6 +774,17 @@ export async function joinSquadController(request, reply) {
 
     const snapshot = await getSquadSnapshot(request.server.db, request.auth.userId, currentWeek);
 
+    await recordAnalyticsEvent({
+      db: request.server.db,
+      request,
+      eventType: 'squad_joined',
+      userId: request.auth.userId,
+      metadata: {
+        squadId: openSquad.id,
+        weeklyGoal
+      }
+    });
+
     return reply.code(201).send({
       success: true,
       joined: true,
@@ -894,6 +906,19 @@ export async function logSquadAppController(request, reply) {
       .from(users)
       .where(eq(users.id, request.auth.userId))
       .limit(1);
+
+    await recordAnalyticsEvent({
+      db: request.server.db,
+      request,
+      eventType: 'application_logged',
+      userId: request.auth.userId,
+      metadata: {
+        squadId: membership.squadId,
+        applicationLogId: appLog?.id || null,
+        shadowbanned: shadowbanDecision.shadowbanned,
+        goalRewardGranted
+      }
+    });
 
     return reply.send({
       success: true,
