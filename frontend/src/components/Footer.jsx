@@ -131,7 +131,7 @@ export default function Footer() {
           <div className="flex items-center gap-6">
              <div className="flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--panel)] px-4 py-1.5 transition hover:border-[var(--accent-soft)]">
                 <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--muted)]">Engineered by</span>
-                <span className="text-xs font-black text-[var(--text)]">Vivek Yadav</span>
+                <span className="text-xs font-black text-[var(--text)]">Vivek Yadav & Shivam Yadav</span>
              </div>
           </div>
         </div>

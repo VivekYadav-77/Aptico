@@ -15,6 +15,7 @@ import {
   LANDING_CORE_PILLARS,
   LANDING_COMPARISON,
   LANDING_FAQ,
+  TEAM_MEMBERS,
   NAVBAR_HEIGHT,
 } from '../constants/index.js';
 
@@ -63,6 +64,62 @@ function initials(name) {
 }
 
 // ── UI PREVIEWS ──────────────────────────────────────────────
+function TeamMemberCard({ member }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const fallbackInitials = member.initials || String(member.name || '')
+    .split(' ')
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+  return (
+    <article className="group overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel)] shadow-sm transition-all duration-300 hover:border-[var(--accent)]/35 hover:shadow-xl">
+      <div className="grid gap-0 sm:grid-cols-[13rem_1fr]">
+        <div className="relative aspect-[4/3] overflow-hidden bg-[var(--panel-soft)] sm:aspect-auto sm:min-h-[18rem]">
+          {!imageFailed && member.image ? (
+            <img
+              src={member.image}
+              alt={`${member.name} portrait`}
+              className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+              onError={() => setImageFailed(true)}
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-[linear-gradient(135deg,var(--accent-soft),var(--panel-strong))]">
+              <span className="text-5xl font-black tracking-tight text-[var(--accent-strong)]">{fallbackInitials}</span>
+            </div>
+          )}
+          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/35 to-transparent" />
+        </div>
+        <div className="flex min-w-0 flex-col justify-between p-6">
+          <div>
+            <p className="app-kicker">Aptico Team</p>
+            <h3 className="mt-3 text-2xl font-black tracking-tight text-[var(--text)]">{member.name}</h3>
+            <p className="mt-1 text-sm font-bold text-[var(--accent-strong)]">{member.role}</p>
+            <p className="mt-4 text-sm leading-7 text-[var(--muted-strong)]">{member.focus}</p>
+          </div>
+          {member.links?.length ? (
+            <div className="mt-6 flex flex-wrap gap-2">
+              {member.links.map((link) => (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  target={link.href?.startsWith('mailto:') ? undefined : '_blank'}
+                  rel={link.href?.startsWith('mailto:') ? undefined : 'noreferrer'}
+                  className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] px-3 py-2 text-xs font-bold text-[var(--muted-strong)] transition hover:border-[var(--accent)] hover:text-[var(--text)]"
+                >
+                  <span className="material-symbols-outlined text-[16px]">{link.icon}</span>
+                  {link.label}
+                </a>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function UIPreview({ type }) {
   if (type === 'analysis') {
     return (
@@ -215,6 +272,7 @@ export default function GuestDashboard() {
           <div className="flex flex-1 items-center justify-end gap-6">
             <nav className="hidden items-center gap-6 md:flex">
               <a href="#features" className="text-sm font-bold text-[var(--muted-strong)] transition hover:text-[var(--text)]">Features</a>
+              <a href="#team" className="text-sm font-bold text-[var(--muted-strong)] transition hover:text-[var(--text)]">Team</a>
               <Link to="/docs" className="text-sm font-bold text-[var(--muted-strong)] transition hover:text-[var(--text)]">Docs</Link>
               <Link to="/login" className="text-sm font-bold text-[var(--muted-strong)] transition hover:text-[var(--text)]">Log in</Link>
             </nav>
@@ -237,7 +295,7 @@ export default function GuestDashboard() {
         {mobileMenuOpen && (
           <div className="border-t border-[var(--border)] bg-[var(--shell)] px-6 py-5 md:hidden">
             <nav className="flex flex-col gap-1">
-              {[ ['Intelligence', '#pillars'], ['Method', '#comparison'], ['Features', '#features'], ].map(([label, href]) => (
+              {[ ['Intelligence', '#pillars'], ['Method', '#comparison'], ['Features', '#features'], ['Team', '#team'], ].map(([label, href]) => (
                 <a key={label} href={href} onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-3 text-sm font-semibold text-[var(--muted-strong)] transition hover:bg-[var(--panel-soft)] hover:text-[var(--text)]">
                   {label}
                 </a>
@@ -417,6 +475,34 @@ export default function GuestDashboard() {
                 </Reveal>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section id="team" className="border-y border-[var(--border)] bg-[var(--panel-soft)] py-20 md:py-28">
+          <div className="app-container">
+            <Reveal className="mx-auto max-w-3xl text-center mb-14">
+              <p className="app-kicker">Built by developers</p>
+              <h2 className="mt-3 text-3xl font-black tracking-[-0.03em] text-[var(--text)] sm:text-4xl md:text-5xl">
+                The people behind Aptico.
+              </h2>
+              <p className="mx-auto mt-5 max-w-2xl text-base leading-8 text-[var(--muted-strong)]">
+                Aptico is built as a real product: user workflows, admin controls, privacy-safe analytics, support systems, and recruiter-friendly proof all working together.
+              </p>
+            </Reveal>
+
+            <div className="grid gap-5 lg:grid-cols-2">
+              {TEAM_MEMBERS.map((member) => (
+                <Reveal key={member.name}>
+                  <TeamMemberCard member={member} />
+                </Reveal>
+              ))}
+            </div>
+
+            <Reveal className="mt-8 rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-5 text-center">
+              <p className="text-sm font-bold leading-7 text-[var(--muted-strong)]">
+                Built with full-stack ownership across product design, backend systems, admin operations, and user-facing workflows.
+              </p>
+            </Reveal>
           </div>
         </section>
 

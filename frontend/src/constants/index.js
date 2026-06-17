@@ -156,7 +156,7 @@ export const FOOTER_LINKS = {
     { label: 'Squads', to: '/squads' },
   ],
   company: [
-    { label: 'About', href: '#' },
+    { label: 'Team', href: '/#team' },
     { label: 'Blog', to: '/docs' },
   ],
   legal: [
@@ -206,6 +206,29 @@ export const LANDING_FAQ = [
 ];
 
 // ── Social links ─────────────────────────────────────────────
+export const TEAM_MEMBERS = [
+  {
+    name: 'Vivek Yadav',
+    role: 'Full-stack Developer',
+    focus: 'Product architecture, AI workflows, platform experience, and career intelligence systems.',
+    image: '/team/vivek-yadav.jpg',
+    initials: 'VY',
+    links: [
+      { label: 'GitHub', href: 'https://github.com/VivekYadav-77', icon: 'code' },
+    ],
+  },
+  {
+    name: 'Shivam Yadav',
+    role: 'Developer and Platform Operator',
+    focus: 'Admin operations, support flows, user controls, monitoring, and product quality.',
+    image: '/team/shivam-yadav.jpg',
+    initials: 'SY',
+    links: [
+      { label: 'Email', href: 'mailto:shivamyadav9462@gmail.com', icon: 'mail' },
+    ],
+  },
+];
+
 export const SOCIAL_LINKS = [
   { label: 'GitHub', href: 'https://github.com/VivekYadav-77/Aptico', icon: 'code' },
 ];
