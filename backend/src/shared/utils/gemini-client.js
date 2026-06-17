@@ -30,7 +30,6 @@ export function normalizeGeminiError(error) {
 
 export function getGeminiKeys(keys) {
   const availableKeys = (keys || []).filter(Boolean);
-  console.log("availableKeys", availableKeys);
   if (!availableKeys.length) {
     const error = new Error('Gemini keys are not configured yet.');
     error.statusCode = 503;

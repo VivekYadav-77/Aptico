@@ -33,7 +33,6 @@ function writeSSE(raw, event, data) {
 
 export async function analyzeController(request, reply) {
   const incomingFile = request.body?.file;
-  console.log("in the analyze controller")
 
   // ── Input validation ────────────────────────────────────────────────────────
   if (incomingFile?.size > MAX_FILE_BYTES) {
