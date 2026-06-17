@@ -19,14 +19,28 @@ export const SUPPORT_STATUSES = ['open', 'pending_admin', 'waiting_user', 'resol
 export const SUPPORT_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
 
 const ticketBodySchema = z.object({
-  category: z.enum(SUPPORT_CATEGORIES),
-  subject: z.string().trim().min(6).max(160),
-  message: z.string().trim().min(12).max(4000),
+  category: z.enum(SUPPORT_CATEGORIES, {
+    errorMap: () => ({ message: 'Please choose a valid support category.' })
+  }),
+  subject: z
+    .string({ required_error: 'Please enter a short subject.' })
+    .trim()
+    .min(6, 'Subject must be at least 6 characters.')
+    .max(160, 'Subject must be 160 characters or fewer.'),
+  message: z
+    .string({ required_error: 'Please describe the issue.' })
+    .trim()
+    .min(12, 'Message must be at least 12 characters.')
+    .max(4000, 'Message must be 4000 characters or fewer.'),
   relatedFeature: z.string().trim().max(100).optional().nullable()
 });
 
 const publicTicketBodySchema = ticketBodySchema.extend({
-  email: z.string().trim().email().transform((value) => value.toLowerCase())
+  email: z
+    .string({ required_error: 'Please enter your email address.' })
+    .trim()
+    .email('Please enter a valid email address.')
+    .transform((value) => value.toLowerCase())
 });
 
 const messageBodySchema = z.object({
@@ -38,7 +52,18 @@ const ticketParamsSchema = z.object({
 });
 
 function sendSupportError(reply, error, fallbackMessage) {
-  const statusCode = error.name === 'ZodError' ? 400 : error.statusCode || 500;
+  if (error instanceof z.ZodError) {
+    const fieldErrors = error.flatten().fieldErrors;
+    const firstMessage = error.issues[0]?.message || 'Please check the support request details.';
+    return reply.code(400).send({
+      success: false,
+      code: 'VALIDATION_ERROR',
+      error: firstMessage,
+      fieldErrors
+    });
+  }
+
+  const statusCode = error.statusCode || 500;
   return reply.code(statusCode).send({
     success: false,
     error: error.message || fallbackMessage
