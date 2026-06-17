@@ -97,77 +97,79 @@ function SearchDropdown({ query, onClose, navigate, showAdmin = false }) {
 
   return (
     <div
-      className="search-dropdown absolute left-0 top-[calc(100%+8px)] z-[200] w-[min(24rem,calc(100vw-2rem))] max-w-sm overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel)] shadow-[0_24px_48px_rgba(0,0,0,0.18)]"
+      className="search-dropdown absolute left-0 top-[calc(100%+8px)] z-[200] flex max-h-[calc(100vh-5rem)] w-[min(24rem,calc(100vw-2rem))] max-w-sm flex-col overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel)] shadow-[0_24px_48px_rgba(0,0,0,0.18)] md:max-h-[min(34rem,calc(100vh-5.5rem))]"
       style={{ backdropFilter: 'blur(20px)' }}
     >
-      {!trimmed ? (
-        <div className="px-5 py-8 text-center">
-           <span className="material-symbols-outlined text-[32px] text-[var(--muted)] mb-3">manage_search</span>
-           <p className="text-sm font-medium text-[var(--text)]">Type to search insights</p>
-           <p className="mt-1 text-xs text-[var(--muted-strong)]">Find pages, squad info, and settings quickly.</p>
-           <div className="mt-5 flex flex-wrap justify-center gap-2">
-             {['/dashboard', '/analysis', '/jobs'].map(path => {
-               const item = NAV_ITEMS.find(n => n.to === path);
-               return item ? (
-                 <button key={path} onClick={() => handleSelect(path)} className="flex items-center gap-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] px-3 py-1.5 text-xs font-semibold text-[var(--text)] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all duration-200">
-                   <span className="material-symbols-outlined text-[14px] text-[var(--accent)] drop-shadow-[0_0_4px_rgba(78,222,163,0.4)]">{item.icon}</span>
-                   {item.label}
-                 </button>
-               ) : null;
-             })}
-           </div>
-        </div>
-      ) : hasResults ? (
-        <div className="py-3">
-          {navResults.length > 0 && (
-            <div className="px-5 pb-2">
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Pages</p>
-              {navResults.map((item) => (
-                <button
-                  key={item.to}
-                  type="button"
-                  onClick={() => handleSelect(item.to)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition hover:bg-[var(--panel-soft)]"
-                >
-                  <span className="material-symbols-outlined text-[18px] text-[var(--accent-strong)]">{item.icon}</span>
-                  <div>
-                    <p className="font-semibold text-[var(--text)]">{item.label}</p>
-                    <p className="text-xs text-[var(--muted-strong)]">{item.description}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-          {insightResults.length > 0 && (
-            <div className="px-5 pt-1">
-              {navResults.length > 0 && <div className="mb-2 border-t border-[var(--border)]" />}
-              <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Insights</p>
-              {insightResults.slice(0, 5).map((item, i) => (
-                <button
-                  key={i}
-                  type="button"
-                  onClick={() => handleSelect(item.to)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm transition hover:bg-[var(--panel-soft)]"
-                >
-                  <span className="material-symbols-outlined text-[18px] text-[var(--muted)]">{item.icon}</span>
-                  <div>
-                    <p className="font-medium text-[var(--text)]">{item.label}</p>
-                    <p className="text-xs text-[var(--muted-strong)]">{item.category}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="px-5 py-8 text-center">
-          <span className="material-symbols-outlined text-[32px] text-[var(--muted)]">search_off</span>
-          <p className="mt-2 text-sm font-medium text-[var(--text)]">No results for &ldquo;{query}&rdquo;</p>
-          <p className="mt-1 text-xs text-[var(--muted-strong)]">Try searching for a page, feature, or setting</p>
-        </div>
-      )}
+      <div className="search-dropdown-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        {!trimmed ? (
+          <div className="px-5 py-8 text-center">
+             <span className="material-symbols-outlined text-[32px] text-[var(--muted)] mb-3">manage_search</span>
+             <p className="text-sm font-medium text-[var(--text)]">Type to search insights</p>
+             <p className="mt-1 text-xs text-[var(--muted-strong)]">Find pages, squad info, and settings quickly.</p>
+             <div className="mt-5 flex flex-wrap justify-center gap-2">
+               {['/dashboard', '/analysis', '/jobs'].map(path => {
+                 const item = NAV_ITEMS.find(n => n.to === path);
+                 return item ? (
+                   <button key={path} onClick={() => handleSelect(path)} className="flex items-center gap-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] px-3 py-1.5 text-xs font-semibold text-[var(--text)] hover:bg-white/[0.08] hover:border-white/[0.15] transition-all duration-200">
+                     <span className="material-symbols-outlined text-[14px] text-[var(--accent)] drop-shadow-[0_0_4px_rgba(78,222,163,0.4)]">{item.icon}</span>
+                     {item.label}
+                   </button>
+                 ) : null;
+               })}
+             </div>
+          </div>
+        ) : hasResults ? (
+          <div className="py-3">
+            {navResults.length > 0 && (
+              <div className="px-4 pb-2">
+                <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Pages</p>
+                {navResults.map((item) => (
+                  <button
+                    key={item.to}
+                    type="button"
+                    onClick={() => handleSelect(item.to)}
+                    className="search-result-row flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                  >
+                    <span className="material-symbols-outlined text-[20px] text-[var(--accent-strong)]">{item.icon}</span>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-[var(--text)]">{item.label}</p>
+                      <p className="line-clamp-2 text-xs leading-5 text-[var(--muted-strong)]">{item.description}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+            {insightResults.length > 0 && (
+              <div className="px-4 pt-1">
+                {navResults.length > 0 && <div className="mb-2 border-t border-[var(--border)]" />}
+                <p className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Insights</p>
+                {insightResults.slice(0, 5).map((item, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => handleSelect(item.to)}
+                    className="search-result-row flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+                  >
+                    <span className="material-symbols-outlined text-[20px] text-[var(--muted)]">{item.icon}</span>
+                    <div className="min-w-0">
+                      <p className="font-medium text-[var(--text)]">{item.label}</p>
+                      <p className="text-xs text-[var(--muted-strong)]">{item.category}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="px-5 py-8 text-center">
+            <span className="material-symbols-outlined text-[32px] text-[var(--muted)]">search_off</span>
+            <p className="mt-2 text-sm font-medium text-[var(--text)]">No results for &ldquo;{query}&rdquo;</p>
+            <p className="mt-1 text-xs text-[var(--muted-strong)]">Try searching for a page, feature, or setting</p>
+          </div>
+        )}
+      </div>
 
-      <div className="border-t border-[var(--border)] px-5 py-2.5">
+      <div className="shrink-0 border-t border-[var(--border)] bg-[var(--panel)] px-5 py-2.5">
         <p className="text-[10px] text-[var(--muted)]">Press <kbd className="rounded border border-[var(--border)] px-1 py-0.5 font-mono text-[10px]">Esc</kbd> to close</p>
       </div>
     </div>
