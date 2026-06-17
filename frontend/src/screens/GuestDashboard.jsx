@@ -66,6 +66,7 @@ function initials(name) {
 // ── UI PREVIEWS ──────────────────────────────────────────────
 function TeamMemberCard({ member }) {
   const [imageFailed, setImageFailed] = useState(false);
+  const visibleLinks = (member.links || []).filter((link) => Boolean(link.href));
   const fallbackInitials = member.initials || String(member.name || '')
     .split(' ')
     .map((part) => part[0])
@@ -96,11 +97,12 @@ function TeamMemberCard({ member }) {
             <p className="app-kicker">Aptico Team</p>
             <h3 className="mt-3 text-2xl font-black tracking-tight text-[var(--text)]">{member.name}</h3>
             <p className="mt-1 text-sm font-bold text-[var(--accent-strong)]">{member.role}</p>
+            {member.designation ? <p className="mt-2 text-xs font-black uppercase tracking-[0.16em] text-[var(--muted)]">{member.designation}</p> : null}
             <p className="mt-4 text-sm leading-7 text-[var(--muted-strong)]">{member.focus}</p>
           </div>
-          {member.links?.length ? (
+          {visibleLinks.length ? (
             <div className="mt-6 flex flex-wrap gap-2">
-              {member.links.map((link) => (
+              {visibleLinks.map((link) => (
                 <a
                   key={link.label}
                   href={link.href}

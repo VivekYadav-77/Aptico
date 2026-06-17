@@ -1,7 +1,7 @@
-Place team portraits in this folder with these filenames:
+Team portraits used by the landing page:
 
-- `vivek-yadav.jpg`
-- `shivam-yadav.jpg`
+- `Vivek.jpeg`
+- `Shivang.png`
 
 Recommended image shape:
 
