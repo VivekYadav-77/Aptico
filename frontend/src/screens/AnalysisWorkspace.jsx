@@ -107,6 +107,14 @@ function AnalysisErrorBanner({ message }) {
         <div>
           {restricted ? <p className="mb-1 text-xs uppercase tracking-[0.18em] text-[var(--danger-strong)]">Admin restriction</p> : null}
           <p className="text-[var(--text)]">{message}</p>
+          {restricted ? (
+            <Link
+              to={`/support?category=feature_restriction_appeal&feature=analysis&message=${encodeURIComponent(message)}`}
+              className="mt-3 inline-flex text-xs font-black uppercase tracking-[0.16em] text-[var(--danger-strong)] hover:underline"
+            >
+              Contact support
+            </Link>
+          ) : null}
         </div>
       </div>
     </div>

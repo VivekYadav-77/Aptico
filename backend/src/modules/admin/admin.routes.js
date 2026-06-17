@@ -1,8 +1,9 @@
 import { and, eq, isNull } from 'drizzle-orm';
 import { z } from 'zod';
-import { refreshTokens, supportTicketMessages, supportTickets } from '../../db/schema.js';
+import { adminAuditLogs, adminRestrictions, emailDeliveryLogs, emailServiceBlocks, refreshTokens, supportTicketInternalNotes, supportTicketMessages, supportTickets, users } from '../../db/schema.js';
 import { cleanupOldAnalyticsEvents, recordAdminAuditLog } from '../analytics/analytics.service.js';
 import { createNotification } from '../../shared/utils/notification-helper.js';
+import { sendSupportEmail } from '../../shared/services/email.service.js';
 import {
   applyContentAction,
   changeUserRole,
@@ -100,6 +101,16 @@ const supportUpdateSchema = z.object({
   reason: z.string().trim().min(6).max(1000)
 });
 
+const supportAssignSchema = z.object({
+  assignedAdminId: z.string().uuid().optional().nullable(),
+  assignToMe: z.boolean().optional(),
+  reason: z.string().trim().min(6).max(1000)
+});
+
+const supportInternalNoteSchema = z.object({
+  note: z.string().trim().min(2).max(4000)
+});
+
 const emailServiceBlockSchema = z.object({
   email: z.string().trim().email(),
   isBlocked: z.boolean(),
@@ -122,6 +133,65 @@ function wait(durationMs) {
   });
 }
 
+async function getSupportTicketWithUser(db, ticketId) {
+  const rows = await db
+    .select({
+      id: supportTickets.id,
+      userId: supportTickets.userId,
+      contactEmail: supportTickets.contactEmail,
+      subject: supportTickets.subject,
+      status: supportTickets.status,
+      priority: supportTickets.priority,
+      userEmail: users.email,
+      userName: users.name
+    })
+    .from(supportTickets)
+    .leftJoin(users, eq(supportTickets.userId, users.id))
+    .where(eq(supportTickets.id, ticketId))
+    .limit(1);
+
+  return rows[0] || null;
+}
+
+async function isSupportEmailBlocked(db, email) {
+  if (!email) return false;
+  const rows = await db
+    .select({ id: emailServiceBlocks.id })
+    .from(emailServiceBlocks)
+    .where(and(eq(emailServiceBlocks.email, email), eq(emailServiceBlocks.isBlocked, true)))
+    .limit(1);
+  return Boolean(rows[0]);
+}
+
+function sendSupportUpdateEmail({ db, request, ticket, subject, title, message, logType }) {
+  const email = ticket.userEmail || ticket.contactEmail;
+  if (!email) return;
+
+  void (async () => {
+    try {
+      const blocked = await isSupportEmailBlocked(db, email);
+      if (blocked) {
+        return;
+      }
+
+      await sendSupportEmail({
+        db,
+        request,
+        email,
+        name: ticket.userName,
+        userId: ticket.userId,
+        subject,
+        title,
+        message,
+        ticketSubject: ticket.subject,
+        logType
+      });
+    } catch (error) {
+      request.log?.warn?.({ error }, 'Support email notification failed');
+    }
+  })();
+}
+
 export default async function adminRoutes(app) {
   app.post('/support/:ticketId/reply', async (request, reply) => {
     try {
@@ -133,7 +203,7 @@ export default async function adminRoutes(app) {
         return reply.code(503).send({ success: false, error: 'Database is not configured yet.' });
       }
 
-      const [ticket] = await db.select().from(supportTickets).where(eq(supportTickets.id, ticketId)).limit(1);
+      const ticket = await getSupportTicketWithUser(db, ticketId);
       if (!ticket) {
         return reply.code(404).send({ success: false, error: 'Support ticket was not found.' });
       }
@@ -157,13 +227,25 @@ export default async function adminRoutes(app) {
         })
         .where(eq(supportTickets.id, ticketId));
 
-      createNotification(db, {
-        userId: ticket.userId,
-        type: 'support_ticket_reply',
-        actorId: request.auth.userId,
-        entityId: ticket.id,
-        entityType: 'support_ticket',
-        message: `Admin replied to your support ticket: ${ticket.subject}`
+      if (ticket.userId) {
+        createNotification(db, {
+          userId: ticket.userId,
+          type: 'support_ticket_reply',
+          actorId: request.auth.userId,
+          entityId: ticket.id,
+          entityType: 'support_ticket',
+          message: `Admin replied to your support ticket: ${ticket.subject}`
+        });
+      }
+
+      sendSupportUpdateEmail({
+        db,
+        request,
+        ticket,
+        subject: `Aptico support replied: ${ticket.subject}`,
+        title: 'Admin replied to your support ticket',
+        message: body.message,
+        logType: 'support_ticket_reply'
       });
 
       await recordAdminAuditLog({
@@ -192,7 +274,7 @@ export default async function adminRoutes(app) {
         return reply.code(503).send({ success: false, error: 'Database is not configured yet.' });
       }
 
-      const [ticket] = await db.select().from(supportTickets).where(eq(supportTickets.id, ticketId)).limit(1);
+      const ticket = await getSupportTicketWithUser(db, ticketId);
       if (!ticket) {
         return reply.code(404).send({ success: false, error: 'Support ticket was not found.' });
       }
@@ -200,6 +282,13 @@ export default async function adminRoutes(app) {
       const updates = { updatedAt: new Date() };
       if (body.status) updates.status = body.status;
       if (body.priority) updates.priority = body.priority;
+      if (body.status === 'resolved') updates.resolvedAt = new Date();
+      if (body.status === 'closed') updates.closedAt = new Date();
+      if (body.status === 'open') {
+        updates.resolvedAt = null;
+        updates.closedAt = null;
+      }
+      if (body.priority === 'urgent') updates.escalatedAt = new Date();
 
       const [updated] = await db
         .update(supportTickets)
@@ -208,13 +297,25 @@ export default async function adminRoutes(app) {
         .returning();
 
       if (body.status && body.status !== ticket.status) {
-        createNotification(db, {
-          userId: ticket.userId,
-          type: 'support_ticket_status',
-          actorId: request.auth.userId,
-          entityId: ticket.id,
-          entityType: 'support_ticket',
-          message: `Your support ticket "${ticket.subject}" is now ${body.status.replaceAll('_', ' ')}.`
+        if (ticket.userId) {
+          createNotification(db, {
+            userId: ticket.userId,
+            type: 'support_ticket_status',
+            actorId: request.auth.userId,
+            entityId: ticket.id,
+            entityType: 'support_ticket',
+            message: `Your support ticket "${ticket.subject}" is now ${body.status.replaceAll('_', ' ')}.`
+          });
+        }
+
+        sendSupportUpdateEmail({
+          db,
+          request,
+          ticket,
+          subject: `Aptico support status updated: ${ticket.subject}`,
+          title: 'Support ticket status updated',
+          message: `Your support ticket is now ${body.status.replaceAll('_', ' ')}.\n\nReason: ${body.reason}`,
+          logType: 'support_ticket_status'
         });
       }
 
@@ -235,6 +336,88 @@ export default async function adminRoutes(app) {
       return reply.send({ success: true, data: updated });
     } catch (error) {
       return sendAdminError(reply, error, 'Could not update support ticket.');
+    }
+  });
+
+  app.post('/support/:ticketId/assign', async (request, reply) => {
+    try {
+      const { ticketId } = supportParamsSchema.parse(request.params || {});
+      const body = supportAssignSchema.parse(request.body || {});
+      const db = request.server.db;
+
+      if (!db) {
+        return reply.code(503).send({ success: false, error: 'Database is not configured yet.' });
+      }
+
+      const ticket = await getSupportTicketWithUser(db, ticketId);
+      if (!ticket) {
+        return reply.code(404).send({ success: false, error: 'Support ticket was not found.' });
+      }
+
+      const assignedAdminId = body.assignToMe ? request.auth.userId : body.assignedAdminId || null;
+      const [updated] = await db
+        .update(supportTickets)
+        .set({
+          assignedAdminId,
+          assignedAt: assignedAdminId ? new Date() : null,
+          updatedAt: new Date()
+        })
+        .where(eq(supportTickets.id, ticketId))
+        .returning();
+
+      await recordAdminAuditLog({
+        db,
+        request,
+        adminUserId: request.auth.userId,
+        action: 'support_ticket_assign',
+        targetType: 'support_ticket',
+        targetId: ticket.id,
+        metadata: { reason: body.reason, assignedAdminId }
+      });
+
+      return reply.send({ success: true, data: updated });
+    } catch (error) {
+      return sendAdminError(reply, error, 'Could not assign support ticket.');
+    }
+  });
+
+  app.post('/support/:ticketId/internal-notes', async (request, reply) => {
+    try {
+      const { ticketId } = supportParamsSchema.parse(request.params || {});
+      const body = supportInternalNoteSchema.parse(request.body || {});
+      const db = request.server.db;
+
+      if (!db) {
+        return reply.code(503).send({ success: false, error: 'Database is not configured yet.' });
+      }
+
+      const ticket = await getSupportTicketWithUser(db, ticketId);
+      if (!ticket) {
+        return reply.code(404).send({ success: false, error: 'Support ticket was not found.' });
+      }
+
+      const [note] = await db
+        .insert(supportTicketInternalNotes)
+        .values({
+          ticketId,
+          adminUserId: request.auth.userId,
+          note: body.note
+        })
+        .returning();
+
+      await recordAdminAuditLog({
+        db,
+        request,
+        adminUserId: request.auth.userId,
+        action: 'support_internal_note',
+        targetType: 'support_ticket',
+        targetId: ticket.id,
+        metadata: { noteLength: body.note.length }
+      });
+
+      return reply.code(201).send({ success: true, data: note });
+    } catch (error) {
+      return sendAdminError(reply, error, 'Could not add internal support note.');
     }
   });
 

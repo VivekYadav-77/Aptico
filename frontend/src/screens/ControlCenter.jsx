@@ -28,9 +28,10 @@ const EMAIL_STATUSES = ['', 'pending', 'sent', 'failed'];
 const SUPPORT_CATEGORIES = ['', 'account_restriction', 'feature_restriction_appeal', 'email_access', 'job_search', 'analysis', 'squad_community', 'bug_report', 'feedback', 'other'];
 const SUPPORT_STATUSES = ['', 'open', 'pending_admin', 'waiting_user', 'resolved', 'closed'];
 const SUPPORT_PRIORITIES = ['', 'low', 'normal', 'high', 'urgent'];
+const SUPPORT_ASSIGNED = ['', 'unassigned', 'assigned', 'me'];
 
 const ADMIN_CONTROL_CENTER_QUERY = `
-  query AdminControlCenter($eventType: String, $selectedUserId: ID!, $contentType: String!, $contentSearch: String, $emailSearch: String, $emailType: String, $emailStatus: String, $supportTicketId: ID!, $supportStatus: String, $supportCategory: String, $supportPriority: String, $supportSearch: String) {
+  query AdminControlCenter($eventType: String, $selectedUserId: ID!, $contentType: String!, $contentSearch: String, $emailSearch: String, $emailType: String, $emailStatus: String, $supportTicketId: ID!, $supportStatus: String, $supportCategory: String, $supportPriority: String, $supportAssigned: String, $supportSearch: String) {
     adminOverview {
       totalUsers
       totalAnalyses
@@ -140,11 +141,22 @@ const ADMIN_CONTROL_CENTER_QUERY = `
     suspiciousSignals {
       label severity detail count lastSeenAt
     }
-    adminSupportTickets(status: $supportStatus, category: $supportCategory, priority: $supportPriority, search: $supportSearch, limit: 50) {
-      id userId userEmail userName category subject message status priority relatedFeature createdAt updatedAt lastAdminReplyAt lastUserReplyAt
+    adminSupportTickets(status: $supportStatus, category: $supportCategory, priority: $supportPriority, assigned: $supportAssigned, search: $supportSearch, limit: 50) {
+      id userId userEmail userName contactEmail isPublic assignedAdminId assignedAdminEmail category subject message status priority relatedFeature createdAt updatedAt assignedAt resolvedAt closedAt escalatedAt emailServiceBlockedAtSubmit emailServiceBlocked lastAdminReplyAt lastUserReplyAt
     }
     adminSupportMessages(ticketId: $supportTicketId, limit: 100) {
       id ticketId senderUserId senderRole senderEmail senderName message createdAt
+    }
+    adminSupportInternalNotes(ticketId: $supportTicketId, limit: 50) {
+      id ticketId adminUserId adminEmail adminName note createdAt
+    }
+    adminSupportContext(ticketId: $supportTicketId) {
+      userStatus
+      emailServiceBlocked
+      emailServiceBlockReason
+      activeRestrictions { id userId feature isRestricted reason expiresAt createdBy createdAt updatedAt }
+      recentAuditLogs { id adminEmail action targetType targetId metadata createdAt }
+      recentEmailLogs { id email emailType provider status subject errorCode errorMessage createdAt deliveredAt }
     }
   }
 `;
@@ -508,10 +520,13 @@ export default function ControlCenter() {
   const [supportStatus, setSupportStatus] = useState('');
   const [supportCategory, setSupportCategory] = useState('');
   const [supportPriority, setSupportPriority] = useState('');
+  const [supportAssigned, setSupportAssigned] = useState('');
   const [supportSearch, setSupportSearch] = useState('');
   const [selectedSupportTicketId, setSelectedSupportTicketId] = useState('');
   const [supportReply, setSupportReply] = useState('');
   const [supportUpdateForm, setSupportUpdateForm] = useState({ status: 'open', priority: 'normal', reason: '' });
+  const [supportAssignReason, setSupportAssignReason] = useState('');
+  const [supportInternalNote, setSupportInternalNote] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -542,7 +557,9 @@ export default function ControlCenter() {
     adminModerationActions: [],
     suspiciousSignals: [],
     adminSupportTickets: [],
-    adminSupportMessages: []
+    adminSupportMessages: [],
+    adminSupportInternalNotes: [],
+    adminSupportContext: null
   });
 
   useEffect(() => {
@@ -630,8 +647,9 @@ export default function ControlCenter() {
     supportStatus: supportStatus || null,
     supportCategory: supportCategory || null,
     supportPriority: supportPriority || null,
+    supportAssigned: supportAssigned || null,
     supportSearch: supportSearch.trim() || null
-  }), [eventType, selectedUser?.id, contentType, contentSearch, emailSearch, emailType, emailStatus, selectedSupportTicket?.id, supportStatus, supportCategory, supportPriority, supportSearch]);
+  }), [eventType, selectedUser?.id, contentType, contentSearch, emailSearch, emailType, emailStatus, selectedSupportTicket?.id, supportStatus, supportCategory, supportPriority, supportAssigned, supportSearch]);
 
   async function loadDashboard({ silent = false, authRetried = false } = {}) {
     if (!isAuthorized) {
@@ -666,7 +684,9 @@ export default function ControlCenter() {
         adminModerationActions: next.adminModerationActions || [],
         suspiciousSignals: next.suspiciousSignals || [],
         adminSupportTickets: next.adminSupportTickets || [],
-        adminSupportMessages: next.adminSupportMessages || []
+        adminSupportMessages: next.adminSupportMessages || [],
+        adminSupportInternalNotes: next.adminSupportInternalNotes || [],
+        adminSupportContext: next.adminSupportContext || null
       });
     } catch (requestError) {
       const status = requestError.response?.status;
@@ -846,6 +866,39 @@ export default function ControlCenter() {
     });
   }
 
+  async function quickUpdateSupportTicket(status, priority = selectedSupportTicket?.priority || 'normal') {
+    if (!selectedSupportTicket) return;
+    const reason = `Quick action: ${humanize(status)}`;
+    await runAdminAction(`support-${status}`, async () => {
+      await api.patch(`/api/admin/support/${selectedSupportTicket.id}`, { status, priority, reason });
+      return `Support ticket marked ${humanize(status)}.`;
+    });
+  }
+
+  async function assignSupportTicket(assignToMe = true) {
+    if (!selectedSupportTicket) return;
+    await runAdminAction(assignToMe ? 'support-assign-me' : 'support-unassign', async () => {
+      await api.post(`/api/admin/support/${selectedSupportTicket.id}/assign`, {
+        assignToMe,
+        assignedAdminId: assignToMe ? undefined : null,
+        reason: supportAssignReason || (assignToMe ? 'Admin claimed ticket for review.' : 'Admin cleared ticket assignment.')
+      });
+      setSupportAssignReason('');
+      return assignToMe ? 'Support ticket assigned to you.' : 'Support ticket unassigned.';
+    });
+  }
+
+  async function addSupportInternalNote() {
+    if (!selectedSupportTicket) return;
+    await runAdminAction('support-note', async () => {
+      await api.post(`/api/admin/support/${selectedSupportTicket.id}/internal-notes`, {
+        note: supportInternalNote
+      });
+      setSupportInternalNote('');
+      return 'Internal support note added.';
+    });
+  }
+
   if (!roleCheckComplete) return null;
   if (!isAuthorized) return <Navigate replace to="/dashboard" />;
 
@@ -898,6 +951,13 @@ export default function ControlCenter() {
       detail: `${emailMetrics.failedLast24h || 0} failed in the last 24h`,
       tone: emailMetrics.failed ? 'danger' : 'success'
     }
+  ];
+  const supportTickets = data.adminSupportTickets || [];
+  const supportCardData = [
+    { icon: 'confirmation_number', label: 'Open tickets', value: supportTickets.filter((ticket) => !['resolved', 'closed'].includes(ticket.status)).length, tone: 'info' },
+    { icon: 'priority_high', label: 'Urgent', value: supportTickets.filter((ticket) => ticket.priority === 'urgent').length, tone: supportTickets.some((ticket) => ticket.priority === 'urgent') ? 'danger' : 'neutral' },
+    { icon: 'person_search', label: 'Unassigned', value: supportTickets.filter((ticket) => !ticket.assignedAdminId).length, tone: 'warning' },
+    { icon: 'public', label: 'Public tickets', value: supportTickets.filter((ticket) => ticket.isPublic).length, tone: 'success' }
   ];
 
   return (
@@ -1130,96 +1190,141 @@ export default function ControlCenter() {
       ) : null}
 
       {!isLoading && activeSection === 'support' ? (
-        <div className="admin-workspace">
-          <main className="admin-panel">
-            <div className="admin-toolbar">
-              <div>
-                <p className="admin-eyebrow">Support queue</p>
-                <h2 className="text-xl font-black text-[var(--text)]">User support tickets</h2>
-              </div>
-              <div className="grid w-full gap-2 md:w-auto md:grid-cols-4">
-                <select className="app-input" value={supportStatus} onChange={(event) => setSupportStatus(event.target.value)}>
-                  {SUPPORT_STATUSES.map((status) => <option key={status || 'all'} value={status}>{status ? humanize(status) : 'All status'}</option>)}
-                </select>
-                <select className="app-input" value={supportPriority} onChange={(event) => setSupportPriority(event.target.value)}>
-                  {SUPPORT_PRIORITIES.map((priority) => <option key={priority || 'all'} value={priority}>{priority ? humanize(priority) : 'All priority'}</option>)}
-                </select>
-                <select className="app-input" value={supportCategory} onChange={(event) => setSupportCategory(event.target.value)}>
-                  {SUPPORT_CATEGORIES.map((category) => <option key={category || 'all'} value={category}>{category ? humanize(category) : 'All category'}</option>)}
-                </select>
-                <input className="app-input" value={supportSearch} onChange={(event) => setSupportSearch(event.target.value)} placeholder="Search tickets" />
-              </div>
-            </div>
-            <div className="mt-5 grid gap-3">
-              {data.adminSupportTickets.length ? data.adminSupportTickets.map((ticket) => (
-                <button
-                  key={ticket.id}
-                  type="button"
-                  onClick={() => setSelectedSupportTicketId(ticket.id)}
-                  className={`admin-list-row text-left transition ${selectedSupportTicket?.id === ticket.id ? 'border-[var(--accent)] bg-[var(--accent-soft)]' : ''}`}
-                >
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap gap-2">
-                      <StatusBadge value={ticket.status} />
-                      <StatusBadge value={ticket.priority} tone={ticket.priority === 'urgent' || ticket.priority === 'high' ? 'danger' : 'neutral'} />
-                      <StatusBadge value={ticket.category} tone="info" />
-                      {ticket.userEmail ? <span className="admin-chip truncate">{ticket.userEmail}</span> : null}
-                    </div>
-                    <p className="mt-3 text-sm font-black text-[var(--text)]">{ticket.subject}</p>
-                    <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--muted-strong)]">{ticket.message}</p>
-                  </div>
-                  <time className="admin-time">{formatDate(ticket.updatedAt)}</time>
-                </button>
-              )) : <EmptyState label="No support tickets" detail="Tickets from users will appear here." />}
-            </div>
-          </main>
-
-          <aside className="admin-detail-panel">
-            {selectedSupportTicket ? (
-              <>
-                <div className="flex flex-wrap gap-2">
-                  <StatusBadge value={selectedSupportTicket.status} />
-                  <StatusBadge value={selectedSupportTicket.priority} />
+        <div className="space-y-6">
+          <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {supportCardData.map((card) => <AdminCard key={card.label} icon={card.icon} label={card.label} value={card.value} tone={card.tone} />)}
+          </section>
+          <div className="admin-workspace">
+            <main className="admin-panel">
+              <div className="admin-toolbar">
+                <div>
+                  <p className="admin-eyebrow">Support queue</p>
+                  <h2 className="text-xl font-black text-[var(--text)]">User support tickets</h2>
                 </div>
-                <h2 className="mt-3 text-xl font-black text-[var(--text)]">{selectedSupportTicket.subject}</h2>
-                <p className="mt-2 text-sm text-[var(--muted-strong)]">{selectedSupportTicket.userEmail || 'Unknown user'}</p>
-                <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-[var(--text)]">{selectedSupportTicket.message}</p>
-
-                <div className="mt-6 grid gap-3">
-                  <p className="admin-eyebrow">Conversation</p>
-                  {data.adminSupportMessages.length ? data.adminSupportMessages.map((item) => (
-                    <article key={item.id} className={`rounded-lg border p-3 ${item.senderRole === 'admin' ? 'border-emerald-500/25 bg-emerald-500/10' : 'border-[var(--border)] bg-[var(--panel-soft)]'}`}>
-                      <div className="flex flex-wrap justify-between gap-2">
-                        <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--muted)]">{item.senderRole === 'admin' ? 'Admin' : item.senderEmail || 'User'}</p>
-                        <time className="text-xs font-semibold text-[var(--muted-strong)]">{formatDate(item.createdAt)}</time>
+                <div className="grid w-full gap-2 md:w-auto md:grid-cols-5">
+                  <select className="app-input" value={supportStatus} onChange={(event) => setSupportStatus(event.target.value)}>
+                    {SUPPORT_STATUSES.map((status) => <option key={status || 'all'} value={status}>{status ? humanize(status) : 'All status'}</option>)}
+                  </select>
+                  <select className="app-input" value={supportPriority} onChange={(event) => setSupportPriority(event.target.value)}>
+                    {SUPPORT_PRIORITIES.map((priority) => <option key={priority || 'all'} value={priority}>{priority ? humanize(priority) : 'All priority'}</option>)}
+                  </select>
+                  <select className="app-input" value={supportAssigned} onChange={(event) => setSupportAssigned(event.target.value)}>
+                    {SUPPORT_ASSIGNED.map((assigned) => <option key={assigned || 'all'} value={assigned}>{assigned ? humanize(assigned) : 'All assignment'}</option>)}
+                  </select>
+                  <select className="app-input" value={supportCategory} onChange={(event) => setSupportCategory(event.target.value)}>
+                    {SUPPORT_CATEGORIES.map((category) => <option key={category || 'all'} value={category}>{category ? humanize(category) : 'All category'}</option>)}
+                  </select>
+                  <input className="app-input" value={supportSearch} onChange={(event) => setSupportSearch(event.target.value)} placeholder="Search tickets" />
+                </div>
+              </div>
+              <div className="mt-5 grid gap-3">
+                {data.adminSupportTickets.length ? data.adminSupportTickets.map((ticket) => (
+                  <button
+                    key={ticket.id}
+                    type="button"
+                    onClick={() => setSelectedSupportTicketId(ticket.id)}
+                    className={`admin-list-row text-left transition ${selectedSupportTicket?.id === ticket.id ? 'border-[var(--accent)] bg-[var(--accent-soft)]' : ''}`}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap gap-2">
+                        <StatusBadge value={ticket.status} />
+                        <StatusBadge value={ticket.priority} tone={ticket.priority === 'urgent' || ticket.priority === 'high' ? 'danger' : 'neutral'} />
+                        <StatusBadge value={ticket.isPublic ? 'public' : 'logged_in'} tone="info" />
+                        {ticket.emailServiceBlocked ? <StatusBadge value="email blocked" tone="danger" /> : null}
+                        <StatusBadge value={ticket.category} tone="info" />
+                        <span className="admin-chip truncate">{ticket.userEmail || ticket.contactEmail || 'No email'}</span>
                       </div>
-                      <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--text)]">{item.message}</p>
-                    </article>
-                  )) : <EmptyState label="No messages loaded" />}
-                </div>
+                      <p className="mt-3 text-sm font-black text-[var(--text)]">{ticket.subject}</p>
+                      <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--muted-strong)]">{ticket.message}</p>
+                      <p className="mt-2 text-xs text-[var(--muted)]">Assigned: {ticket.assignedAdminEmail || 'Unassigned'}</p>
+                    </div>
+                    <time className="admin-time">{formatDate(ticket.updatedAt)}</time>
+                  </button>
+                )) : <EmptyState label="No support tickets" detail="Tickets from users will appear here." />}
+              </div>
+            </main>
 
-                <div className="mt-6 grid gap-3">
-                  <p className="admin-eyebrow">Reply</p>
-                  <textarea className="app-input min-h-28" value={supportReply} onChange={(event) => setSupportReply(event.target.value)} placeholder="Write an admin reply" />
-                  <button type="button" className="app-button w-fit" onClick={replyToSupportTicket} disabled={busyAction === 'support-reply'}>Send reply</button>
-                </div>
+            <aside className="admin-detail-panel">
+              {selectedSupportTicket ? (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    <StatusBadge value={selectedSupportTicket.status} />
+                    <StatusBadge value={selectedSupportTicket.priority} />
+                    <StatusBadge value={selectedSupportTicket.isPublic ? 'public' : 'logged_in'} tone="info" />
+                  </div>
+                  <h2 className="mt-3 text-xl font-black text-[var(--text)]">{selectedSupportTicket.subject}</h2>
+                  <p className="mt-2 text-sm text-[var(--muted-strong)]">{selectedSupportTicket.userEmail || selectedSupportTicket.contactEmail || 'Unknown user'}</p>
+                  {selectedSupportTicket.emailServiceBlocked ? <div className="admin-warning-box mt-4">Email service blocked for this address. Support stays available, but outbound email updates are skipped.</div> : null}
+                  <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-[var(--text)]">{selectedSupportTicket.message}</p>
 
-                <div className="mt-6 grid gap-3">
-                  <p className="admin-eyebrow">Status control</p>
-                  <select className="app-input" value={supportUpdateForm.status} onChange={(event) => setSupportUpdateForm((form) => ({ ...form, status: event.target.value }))}>
-                    {SUPPORT_STATUSES.filter(Boolean).map((status) => <option key={status} value={status}>{humanize(status)}</option>)}
-                  </select>
-                  <select className="app-input" value={supportUpdateForm.priority} onChange={(event) => setSupportUpdateForm((form) => ({ ...form, priority: event.target.value }))}>
-                    {SUPPORT_PRIORITIES.filter(Boolean).map((priority) => <option key={priority} value={priority}>{humanize(priority)}</option>)}
-                  </select>
-                  <textarea className="app-input min-h-20" value={supportUpdateForm.reason} onChange={(event) => setSupportUpdateForm((form) => ({ ...form, reason: event.target.value }))} placeholder="Admin reason for ticket update" />
-                  <button type="button" className="app-button-secondary w-fit" onClick={updateSupportTicket} disabled={busyAction === 'support-update'}>Apply update</button>
-                </div>
-              </>
-            ) : (
-              <EmptyState label="Select a ticket" detail="Open a support ticket to reply or update its status." />
-            )}
-          </aside>
+                  <div className="mt-6 flex flex-wrap gap-2">
+                    <button type="button" className="app-button-secondary" onClick={() => assignSupportTicket(true)} disabled={busyAction === 'support-assign-me'}>Assign to me</button>
+                    <button type="button" className="app-button-secondary" onClick={() => assignSupportTicket(false)} disabled={busyAction === 'support-unassign'}>Unassign</button>
+                    <button type="button" className="app-button-secondary" onClick={() => quickUpdateSupportTicket('resolved')} disabled={busyAction === 'support-resolved'}>Resolve</button>
+                    <button type="button" className="app-button-secondary" onClick={() => quickUpdateSupportTicket('closed')} disabled={busyAction === 'support-closed'}>Close</button>
+                    <button type="button" className="app-button-secondary" onClick={() => quickUpdateSupportTicket('open')} disabled={busyAction === 'support-open'}>Reopen</button>
+                    <button type="button" className="app-button-danger" onClick={() => quickUpdateSupportTicket(selectedSupportTicket.status, 'urgent')} disabled={busyAction === `support-${selectedSupportTicket.status}`}>Escalate</button>
+                  </div>
+                  <input className="app-input mt-3" value={supportAssignReason} onChange={(event) => setSupportAssignReason(event.target.value)} placeholder="Assignment reason (optional)" />
+
+                  <div className="mt-6 grid gap-3">
+                    <p className="admin-eyebrow">Context</p>
+                    <div className="grid gap-2 text-sm text-[var(--muted-strong)]">
+                      <p>User status: <span className="font-bold text-[var(--text)]">{data.adminSupportContext?.userStatus || 'Unknown'}</span></p>
+                      <p>Active restrictions: <span className="font-bold text-[var(--text)]">{data.adminSupportContext?.activeRestrictions?.length || 0}</span></p>
+                      <p>Email blocked: <span className="font-bold text-[var(--text)]">{data.adminSupportContext?.emailServiceBlocked ? 'Yes' : 'No'}</span></p>
+                      {data.adminSupportContext?.emailServiceBlockReason ? <p>Block reason: {data.adminSupportContext.emailServiceBlockReason}</p> : null}
+                    </div>
+                  </div>
+
+                  <div className="mt-6 grid gap-3">
+                    <p className="admin-eyebrow">Conversation</p>
+                    {data.adminSupportMessages.length ? data.adminSupportMessages.map((item) => (
+                      <article key={item.id} className={`rounded-lg border p-3 ${item.senderRole === 'admin' ? 'border-emerald-500/25 bg-emerald-500/10' : 'border-[var(--border)] bg-[var(--panel-soft)]'}`}>
+                        <div className="flex flex-wrap justify-between gap-2">
+                          <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--muted)]">{item.senderRole === 'admin' ? 'Admin' : item.senderEmail || 'User'}</p>
+                          <time className="text-xs font-semibold text-[var(--muted-strong)]">{formatDate(item.createdAt)}</time>
+                        </div>
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--text)]">{item.message}</p>
+                      </article>
+                    )) : <EmptyState label="No messages loaded" />}
+                  </div>
+
+                  <div className="mt-6 grid gap-3">
+                    <p className="admin-eyebrow">Internal notes</p>
+                    {data.adminSupportInternalNotes.length ? data.adminSupportInternalNotes.map((note) => (
+                      <article key={note.id} className="rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] p-3">
+                        <p className="text-xs font-black uppercase tracking-[0.14em] text-[var(--muted)]">{note.adminEmail || 'Admin'} | {formatDate(note.createdAt)}</p>
+                        <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-[var(--text)]">{note.note}</p>
+                      </article>
+                    )) : <p className="text-sm text-[var(--muted-strong)]">No internal notes yet.</p>}
+                    <textarea className="app-input min-h-20" value={supportInternalNote} onChange={(event) => setSupportInternalNote(event.target.value)} placeholder="Private admin note" />
+                    <button type="button" className="app-button-secondary w-fit" onClick={addSupportInternalNote} disabled={busyAction === 'support-note'}>Add note</button>
+                  </div>
+
+                  <div className="mt-6 grid gap-3">
+                    <p className="admin-eyebrow">Reply</p>
+                    <textarea className="app-input min-h-28" value={supportReply} onChange={(event) => setSupportReply(event.target.value)} placeholder="Write an admin reply" />
+                    <button type="button" className="app-button w-fit" onClick={replyToSupportTicket} disabled={busyAction === 'support-reply'}>Send reply</button>
+                  </div>
+
+                  <div className="mt-6 grid gap-3">
+                    <p className="admin-eyebrow">Status control</p>
+                    <select className="app-input" value={supportUpdateForm.status} onChange={(event) => setSupportUpdateForm((form) => ({ ...form, status: event.target.value }))}>
+                      {SUPPORT_STATUSES.filter(Boolean).map((status) => <option key={status} value={status}>{humanize(status)}</option>)}
+                    </select>
+                    <select className="app-input" value={supportUpdateForm.priority} onChange={(event) => setSupportUpdateForm((form) => ({ ...form, priority: event.target.value }))}>
+                      {SUPPORT_PRIORITIES.filter(Boolean).map((priority) => <option key={priority} value={priority}>{humanize(priority)}</option>)}
+                    </select>
+                    <textarea className="app-input min-h-20" value={supportUpdateForm.reason} onChange={(event) => setSupportUpdateForm((form) => ({ ...form, reason: event.target.value }))} placeholder="Admin reason for ticket update" />
+                    <button type="button" className="app-button-secondary w-fit" onClick={updateSupportTicket} disabled={busyAction === 'support-update'}>Apply update</button>
+                  </div>
+                </>
+              ) : (
+                <EmptyState label="Select a ticket" detail="Open a support ticket to reply or update its status." />
+              )}
+            </aside>
+          </div>
         </div>
       ) : null}
 

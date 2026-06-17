@@ -22,6 +22,7 @@ function notificationTarget(item) {
   }
   if (item.type === 'squad_ping' || item.type === 'squad_goal_reached') return '/squads';
   if (item.type === 'job_match_alert') return '/jobs';
+  if (item.type === 'support_ticket_reply' || item.type === 'support_ticket_status') return '/support';
   if (item.type === 'admin_restriction_update' || item.type === 'admin_account_status') return '/notifications';
   return '/squads';
 }

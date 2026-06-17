@@ -9,6 +9,7 @@ import AnalysisWorkspace from '../screens/AnalysisWorkspace.jsx';
 import AuthPermanent from '../screens/AuthPermanent.jsx';
 import CommunityWins from '../screens/CommunityWins.jsx';
 import ControlCenter from '../screens/ControlCenter.jsx';
+import ContactSupport from '../screens/ContactSupport.jsx';
 import DocArticlePage from '../features/docs/pages/DocArticlePage.jsx';
 import DocsHubPage from '../features/docs/pages/DocsHubPage.jsx';
 import GuestDashboard from '../screens/GuestDashboard.jsx';
@@ -40,6 +41,7 @@ const routes = {
   auth: AuthPermanent,
   communityWins: CommunityWins,
   controlCenter: ControlCenter,
+  contactSupport: ContactSupport,
   docArticle: DocArticlePage,
   docsHub: DocsHubPage,
   guest: GuestDashboard,

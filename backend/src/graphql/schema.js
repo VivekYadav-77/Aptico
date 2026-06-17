@@ -170,9 +170,13 @@ export const schema = /* GraphQL */ `
 
   type AdminSupportTicket {
     id: ID!
-    userId: ID!
+    userId: ID
     userEmail: String
     userName: String
+    contactEmail: String
+    isPublic: Boolean!
+    assignedAdminId: ID
+    assignedAdminEmail: String
     category: String!
     subject: String!
     message: String!
@@ -181,6 +185,12 @@ export const schema = /* GraphQL */ `
     relatedFeature: String
     createdAt: String!
     updatedAt: String!
+    assignedAt: String
+    resolvedAt: String
+    closedAt: String
+    escalatedAt: String
+    emailServiceBlockedAtSubmit: String
+    emailServiceBlocked: Boolean!
     lastAdminReplyAt: String
     lastUserReplyAt: String
   }
@@ -194,6 +204,25 @@ export const schema = /* GraphQL */ `
     senderName: String
     message: String!
     createdAt: String!
+  }
+
+  type AdminSupportInternalNote {
+    id: ID!
+    ticketId: ID!
+    adminUserId: ID
+    adminEmail: String
+    adminName: String
+    note: String!
+    createdAt: String!
+  }
+
+  type AdminSupportContext {
+    userStatus: String
+    activeRestrictions: [AdminRestriction!]!
+    recentAuditLogs: [AdminAuditLog!]!
+    recentEmailLogs: [EmailDeliveryLog!]!
+    emailServiceBlocked: Boolean!
+    emailServiceBlockReason: String
   }
 
   type Query {
@@ -215,8 +244,10 @@ export const schema = /* GraphQL */ `
     adminModerationQueue(contentType: String = "post", limit: Int = 40, search: String): [AdminModerationItem!]!
     adminModerationActions(limit: Int = 40): [AdminModerationAction!]!
     suspiciousSignals: [AdminSuspiciousSignal!]!
-    adminSupportTickets(status: String, category: String, priority: String, search: String, limit: Int = 50): [AdminSupportTicket!]!
+    adminSupportTickets(status: String, category: String, priority: String, assigned: String, search: String, limit: Int = 50): [AdminSupportTicket!]!
     adminSupportMessages(ticketId: ID!, limit: Int = 100): [AdminSupportMessage!]!
+    adminSupportInternalNotes(ticketId: ID!, limit: Int = 50): [AdminSupportInternalNote!]!
+    adminSupportContext(ticketId: ID!): AdminSupportContext!
   }
 `;
 

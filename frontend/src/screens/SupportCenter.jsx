@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useLocation } from '@/lib/router-compat.jsx';
 import AppShell from '../components/AppShell.jsx';
 import { createSupportTicket, getSupportTicket, getSupportTickets, replyToSupportTicket } from '../api/supportApi.js';
 import { getRequestErrorMessage } from '../utils/requestError.js';
@@ -38,6 +39,7 @@ function StatusBadge({ value }) {
 }
 
 export default function SupportCenter() {
+  const location = useLocation();
   const [tickets, setTickets] = useState([]);
   const [selectedTicketId, setSelectedTicketId] = useState('');
   const [selectedDetail, setSelectedDetail] = useState(null);
@@ -69,6 +71,23 @@ export default function SupportCenter() {
   useEffect(() => {
     void loadTickets();
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search || '');
+    const category = params.get('category');
+    const relatedFeature = params.get('feature') || params.get('relatedFeature');
+    const message = params.get('message');
+
+    if (!category && !relatedFeature && !message) return;
+
+    setForm((current) => ({
+      ...current,
+      category: CATEGORIES.includes(category) ? category : current.category,
+      relatedFeature: relatedFeature || current.relatedFeature,
+      message: message || current.message,
+      subject: current.subject || (relatedFeature ? `Help with ${humanize(relatedFeature)}` : current.subject)
+    }));
+  }, [location.search]);
 
   useEffect(() => {
     if (!selectedTicket?.id) {

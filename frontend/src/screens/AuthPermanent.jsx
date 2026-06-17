@@ -619,6 +619,13 @@ export default function AuthPermanent() {
                  )}
                </div>
 
+               <div className="mt-3 text-center text-xs text-[var(--muted-strong)]">
+                 Cannot sign in or receive email?{' '}
+                 <Link href="/contact-support" className="font-bold text-[var(--accent-strong)] hover:underline">
+                   Contact support
+                 </Link>
+               </div>
+
                <div className="pt-6 text-center">
                  <p className="mono-text text-[9px] uppercase leading-relaxed tracking-[0.22em] text-[var(--muted)]">
                    By continuing, you agree to Aptico's terms of service and privacy policy.

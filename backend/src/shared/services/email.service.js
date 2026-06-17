@@ -255,6 +255,38 @@ function buildPasswordResetEmailHtml({ name, appName, resetLink, expiryMinutes =
   });
 }
 
+function buildSupportNotificationHtml({ name, appName, title, message, ticketSubject }) {
+  const safeName = escapeHtml(name);
+  const greeting = safeName ? `Hi ${safeName},` : 'Hi there,';
+  const safeTitle = escapeHtml(title);
+  const safeTicketSubject = escapeHtml(ticketSubject);
+  const safeMessage = escapeHtml(message).replace(/\n/g, '<br/>');
+
+  return buildEmailShell({
+    appName,
+    previewText: `${appName} support update: ${safeTicketSubject}`,
+    innerHtml: `
+      <h1 style="margin:0 0 8px;font-size:22px;font-weight:800;color:#f9fafb;letter-spacing:-0.03em;">
+        ${safeTitle}
+      </h1>
+      <p style="margin:0 0 20px;font-size:14px;color:#9ca3af;line-height:1.7;">
+        ${greeting} There is an update on your Aptico support ticket.
+      </p>
+      <p style="margin:0 0 10px;font-size:12px;color:#6b7280;text-transform:uppercase;letter-spacing:0.14em;">
+        Ticket
+      </p>
+      <p style="margin:0 0 24px;font-size:15px;color:#f9fafb;font-weight:700;line-height:1.6;">
+        ${safeTicketSubject}
+      </p>
+      <div style="margin:0 0 24px;padding:18px 20px;border:1px solid #1f2937;border-radius:14px;background-color:#0b1220;color:#d1d5db;font-size:14px;line-height:1.7;">
+        ${safeMessage}
+      </div>
+      <p style="margin:0;font-size:12px;color:#6b7280;border-top:1px solid #1f2937;padding-top:20px;">
+        Sign in to Aptico and open Support Center to continue the conversation.
+      </p>`
+  });
+}
+
 // ── GAS HTTP transport ─────────────────────────────────────────────────────────
 
 /**
@@ -431,6 +463,52 @@ export async function sendAuthEmail({
 
   try {
     const result = await dispatchViaGas({ to: email, subject, htmlBody, emailType: type });
+    await updateEmailDeliveryLog({ db, id: logId, status: 'sent' });
+    return result;
+  } catch (error) {
+    await updateEmailDeliveryLog({ db, id: logId, status: 'failed', error });
+    throw error;
+  }
+}
+
+export async function sendSupportEmail({
+  email,
+  name,
+  subject,
+  title,
+  message,
+  ticketSubject,
+  appName = 'Aptico',
+  db = null,
+  request = null,
+  userId = null,
+  logType = 'support_ticket_update'
+}) {
+  if (!email || !subject || !message || !ticketSubject) {
+    throw createEmailError('email, subject, message, and ticketSubject are required to send a support email.', 400, 'EMAIL_INVALID_PAYLOAD');
+  }
+
+  const provider = 'google_apps_script';
+  const htmlBody = buildSupportNotificationHtml({
+    name,
+    appName,
+    title: title || 'Support ticket update',
+    message,
+    ticketSubject
+  });
+
+  const logId = await createEmailDeliveryLog({
+    db,
+    request,
+    email,
+    userId,
+    emailType: logType,
+    provider,
+    subject
+  });
+
+  try {
+    const result = await dispatchViaGas({ to: email, subject, htmlBody, emailType: 'support' });
     await updateEmailDeliveryLog({ db, id: logId, status: 'sent' });
     return result;
   } catch (error) {

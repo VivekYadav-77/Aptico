@@ -10,6 +10,11 @@ export async function createSupportTicket(payload) {
   return response.data.data;
 }
 
+export async function createPublicSupportTicket(payload) {
+  const response = await api.post('/api/support/public/tickets', payload);
+  return response.data.data;
+}
+
 export async function getSupportTicket(ticketId) {
   const response = await api.get(`/api/support/tickets/${ticketId}`);
   return response.data.data;

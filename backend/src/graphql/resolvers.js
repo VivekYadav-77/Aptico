@@ -1,4 +1,5 @@
-import { and, desc, eq, gte, ilike, isNull, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, ilike, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 import {
   adminAuditLogs,
   adminRestrictions,
@@ -12,6 +13,7 @@ import {
   posts,
   refreshTokens,
   savedJobs,
+  supportTicketInternalNotes,
   supportTicketMessages,
   supportTickets,
   users,
@@ -573,18 +575,26 @@ export const resolvers = {
       if (args.status) conditions.push(eq(supportTickets.status, args.status));
       if (args.category) conditions.push(eq(supportTickets.category, args.category));
       if (args.priority) conditions.push(eq(supportTickets.priority, args.priority));
+      if (args.assigned === 'unassigned') conditions.push(isNull(supportTickets.assignedAdminId));
+      if (args.assigned === 'assigned') conditions.push(isNotNull(supportTickets.assignedAdminId));
+      if (args.assigned === 'me') conditions.push(eq(supportTickets.assignedAdminId, context.auth?.userId));
       if (search) {
         conditions.push(
-          sql`(${supportTickets.subject} ilike ${`%${search}%`} or ${supportTickets.message} ilike ${`%${search}%`} or ${users.email} ilike ${`%${search}%`})`
+          sql`(${supportTickets.subject} ilike ${`%${search}%`} or ${supportTickets.message} ilike ${`%${search}%`} or ${users.email} ilike ${`%${search}%`} or ${supportTickets.contactEmail} ilike ${`%${search}%`})`
         );
       }
 
+      const assignedAdmins = alias(users, 'assigned_admins');
       const baseQuery = db
         .select({
           id: supportTickets.id,
           userId: supportTickets.userId,
           userEmail: users.email,
           userName: users.name,
+          contactEmail: supportTickets.contactEmail,
+          isPublic: supportTickets.isPublic,
+          assignedAdminId: supportTickets.assignedAdminId,
+          assignedAdminEmail: assignedAdmins.email,
           category: supportTickets.category,
           subject: supportTickets.subject,
           message: supportTickets.message,
@@ -593,11 +603,22 @@ export const resolvers = {
           relatedFeature: supportTickets.relatedFeature,
           createdAt: supportTickets.createdAt,
           updatedAt: supportTickets.updatedAt,
+          assignedAt: supportTickets.assignedAt,
+          resolvedAt: supportTickets.resolvedAt,
+          closedAt: supportTickets.closedAt,
+          escalatedAt: supportTickets.escalatedAt,
+          emailServiceBlockedAtSubmit: supportTickets.emailServiceBlockedAtSubmit,
+          emailServiceBlocked: sql`exists (
+            select 1 from email_service_blocks esb
+            where esb.email = coalesce(${users.email}, ${supportTickets.contactEmail})
+            and esb.is_blocked = true
+          )`,
           lastAdminReplyAt: supportTickets.lastAdminReplyAt,
           lastUserReplyAt: supportTickets.lastUserReplyAt
         })
         .from(supportTickets)
-        .leftJoin(users, eq(supportTickets.userId, users.id));
+        .leftJoin(users, eq(supportTickets.userId, users.id))
+        .leftJoin(assignedAdmins, eq(supportTickets.assignedAdminId, assignedAdmins.id));
 
       const filteredQuery = conditions.length ? baseQuery.where(and(...conditions)) : baseQuery;
       const rows = await filteredQuery
@@ -608,6 +629,12 @@ export const resolvers = {
         ...row,
         createdAt: serializeDate(row.createdAt),
         updatedAt: serializeDate(row.updatedAt),
+        assignedAt: serializeDate(row.assignedAt),
+        resolvedAt: serializeDate(row.resolvedAt),
+        closedAt: serializeDate(row.closedAt),
+        escalatedAt: serializeDate(row.escalatedAt),
+        emailServiceBlockedAtSubmit: serializeDate(row.emailServiceBlockedAtSubmit),
+        emailServiceBlocked: Boolean(row.emailServiceBlocked),
         lastAdminReplyAt: serializeDate(row.lastAdminReplyAt),
         lastUserReplyAt: serializeDate(row.lastUserReplyAt)
       }));
@@ -635,6 +662,130 @@ export const resolvers = {
         ...row,
         createdAt: serializeDate(row.createdAt)
       }));
+    },
+    adminSupportInternalNotes: async (_source, args, context) => {
+      const db = await requireDb(context);
+      const rows = await db
+        .select({
+          id: supportTicketInternalNotes.id,
+          ticketId: supportTicketInternalNotes.ticketId,
+          adminUserId: supportTicketInternalNotes.adminUserId,
+          adminEmail: users.email,
+          adminName: users.name,
+          note: supportTicketInternalNotes.note,
+          createdAt: supportTicketInternalNotes.createdAt
+        })
+        .from(supportTicketInternalNotes)
+        .leftJoin(users, eq(supportTicketInternalNotes.adminUserId, users.id))
+        .where(eq(supportTicketInternalNotes.ticketId, args.ticketId))
+        .orderBy(desc(supportTicketInternalNotes.createdAt))
+        .limit(normalizeLimit(args.limit, 50, 100));
+
+      return rows.map((row) => ({
+        ...row,
+        createdAt: serializeDate(row.createdAt)
+      }));
+    },
+    adminSupportContext: async (_source, args, context) => {
+      const db = await requireDb(context);
+      const [ticket] = await db
+        .select({
+          userId: supportTickets.userId,
+          contactEmail: supportTickets.contactEmail,
+          userEmail: users.email,
+          userStatus: users.status
+        })
+        .from(supportTickets)
+        .leftJoin(users, eq(supportTickets.userId, users.id))
+        .where(eq(supportTickets.id, args.ticketId))
+        .limit(1);
+
+      if (!ticket) {
+        return {
+          userStatus: null,
+          activeRestrictions: [],
+          recentAuditLogs: [],
+          recentEmailLogs: [],
+          emailServiceBlocked: false,
+          emailServiceBlockReason: null
+        };
+      }
+
+      const email = ticket.userEmail || ticket.contactEmail || '';
+      const [restrictions, auditRows, emailRows, blockRows] = await Promise.all([
+        ticket.userId
+          ? db.select().from(adminRestrictions).where(and(eq(adminRestrictions.userId, ticket.userId), eq(adminRestrictions.isRestricted, true))).limit(20)
+          : [],
+        ticket.userId
+          ? db
+              .select({
+                id: adminAuditLogs.id,
+                adminUserId: adminAuditLogs.adminUserId,
+                adminEmail: users.email,
+                action: adminAuditLogs.action,
+                targetType: adminAuditLogs.targetType,
+                targetId: adminAuditLogs.targetId,
+                metadata: adminAuditLogs.metadata,
+                createdAt: adminAuditLogs.createdAt
+              })
+              .from(adminAuditLogs)
+              .leftJoin(users, eq(adminAuditLogs.adminUserId, users.id))
+              .where(or(eq(adminAuditLogs.targetId, ticket.userId), eq(adminAuditLogs.targetId, args.ticketId)))
+              .orderBy(desc(adminAuditLogs.createdAt))
+              .limit(8)
+          : [],
+        email
+          ? db
+              .select()
+              .from(emailDeliveryLogs)
+              .where(eq(emailDeliveryLogs.email, email))
+              .orderBy(desc(emailDeliveryLogs.createdAt))
+              .limit(8)
+          : [],
+        email
+          ? db.select().from(emailServiceBlocks).where(and(eq(emailServiceBlocks.email, email), eq(emailServiceBlocks.isBlocked, true))).limit(1)
+          : []
+      ]);
+
+      return {
+        userStatus: ticket.userStatus || null,
+        activeRestrictions: restrictions.map((row) => ({
+          id: row.id,
+          userId: row.userId,
+          feature: row.feature,
+          isRestricted: row.isRestricted,
+          reason: row.reason,
+          expiresAt: serializeDate(row.expiresAt),
+          createdBy: row.createdBy,
+          createdAt: serializeDate(row.createdAt),
+          updatedAt: serializeDate(row.updatedAt)
+        })),
+        recentAuditLogs: auditRows.map((row) => ({
+          ...row,
+          metadata: serializeMetadata(row.metadata),
+          createdAt: serializeDate(row.createdAt)
+        })),
+        recentEmailLogs: emailRows.map((row) => ({
+          id: row.id,
+          userId: row.userId,
+          userEmail: ticket.userEmail || null,
+          userName: null,
+          email: row.email,
+          emailType: row.emailType,
+          provider: row.provider,
+          status: row.status,
+          subject: row.subject,
+          country: row.country,
+          region: row.region,
+          city: row.city,
+          errorCode: row.errorCode,
+          errorMessage: row.errorMessage,
+          createdAt: serializeDate(row.createdAt),
+          deliveredAt: serializeDate(row.deliveredAt)
+        })),
+        emailServiceBlocked: Boolean(blockRows[0]),
+        emailServiceBlockReason: blockRows[0]?.reason || null
+      };
     }
   }
 };

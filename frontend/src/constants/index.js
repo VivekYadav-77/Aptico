@@ -63,6 +63,7 @@ export const SEARCHABLE_INSIGHTS = [
   { label: 'Verified listings only', icon: 'verified', to: '/jobs', category: 'Job Search' },
   { label: 'Read platform docs', icon: 'menu_book', to: '/docs', category: 'Docs' },
   { label: 'Contact admin support', icon: 'support_agent', to: '/support', category: 'Support' },
+  { label: 'Contact support without login', icon: 'contact_support', to: '/contact-support', category: 'Support' },
   { label: 'Appeal account restriction', icon: 'gavel', to: '/support', category: 'Support' },
   { label: 'Learn resume analysis', icon: 'analytics', to: '/docs/resume-analysis', category: 'Docs' },
   { label: 'Learn anonymous squads', icon: 'groups', to: '/docs/anonymous-squads', category: 'Docs' },

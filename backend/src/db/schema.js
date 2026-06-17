@@ -613,9 +613,10 @@ export const supportTickets = pgTable(
   'support_tickets',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    contactEmail: text('contact_email'),
+    isPublic: boolean('is_public').notNull().default(false),
+    assignedAdminId: uuid('assigned_admin_id').references(() => users.id, { onDelete: 'set null' }),
     category: varchar('category', { length: 80 }).notNull(),
     subject: varchar('subject', { length: 160 }).notNull(),
     message: text('message').notNull(),
@@ -624,15 +625,38 @@ export const supportTickets = pgTable(
     relatedFeature: varchar('related_feature', { length: 100 }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+    assignedAt: timestamp('assigned_at', { withTimezone: true }),
+    resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+    escalatedAt: timestamp('escalated_at', { withTimezone: true }),
+    emailServiceBlockedAtSubmit: timestamp('email_service_blocked_at_submit', { withTimezone: true }),
     lastAdminReplyAt: timestamp('last_admin_reply_at', { withTimezone: true }),
     lastUserReplyAt: timestamp('last_user_reply_at', { withTimezone: true })
   },
   (table) => ({
     userStatusUpdatedIdx: index('support_tickets_user_status_updated_idx').on(table.userId, table.status, table.updatedAt),
+    contactEmailIdx: index('support_tickets_contact_email_idx').on(table.contactEmail),
+    assignedStatusIdx: index('support_tickets_assigned_status_idx').on(table.assignedAdminId, table.status),
     statusPriorityUpdatedIdx: index('support_tickets_status_priority_updated_idx').on(table.status, table.priority, table.updatedAt),
     categoryUpdatedIdx: index('support_tickets_category_updated_idx').on(table.category, table.updatedAt),
     statusCheck: check('support_tickets_status_check', sql`${table.status} in ('open', 'pending_admin', 'waiting_user', 'resolved', 'closed')`),
     priorityCheck: check('support_tickets_priority_check', sql`${table.priority} in ('low', 'normal', 'high', 'urgent')`)
+  })
+);
+
+export const supportTicketInternalNotes = pgTable(
+  'support_ticket_internal_notes',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    ticketId: uuid('ticket_id')
+      .notNull()
+      .references(() => supportTickets.id, { onDelete: 'cascade' }),
+    adminUserId: uuid('admin_user_id').references(() => users.id, { onDelete: 'set null' }),
+    note: text('note').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    ticketCreatedIdx: index('support_ticket_internal_notes_ticket_created_idx').on(table.ticketId, table.createdAt)
   })
 );
 
