@@ -153,7 +153,25 @@ async function resolveAuth(request, reply, { optional, adminOnly = false }) {
     restrictionReasons: {}
   };
 
-  const accountControls = await loadAccountControls(request, payload.sub);
+  let accountControls = null;
+
+  try {
+    accountControls = await loadAccountControls(request, payload.sub);
+  } catch (error) {
+    request.log.error({ err: error, userId: payload.sub }, 'Failed to load account controls.');
+
+    if (allowGuestFallback) {
+      request.auth = null;
+      return;
+    }
+
+    return reply.code(503).send({
+      success: false,
+      code: 'ACCOUNT_CONTROLS_UNAVAILABLE',
+      message: 'Account controls are temporarily unavailable. Please try again shortly.'
+    });
+  }
+
   if (!accountControls) {
     if (allowGuestFallback) {
       request.auth = null;

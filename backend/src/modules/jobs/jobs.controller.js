@@ -88,10 +88,14 @@ export async function getJobsController(request, reply) {
       data: result
     });
   } catch (error) {
+    request.log.error({ err: error }, 'Job search request failed.');
     const statusCode = error.name === 'ZodError' ? 400 : error.statusCode || 500;
     return reply.code(statusCode).send({
       success: false,
-      error: error.message || 'Job search failed.'
+      code: error.name === 'ZodError' ? 'VALIDATION_ERROR' : 'JOB_SEARCH_FAILED',
+      error: statusCode >= 500
+        ? 'Job search is temporarily unavailable. Please try again shortly.'
+        : error.message || 'Job search failed.'
     });
   }
 }
