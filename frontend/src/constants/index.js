@@ -70,6 +70,11 @@ export const SEARCHABLE_INSIGHTS = [
   { label: 'Understand dashboard widgets', icon: 'dashboard', to: '/docs/command-center-dashboard', category: 'Docs' },
   { label: 'Learn rejection logging', icon: 'military_tech', to: '/docs/rejection-logging', category: 'Docs' },
   { label: 'Understand stickers and streaks', icon: 'token', to: '/docs/rewards-stickers', category: 'Docs' },
+  { label: 'Learn saved jobs pipeline', icon: 'bookmark', to: '/docs/saved-jobs-pipeline', category: 'Docs' },
+  { label: 'Manage notifications', icon: 'notifications', to: '/docs/notifications', category: 'Docs' },
+  { label: 'Learn support center', icon: 'support_agent', to: '/docs/support-center', category: 'Docs' },
+  { label: 'Fix account email access', icon: 'mark_email_read', to: '/docs/account-access-email', category: 'Docs' },
+  { label: 'Understand admin restrictions', icon: 'admin_panel_settings', to: '/docs/admin-restrictions-and-safety', category: 'Docs' },
 ];
 
 // ── Landing page content ─────────────────────────────────────
