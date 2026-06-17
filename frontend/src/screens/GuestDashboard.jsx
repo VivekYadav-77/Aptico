@@ -64,7 +64,57 @@ function initials(name) {
 }
 
 // ── UI PREVIEWS ──────────────────────────────────────────────
-function TeamMemberCard({ member }) {
+function TeamEmailModal({ member, onClose }) {
+  const [copied, setCopied] = useState(false);
+
+  if (!member?.email) {
+    return null;
+  }
+
+  async function copyEmail() {
+    try {
+      await navigator.clipboard.writeText(member.email);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/55 px-4 py-6 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="team-email-title">
+      <div className="w-full max-w-md rounded-2xl border border-[var(--border)] bg-[var(--panel)] p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="app-kicker">Developer email</p>
+            <h2 id="team-email-title" className="mt-2 text-2xl font-black text-[var(--text)]">{member.name}</h2>
+            <p className="mt-1 text-sm font-bold text-[var(--accent-strong)]">{member.role}</p>
+          </div>
+          <button type="button" className="app-icon-button" onClick={onClose} aria-label="Close email popup">
+            <span className="material-symbols-outlined text-[18px]">close</span>
+          </button>
+        </div>
+
+        <div className="mt-6 rounded-xl border border-[var(--border)] bg-[var(--panel-soft)] p-4">
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--muted)]">Email address</p>
+          <p className="mt-2 break-all text-base font-black text-[var(--text)]">{member.email}</p>
+        </div>
+
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <button type="button" className="app-button flex-1 justify-center" onClick={copyEmail}>
+            <span className="material-symbols-outlined text-[18px]">{copied ? 'check' : 'content_copy'}</span>
+            {copied ? 'Copied' : 'Copy email'}
+          </button>
+          <button type="button" className="app-button-secondary flex-1 justify-center" onClick={onClose}>
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TeamMemberCard({ member, onEmailClick }) {
   const [imageFailed, setImageFailed] = useState(false);
   const visibleLinks = (member.links || []).filter((link) => Boolean(link.href));
   const fallbackInitials = member.initials || String(member.name || '')
@@ -102,18 +152,33 @@ function TeamMemberCard({ member }) {
           </div>
           {visibleLinks.length ? (
             <div className="mt-6 flex flex-wrap gap-2">
-              {visibleLinks.map((link) => (
-                <a
-                  key={link.label}
-                  href={link.href}
-                  target={link.href?.startsWith('mailto:') ? undefined : '_blank'}
-                  rel={link.href?.startsWith('mailto:') ? undefined : 'noreferrer'}
-                  className="inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] px-3 py-2 text-xs font-bold text-[var(--muted-strong)] transition hover:border-[var(--accent)] hover:text-[var(--text)]"
-                >
-                  <span className="material-symbols-outlined text-[16px]">{link.icon}</span>
-                  {link.label}
-                </a>
-              ))}
+              {visibleLinks.map((link) => {
+                const isEmailLink = link.label.toLowerCase() === 'email';
+                const className = 'inline-flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--panel-soft)] px-3 py-2 text-xs font-bold text-[var(--muted-strong)] transition hover:border-[var(--accent)] hover:text-[var(--text)]';
+
+                return isEmailLink ? (
+                  <button
+                    key={link.label}
+                    type="button"
+                    className={className}
+                    onClick={() => onEmailClick(member)}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">{link.icon}</span>
+                    {link.label}
+                  </button>
+                ) : (
+                  <a
+                    key={link.label}
+                    href={link.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={className}
+                  >
+                    <span className="material-symbols-outlined text-[16px]">{link.icon}</span>
+                    {link.label}
+                  </a>
+                );
+              })}
             </div>
           ) : null}
         </div>
@@ -212,6 +277,7 @@ export default function GuestDashboard() {
   const [jobs, setJobs] = useState(null);
   const [wins, setWins] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [emailContact, setEmailContact] = useState(null);
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -495,7 +561,7 @@ export default function GuestDashboard() {
             <div className="grid gap-5 lg:grid-cols-2">
               {TEAM_MEMBERS.map((member) => (
                 <Reveal key={member.name}>
-                  <TeamMemberCard member={member} />
+                  <TeamMemberCard member={member} onEmailClick={setEmailContact} />
                 </Reveal>
               ))}
             </div>
@@ -507,6 +573,8 @@ export default function GuestDashboard() {
             </Reveal>
           </div>
         </section>
+
+        {emailContact ? <TeamEmailModal member={emailContact} onClose={() => setEmailContact(null)} /> : null}
 
         {/* ── FAQ SECTION ─────────────────────────────────── */}
         <section className="bg-[var(--panel-soft)] py-20 md:py-32 border-y border-[var(--border)]">

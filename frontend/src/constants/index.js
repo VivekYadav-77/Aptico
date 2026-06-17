@@ -218,7 +218,7 @@ export const TEAM_MEMBERS = [
     linkedin: 'https://www.linkedin.com/in/vivekyadav94/',
     github: 'https://github.com/VivekYadav-77',
     links: [
-      { label: 'Email', href: 'vivekyadav.dev007@gmail.com', icon: 'mail' },
+      { label: 'Email', href: 'contact:vivek', icon: 'mail' },
       { label: 'LinkedIn', href: 'https://www.linkedin.com/in/vivekyadav94', icon: 'business_center' },
       { label: 'GitHub', href: 'https://github.com/VivekYadav-77', icon: 'code' },
     ],
@@ -234,7 +234,7 @@ export const TEAM_MEMBERS = [
     linkedin: 'https://www.linkedin.com/in/shivang-rai11',
     github: 'https://github.com/shivangrai5143',
     links: [
-      { label: 'Email', href: 'raishivang69@gmail.com', icon: 'mail' },
+      { label: 'Email', href: 'contact:shivang', icon: 'mail' },
       { label: 'LinkedIn', href: 'https://www.linkedin.com/in/shivang-rai11', icon: 'business_center' },
       { label: 'GitHub', href: 'https://github.com/shivangrai5143', icon: 'code' },
     ],
