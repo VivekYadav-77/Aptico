@@ -333,6 +333,14 @@ async function dispatchViaGas({ to, subject, htmlBody, emailType }) {
 
   const secret = env.gasEmailDispatchToken || '';
 
+  if (!secret) {
+    throw createEmailError(
+      'Email gateway secret is not configured. Set GAS_EMAIL_DISPATCH_TOKEN to match Apps Script APTICO_EMAIL_SECRET.',
+      503,
+      'EMAIL_SECRET_NOT_CONFIGURED'
+    );
+  }
+
   const requestBody = {
     to,
     subject,
@@ -372,11 +380,12 @@ async function dispatchViaGas({ to, subject, htmlBody, emailType }) {
       const gasMessage = gasPayload?.message || gasPayload?.error || response.statusText;
       const gasCode = gasPayload?.code || (response.ok ? 'EMAIL_GATEWAY_REJECTED' : 'EMAIL_SEND_FAILED');
 
-      lastError = createEmailError(
-        'We could not send the email right now. Please try again later.',
-        502,
-        gasCode
-      );
+      const publicMessage =
+        gasCode === 'UNAUTHORIZED'
+          ? 'Email gateway authorization failed. Check the production email secret configuration.'
+          : 'We could not send the email right now. Please try again later.';
+
+      lastError = createEmailError(publicMessage, 502, gasCode);
 
       console.warn(
         `[emailService] Email gateway candidate ${index + 1}/${urls.length} failed with status ${response.status}:`,
