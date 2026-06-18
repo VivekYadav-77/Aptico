@@ -292,34 +292,38 @@ function buildSupportNotificationHtml({ name, appName, title, message, ticketSub
 /**
  * resolveGasUrl
  *
- * Returns the first non-empty GAS endpoint URL from the environment.
+ * Returns the non-empty GAS endpoint URLs from the environment.
  * Priority: type-specific URL → generic dispatch URL → magic-link URL.
  */
-function resolveGasUrl(emailType) {
+function resolveGasUrls(emailType) {
+  const candidates = [];
+
   if (emailType === 'email_verification' && env.gasEmailVerifyUrl) {
-    return env.gasEmailVerifyUrl;
+    candidates.push(env.gasEmailVerifyUrl);
   }
 
   if (emailType === 'password_reset' && env.gasPasswordResetUrl) {
-    return env.gasPasswordResetUrl;
+    candidates.push(env.gasPasswordResetUrl);
   }
 
-  return env.gasEmailDispatchUrl || env.gasMagicLinkUrl || null;
+  candidates.push(env.gasEmailDispatchUrl, env.gasMagicLinkUrl);
+
+  return [...new Set(candidates.filter(Boolean))];
 }
 
 /**
  * dispatchViaGas
  *
  * Sends one email by making an HTTP POST to the deployed Google Apps Script
- * web app endpoint. The shared secret is forwarded in both an Authorization
- * header and the JSON body so the Apps Script's doPost() can validate it.
+ * web app endpoint. The shared secret is forwarded in the JSON body so the
+ * Apps Script's doPost() can validate it.
  *
  * @param {{ to: string, subject: string, htmlBody: string, emailType: string }} options
  */
 async function dispatchViaGas({ to, subject, htmlBody, emailType }) {
-  const url = resolveGasUrl(emailType);
+  const urls = resolveGasUrls(emailType);
 
-  if (!url) {
+  if (!urls.length) {
     throw createEmailError(
       'Email delivery is not configured. Set GAS_EMAIL_DISPATCH_URL in your .env file.',
       503,
@@ -341,52 +345,61 @@ async function dispatchViaGas({ to, subject, htmlBody, emailType }) {
     'Content-Type': 'application/json'
   };
 
-  let response;
+  let lastError = null;
 
-  try {
-    response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(requestBody),
-      // Abort after 10 seconds to avoid holding up auth flows indefinitely.
-      signal: AbortSignal.timeout(10_000)
-    });
-  } catch (fetchError) {
-    // Log the actual technical error to the backend console securely
-    console.error('[emailService] HTTP request to email gateway failed:', fetchError);
-
-    const isTimeout = fetchError.name === 'TimeoutError' || fetchError.name === 'AbortError';
-    throw createEmailError(
-      isTimeout 
-        ? 'The email service is taking too long to respond. Please try again.' 
-        : 'We could not send the email right now. Please try again later.',
-      502,
-      'EMAIL_GATEWAY_UNREACHABLE'
-    );
-  }
-
-  if (!response.ok) {
-    // Attempt to surface GAS error message for internal debugging only.
-    let gasMessage = '';
-
+  for (const [index, url] of urls.entries()) {
     try {
-      const body = await response.json();
-      gasMessage = body?.message || body?.error || '';
-    } catch {
-      // ignore JSON parse errors
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(requestBody),
+        // Abort after 10 seconds to avoid holding up auth flows indefinitely.
+        signal: AbortSignal.timeout(10_000)
+      });
+
+      let gasPayload = null;
+
+      try {
+        gasPayload = await response.json();
+      } catch {
+        // ignore JSON parse errors
+      }
+
+      if (response.ok && gasPayload?.success !== false) {
+        return true;
+      }
+
+      const gasMessage = gasPayload?.message || gasPayload?.error || response.statusText;
+      const gasCode = gasPayload?.code || (response.ok ? 'EMAIL_GATEWAY_REJECTED' : 'EMAIL_SEND_FAILED');
+
+      lastError = createEmailError(
+        'We could not send the email right now. Please try again later.',
+        502,
+        gasCode
+      );
+
+      console.warn(
+        `[emailService] Email gateway candidate ${index + 1}/${urls.length} failed with status ${response.status}:`,
+        gasMessage
+      );
+    } catch (fetchError) {
+      const isTimeout = fetchError.name === 'TimeoutError' || fetchError.name === 'AbortError';
+      lastError = createEmailError(
+        isTimeout
+          ? 'The email service is taking too long to respond. Please try again.'
+          : 'We could not send the email right now. Please try again later.',
+        502,
+        'EMAIL_GATEWAY_UNREACHABLE'
+      );
+
+      console.warn(
+        `[emailService] Email gateway candidate ${index + 1}/${urls.length} request failed:`,
+        fetchError?.message || fetchError
+      );
     }
-
-    // Log the internal gateway error securely
-    console.error('[emailService] Email gateway responded with an error:', response.status, gasMessage || response.statusText);
-
-    throw createEmailError(
-      'We could not send the email right now. Please try again later.',
-      502,
-      'EMAIL_SEND_FAILED'
-    );
   }
 
-  return true;
+  throw lastError || createEmailError('We could not send the email right now. Please try again later.', 502, 'EMAIL_SEND_FAILED');
 }
 
 // ── Public API ─────────────────────────────────────────────────────────────────
