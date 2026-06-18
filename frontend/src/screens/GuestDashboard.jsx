@@ -317,18 +317,18 @@ export default function GuestDashboard() {
     <div className="app-page overflow-x-hidden">
       {/* ── NAVBAR ─────────────────────────────────────────── */}
       <header className="glass fixed left-0 right-0 top-0 z-50 border-b border-[var(--border)]">
-        <div className="app-container flex items-center justify-between" style={{ height: `${NAVBAR_HEIGHT}px` }}>
+        <div className="app-container grid grid-cols-[minmax(0,0.75fr)_auto_minmax(0,1.25fr)] items-center gap-4 lg:gap-6" style={{ height: `${NAVBAR_HEIGHT}px` }}>
           {/* Left Nav */}
-          <nav className="hidden flex-1 items-center gap-6 md:flex">
-            <a href="#pillars" className="text-sm font-bold text-[var(--muted-strong)] transition hover:text-[var(--text)]">Intelligence</a>
-            <a href="#comparison" className="text-sm font-bold text-[var(--muted-strong)] transition hover:text-[var(--text)]">Method</a>
+          <nav className="hidden min-w-0 items-center gap-4 lg:flex xl:gap-6">
+            <a href="#pillars" className="whitespace-nowrap text-sm font-bold text-[var(--muted-strong)] transition hover:text-[var(--text)]">Intelligence</a>
+            <a href="#comparison" className="whitespace-nowrap text-sm font-bold text-[var(--muted-strong)] transition hover:text-[var(--text)]">Method</a>
           </nav>
 
           {/* Centered Branding */}
-          <Link to="/" className="flex flex-1 items-center justify-center gap-3 select-none group">
+          <Link to="/" className="flex min-w-0 items-center justify-center gap-3 select-none group">
             <ApticoLogo className="h-9 w-9 text-[var(--accent)] drop-shadow-[0_0_12px_var(--accent-soft)] transition-transform group-hover:scale-110" />
             <span 
-              className={`animate-text-shimmer text-lg font-black tracking-[-0.04em] transition-all duration-500 overflow-hidden ${
+              className={`animate-text-shimmer overflow-hidden whitespace-nowrap text-lg font-black tracking-[-0.04em] transition-all duration-500 ${
                 scrolled ? 'max-w-0 opacity-0' : 'max-w-[120px] opacity-100'
               }`}
             >
@@ -337,21 +337,21 @@ export default function GuestDashboard() {
           </Link>
 
           {/* Right Nav + Actions */}
-          <div className="flex flex-1 items-center justify-end gap-6">
-            <nav className="hidden items-center gap-6 md:flex">
-              <a href="#features" className="text-sm font-bold text-[var(--muted-strong)] transition hover:text-[var(--text)]">Features</a>
-              <a href="#team" className="text-sm font-bold text-[var(--muted-strong)] transition hover:text-[var(--text)]">Team</a>
-              <Link to="/docs" className="text-sm font-bold text-[var(--muted-strong)] transition hover:text-[var(--text)]">Docs</Link>
-              <Link to="/login" className="text-sm font-bold text-[var(--muted-strong)] transition hover:text-[var(--text)]">Log in</Link>
+          <div className="flex min-w-0 items-center justify-end gap-3 xl:gap-5">
+            <nav className="hidden min-w-0 items-center gap-4 lg:flex xl:gap-6">
+              <a href="#features" className="whitespace-nowrap text-sm font-bold text-[var(--muted-strong)] transition hover:text-[var(--text)]">Features</a>
+              <a href="#team" className="whitespace-nowrap text-sm font-bold text-[var(--muted-strong)] transition hover:text-[var(--text)]">Team</a>
+              <Link to="/docs" className="whitespace-nowrap text-sm font-bold text-[var(--muted-strong)] transition hover:text-[var(--text)]">Docs</Link>
+              <Link to="/login" className="whitespace-nowrap text-sm font-bold text-[var(--muted-strong)] transition hover:text-[var(--text)]">Log in</Link>
             </nav>
             
             <div className="flex items-center gap-3">
               <ThemeToggle compact />
-              <Link to="/signup" className="app-button px-5 py-2 hidden sm:inline-flex">Get Started</Link>
+              <Link to="/signup" className="app-button hidden whitespace-nowrap px-5 py-2 sm:inline-flex">Get Started</Link>
               <button
                 type="button"
                 onClick={() => setMobileMenuOpen((prev) => !prev)}
-                className="app-icon-button md:hidden"
+                className="app-icon-button lg:hidden"
                 aria-label="Toggle menu"
               >
                 <span className="material-symbols-outlined text-[22px]">{mobileMenuOpen ? 'close' : 'menu'}</span>
@@ -361,7 +361,7 @@ export default function GuestDashboard() {
         </div>
 
         {mobileMenuOpen && (
-          <div className="border-t border-[var(--border)] bg-[var(--shell)] px-6 py-5 md:hidden">
+          <div className="border-t border-[var(--border)] bg-[var(--shell)] px-6 py-5 lg:hidden">
             <nav className="flex flex-col gap-1">
               {[ ['Intelligence', '#pillars'], ['Method', '#comparison'], ['Features', '#features'], ['Team', '#team'], ].map(([label, href]) => (
                 <a key={label} href={href} onClick={() => setMobileMenuOpen(false)} className="rounded-xl px-4 py-3 text-sm font-semibold text-[var(--muted-strong)] transition hover:bg-[var(--panel-soft)] hover:text-[var(--text)]">

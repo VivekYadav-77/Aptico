@@ -339,6 +339,61 @@ More deployment details are available in `DEPLOYMENT.md`.
 
 ---
 
+## 🚀 Future Enhancements
+
+### Intelligent Job Discovery Engine
+
+- Build a scalable job aggregation system that continuously collects opportunities from public career pages and supported job sources.
+- Add automated ingestion pipelines with deduplication, validation, normalization, and quality checks so listings stay useful instead of noisy.
+
+### AI-Powered Job Matching
+
+- Introduce personalized job recommendations based on user skills, experience level, preferred locations, work model, and career interests.
+- Generate job match scores with clear explanations for matching skills, missing skills, role-fit signals, and suggested next actions.
+
+### Resume Intelligence
+
+- Expand resume-to-job analysis with deeper compatibility scoring for specific roles, teams, and seniority levels.
+- Provide actionable recommendations for stronger bullet points, ATS compatibility, skill positioning, and application success rate improvement.
+
+### Smart Job Alerts
+
+- Deliver timely notifications for newly discovered opportunities that match user-defined preferences, skills, saved searches, and career goals.
+- Allow users to tune alert frequency so notifications stay helpful and do not become noise.
+
+### Custom Squad Dashboard
+
+- Add a dedicated squad workspace where users can see squad progress, weekly targets, member activity, shared milestones, and accountability signals in one focused dashboard.
+- Support clear join and exit flows so users can enter a squad, leave when needed, and understand how their progress affects squad totals.
+- Add admin-visible squad health controls for monitoring inactive squads, unusual activity, and leaderboard integrity.
+
+### Advanced Search And Ranking
+
+- Develop a relevance-based ranking engine that prioritizes jobs using skill alignment, experience requirements, location preferences, salary range, posting freshness, and user behavior signals.
+- Add saved search profiles so users can quickly switch between different career paths or role categories.
+
+### Application Analytics Dashboard
+
+- Track application performance through response rate, interview conversion rate, rejection patterns, offer conversion rate, and role-fit trends.
+- Provide insights that help users adjust their resume, target better roles, and improve their job-search strategy over time.
+
+### Company Intelligence
+
+- Enrich job listings with company-specific context such as hiring trends, work models, technology stacks, role stability, and public career-page activity.
+- Help users understand not only whether a role fits, but whether the company environment matches their goals.
+
+### Scalable Background Processing
+
+- Introduce queue-based worker services for job ingestion, indexing, recommendation generation, analytics processing, notifications, and scheduled cleanup tasks.
+- Keep expensive processing outside user-facing requests so the product remains responsive as data volume grows.
+
+### Platform Reliability And Monitoring
+
+- Expand logging, monitoring, health checks, alerting, and recovery workflows for stronger production reliability.
+- Add deeper operational dashboards for background jobs, email delivery, API latency, failed tasks, and service availability.
+
+---
+
 ## 👥 Team
 
 ### Vivek Yadav
