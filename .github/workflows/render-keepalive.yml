@@ -1,6 +1,9 @@
 name: Render backend keep-alive
 
+run-name: Render backend keep-alive
+
 on:
+  workflow_dispatch:
   schedule:
     # IST is UTC+05:30. These three UTC schedules ping every 10 minutes
     # from 06:00 IST through 01:00 IST the next day.
@@ -28,16 +31,24 @@ jobs:
           set -euo pipefail
 
           if [ -z "${RENDER_HEALTHCHECK_URL:-}" ]; then
-            echo "Keep-alive skipped because RENDER_HEALTHCHECK_URL is not configured."
-            exit 0
+            echo "::error::RENDER_HEALTHCHECK_URL repository secret is not configured."
+            exit 1
           fi
 
-          curl \
-            --fail \
-            --silent \
-            --show-error \
-            --max-time 20 \
-            --retry 2 \
-            --retry-delay 5 \
-            --output /dev/null \
-            "$RENDER_HEALTHCHECK_URL"
+          echo "UTC time: $(date -u '+%Y-%m-%d %H:%M:%S')"
+          echo "IST time: $(TZ='Asia/Kolkata' date '+%Y-%m-%d %H:%M:%S')"
+
+          status_code="$(
+            curl \
+              --fail \
+              --silent \
+              --show-error \
+              --max-time 20 \
+              --retry 2 \
+              --retry-delay 5 \
+              --output /dev/null \
+              --write-out '%{http_code}' \
+              "$RENDER_HEALTHCHECK_URL"
+          )"
+
+          echo "Health endpoint responded with HTTP ${status_code}."
