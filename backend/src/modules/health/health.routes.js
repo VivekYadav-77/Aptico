@@ -1,4 +1,6 @@
 export default async function healthRoutes(app) {
+  app.head('/', async (_request, reply) => reply.code(204).send());
+
   app.get('/', async () => ({
     status: 'ok',
     timestamp: new Date().toISOString()
