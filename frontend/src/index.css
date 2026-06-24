@@ -351,6 +351,21 @@ span {
   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
+.google-signin-button {
+  display: flex;
+  justify-content: center;
+}
+
+.google-signin-button > div {
+  max-width: 340px;
+  overflow: hidden;
+  border-radius: 9999px;
+}
+
+.google-signin-button iframe {
+  border-radius: 9999px !important;
+}
+
 .app-chip {
   display: inline-flex;
   align-items: center;

@@ -33,6 +33,40 @@ function isPendingConnectionRequest(item) {
     && item.connection_status === 'pending';
 }
 
+function NotificationActionButton({ children, disabled, icon, onClick, tone = 'default' }) {
+  const toneClass = {
+    primary: 'border-[var(--accent)] bg-[var(--accent)] text-[#003824] shadow-[0_10px_24px_rgba(78,222,163,0.18)] hover:shadow-[0_14px_30px_rgba(78,222,163,0.26)]',
+    danger: 'border-red-500/25 bg-red-500/10 text-red-400 hover:border-red-500/45 hover:bg-red-500/15 hover:text-red-300',
+    default: 'border-[var(--border)] bg-[var(--panel-soft)] text-[var(--muted-strong)] hover:border-[var(--accent)]/45 hover:bg-[var(--accent-soft)] hover:text-[var(--accent-strong)]'
+  }[tone];
+
+  return (
+    <button
+      type="button"
+      className={`inline-flex h-9 items-center justify-center gap-1.5 rounded-full border px-3 text-xs font-black uppercase tracking-[0.12em] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 ${toneClass}`}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {icon ? <span className="material-symbols-outlined text-[15px]">{icon}</span> : null}
+      {children}
+    </button>
+  );
+}
+
+function ConnectionStatusBadge({ status }) {
+  const isAccepted = status === 'accepted';
+  return (
+    <span className={`inline-flex h-9 items-center gap-1.5 rounded-full border px-3 text-xs font-black uppercase tracking-[0.12em] ${
+      isAccepted
+        ? 'border-[var(--accent)]/35 bg-[var(--accent-soft)] text-[var(--accent-strong)]'
+        : 'border-[var(--border)] bg-[var(--panel-soft)] text-[var(--muted-strong)]'
+    }`}>
+      <span className="material-symbols-outlined text-[15px]">{isAccepted ? 'check_circle' : 'block'}</span>
+      {isAccepted ? 'Accepted' : 'Declined'}
+    </span>
+  );
+}
+
 export default function Notifications() {
   const [items, setItems] = useState([]);
   const [offset, setOffset] = useState(0);
@@ -203,35 +237,34 @@ export default function Notifications() {
                   <p className="mt-3 font-bold text-[var(--text)]">{item.message}</p>
                   <p className="mt-1 text-sm text-[var(--muted-strong)]">{timeAgo(item.created_at)}</p>
                 </div>
-                <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 self-center sm:max-w-[320px]">
                   {isPendingConnectionRequest(item) ? (
                     <>
-                      <button
-                        type="button"
-                        className="app-button px-3 py-2 text-xs"
+                      <NotificationActionButton
+                        tone="primary"
+                        icon="check"
                         onClick={() => respondToConnectionRequest(item, 'accepted')}
                         disabled={busyId === `accepted-${item.id}` || busyId === `declined-${item.id}`}
                       >
                         Accept
-                      </button>
-                      <button
-                        type="button"
-                        className="app-button-secondary px-3 py-2 text-xs"
+                      </NotificationActionButton>
+                      <NotificationActionButton
+                        icon="close"
                         onClick={() => respondToConnectionRequest(item, 'declined')}
                         disabled={busyId === `accepted-${item.id}` || busyId === `declined-${item.id}`}
                       >
                         Decline
-                      </button>
+                      </NotificationActionButton>
                     </>
                   ) : item.type === 'new_connection_request' && item.connection_status === 'accepted' ? (
-                    <span className="rounded-full border border-[var(--border)] px-3 py-2 text-xs font-black text-[var(--accent-strong)]">Accepted</span>
+                    <ConnectionStatusBadge status="accepted" />
                   ) : item.type === 'new_connection_request' && item.connection_status === 'declined' ? (
-                    <span className="rounded-full border border-[var(--border)] px-3 py-2 text-xs font-black text-[var(--muted-strong)]">Declined</span>
+                    <ConnectionStatusBadge status="declined" />
                   ) : null}
                   {!item.is_read ? (
-                    <button type="button" className="app-button-secondary px-3 py-2 text-xs" onClick={() => markOne(item)} disabled={busyId === `read-${item.id}`}>Read</button>
+                    <NotificationActionButton icon="done_all" onClick={() => markOne(item)} disabled={busyId === `read-${item.id}`}>Read</NotificationActionButton>
                   ) : null}
-                  <button type="button" className="app-button-secondary px-3 py-2 text-xs text-red-500" onClick={() => removeOne(item)} disabled={busyId === `delete-${item.id}`}>Delete</button>
+                  <NotificationActionButton tone="danger" icon="delete" onClick={() => removeOne(item)} disabled={busyId === `delete-${item.id}`}>Delete</NotificationActionButton>
                 </div>
               </article>
             ))}

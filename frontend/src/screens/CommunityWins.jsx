@@ -468,10 +468,10 @@ export default function CommunityWins() {
       </div>
 
       {modalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/60 p-4 backdrop-blur-md animate-in fade-in duration-200 sm:items-center">
           <form 
             onSubmit={handleSubmit} 
-            className="w-full max-w-xl rounded-[2.5rem] border border-[var(--border)] bg-[var(--panel)] p-8 shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-200"
+            className="my-4 max-h-[calc(100vh-2rem)] w-full max-w-xl overflow-y-auto rounded-[2.5rem] border border-[var(--border)] bg-[var(--panel)] p-6 shadow-[0_0_50px_rgba(0,0,0,0.5)] animate-in zoom-in-95 duration-200 sm:my-0 sm:p-8"
           >
             <div className="flex items-center justify-between mb-8">
               <div>
