@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import AppShell from '../components/AppShell.jsx';
-import { deleteNotification, getNotifications, markNotificationsRead } from '../api/socialApi.js';
+import { deleteNotification, getNotifications, markNotificationsRead, respondToConnection } from '../api/socialApi.js';
 
 const socialTypes = ['new_follower', 'new_connection_request', 'connection_accepted', 'post_like', 'post_comment'];
 const careerTypes = ['job_match_alert'];
@@ -24,6 +24,13 @@ function timeAgo(value) {
 
 function humanize(value) {
   return String(value || '').replaceAll('_', ' ');
+}
+
+function isPendingConnectionRequest(item) {
+  return item.type === 'new_connection_request'
+    && item.entity_type === 'connection'
+    && item.entity_id
+    && item.connection_status === 'pending';
 }
 
 export default function Notifications() {
@@ -95,6 +102,26 @@ export default function Notifications() {
     try {
       await deleteNotification(item.id);
       setItems((current) => current.filter((row) => row.id !== item.id));
+    } finally {
+      setBusyId('');
+    }
+  }
+
+  async function respondToConnectionRequest(item, action) {
+    setBusyId(`${action}-${item.id}`);
+    setError('');
+
+    try {
+      const result = await respondToConnection(item.entity_id, action);
+      await markNotificationsRead({ notificationIds: [item.id] });
+      setItems((current) => current.map((row) => (
+        row.id === item.id
+          ? { ...row, connection_status: result.status, is_read: true }
+          : row
+      )));
+    } catch (requestError) {
+      setError(requestError.response?.data?.error || requestError.response?.data?.message || requestError.message || 'Could not respond to connection request.');
+      await loadNotifications({ reset: true });
     } finally {
       setBusyId('');
     }
@@ -177,6 +204,30 @@ export default function Notifications() {
                   <p className="mt-1 text-sm text-[var(--muted-strong)]">{timeAgo(item.created_at)}</p>
                 </div>
                 <div className="flex shrink-0 flex-col gap-2 sm:flex-row">
+                  {isPendingConnectionRequest(item) ? (
+                    <>
+                      <button
+                        type="button"
+                        className="app-button px-3 py-2 text-xs"
+                        onClick={() => respondToConnectionRequest(item, 'accepted')}
+                        disabled={busyId === `accepted-${item.id}` || busyId === `declined-${item.id}`}
+                      >
+                        Accept
+                      </button>
+                      <button
+                        type="button"
+                        className="app-button-secondary px-3 py-2 text-xs"
+                        onClick={() => respondToConnectionRequest(item, 'declined')}
+                        disabled={busyId === `accepted-${item.id}` || busyId === `declined-${item.id}`}
+                      >
+                        Decline
+                      </button>
+                    </>
+                  ) : item.type === 'new_connection_request' && item.connection_status === 'accepted' ? (
+                    <span className="rounded-full border border-[var(--border)] px-3 py-2 text-xs font-black text-[var(--accent-strong)]">Accepted</span>
+                  ) : item.type === 'new_connection_request' && item.connection_status === 'declined' ? (
+                    <span className="rounded-full border border-[var(--border)] px-3 py-2 text-xs font-black text-[var(--muted-strong)]">Declined</span>
+                  ) : null}
                   {!item.is_read ? (
                     <button type="button" className="app-button-secondary px-3 py-2 text-xs" onClick={() => markOne(item)} disabled={busyId === `read-${item.id}`}>Read</button>
                   ) : null}
