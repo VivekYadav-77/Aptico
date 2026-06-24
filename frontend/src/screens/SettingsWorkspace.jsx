@@ -8,6 +8,7 @@ import YourActivityPanel from '../components/YourActivityPanel.jsx';
 import { useTheme } from '../app/theme.jsx';
 import {
   employmentTypeOptions,
+  getCareerProfileCopy,
   profileStatusOptions,
   useProfileSettings,
   workModeOptions
@@ -182,6 +183,7 @@ export default function SettingsWorkspace() {
   }
 
   const formatList = (val) => Array.isArray(val) ? val.join(', ') : (val || '');
+  const careerCopy = getCareerProfileCopy(draft.currentStatus);
 
   function toggleListValue(field, value) {
     setDraft((current) => {
@@ -403,6 +405,12 @@ export default function SettingsWorkspace() {
                   {/* --- CAREER SECTION --- */}
                   {activeSection === 'Career' && (
                     <div className="space-y-8">
+                      {(draft.currentStatus === 'student' || draft.currentStatus === 'job-seeker') ? (
+                        <div className="rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent-soft)] p-4 text-sm text-[var(--accent-strong)]">
+                          <p className="font-black">{careerCopy.modeTitle}</p>
+                          <p className="mt-1 font-semibold leading-6">{careerCopy.modeDescription}</p>
+                        </div>
+                      ) : null}
                       <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-3 bg-gradient-to-br from-[var(--panel-soft)] to-[var(--panel)] p-5 sm:p-7 rounded-3xl border border-[var(--border)]/60 shadow-sm hover:shadow-lg hover:shadow-[var(--accent)]/5 hover:border-[var(--accent)]/20 transition-all duration-500">
                         <SelectField
                           label="Current Status"
@@ -411,24 +419,24 @@ export default function SettingsWorkspace() {
                           options={profileStatusOptions}
                         />
                         <SelectField
-                          label="Employment Type"
+                          label={careerCopy.employmentTypeLabel}
                           value={draft.employmentType}
                           onChange={(e) => updateField('employmentType', e.target.value)}
                           options={employmentTypeOptions}
                         />
-                        <InputField type="number" label="Years of Experience" value={draft.yearsExperience} onChange={(e) => updateField('yearsExperience', e.target.value)} />
+                        <InputField type="text" label={careerCopy.yearsExperienceLabel} value={draft.yearsExperience} onChange={(e) => updateField('yearsExperience', e.target.value)} />
                       </div>
 
                       <div className="grid gap-4 sm:gap-6 grid-cols-1 md:grid-cols-2">
-                        <InputField label="Current Title" value={draft.currentTitle} onChange={(e) => updateField('currentTitle', e.target.value)} placeholder="e.g. Software Engineer" />
-                        <InputField label="Current Company" value={draft.currentCompany} onChange={(e) => updateField('currentCompany', e.target.value)} placeholder="e.g. Tech Corp" />
-                        <InputField label="Industry" value={draft.industry} onChange={(e) => updateField('industry', e.target.value)} placeholder="e.g. Computer Software" />
-                        <InputField label="Target Role" value={draft.targetRole} onChange={(e) => updateField('targetRole', e.target.value)} placeholder="e.g. Engineering Manager" />
+                        <InputField label={careerCopy.currentTitleLabel} value={draft.currentTitle} onChange={(e) => updateField('currentTitle', e.target.value)} placeholder={careerCopy.currentTitlePlaceholder} />
+                        <InputField label={careerCopy.currentCompanyLabel} value={draft.currentCompany} onChange={(e) => updateField('currentCompany', e.target.value)} placeholder={careerCopy.currentCompanyPlaceholder} />
+                        <InputField label={careerCopy.industryLabel} value={draft.industry} onChange={(e) => updateField('industry', e.target.value)} placeholder={careerCopy.industryPlaceholder} />
+                        <InputField label={careerCopy.targetRoleLabel} value={draft.targetRole} onChange={(e) => updateField('targetRole', e.target.value)} placeholder={careerCopy.targetRolePlaceholder} />
                       </div>
 
                       <div className="pt-6 border-t border-[var(--border)]">
                         <div className="space-y-4">
-                          <InputField label="Availability Note" value={draft.availability} onChange={(e) => updateField('availability', e.target.value)} placeholder="e.g. Available immediately, or 2 weeks notice" />
+                          <InputField label={careerCopy.availabilityLabel} value={draft.availability} onChange={(e) => updateField('availability', e.target.value)} placeholder={careerCopy.availabilityPlaceholder} />
                           
                           <div className="space-y-3">
                             <span className="app-field-label ml-1">Preferred Work Modes</span>
@@ -492,31 +500,31 @@ export default function SettingsWorkspace() {
                   {activeSection === 'Experience' && (
                     <div className="space-y-6">
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <p className="text-sm font-medium text-[var(--muted-strong)]">Add your work history entries. Most recent first.</p>
-                        <button type="button" className="app-button w-full justify-center rounded-xl border border-[var(--border)] bg-[var(--panel)] px-5 py-2 text-sm font-bold shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--accent)] hover:text-[var(--accent)] hover:shadow-md sm:w-auto" onClick={() => updateField('experiences', [...(draft.experiences || []), createEmptyExperience()])}>+ Add Experience</button>
+                        <p className="text-sm font-medium text-[var(--muted-strong)]">{careerCopy.experienceSectionDescription}</p>
+                        <button type="button" className="app-button w-full justify-center rounded-xl border border-[var(--border)] bg-[var(--panel)] px-5 py-2 text-sm font-bold shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-[var(--accent)] hover:text-[var(--accent)] hover:shadow-md sm:w-auto" onClick={() => updateField('experiences', [...(draft.experiences || []), createEmptyExperience()])}>{careerCopy.addExperienceLabel}</button>
                       </div>
                       {(draft.experiences || []).length === 0 && (
                         <div className="rounded-2xl border-2 border-dashed border-[var(--border)] bg-gradient-to-b from-[var(--panel-soft)] to-transparent p-6 text-center text-[var(--muted-strong)] transition-all duration-500 hover:border-[var(--accent)]/50 hover:shadow-lg hover:shadow-[var(--accent)]/5 sm:rounded-3xl sm:p-10 group cursor-pointer">
                           <Icons.Career className="w-8 h-8 mx-auto mb-3 opacity-40" />
-                          <p className="font-bold text-sm">No experience added yet</p>
-                          <p className="text-xs mt-1">Click "Add Experience" to start building your work history.</p>
+                          <p className="font-bold text-sm">{careerCopy.emptyExperienceTitle}</p>
+                          <p className="text-xs mt-1">{careerCopy.emptyExperienceMessage}</p>
                         </div>
                       )}
                       {(draft.experiences || []).map((exp, idx) => (
                         <div key={exp.id || idx} className="group relative space-y-4 overflow-hidden rounded-2xl border border-[var(--border)] bg-gradient-to-br from-[var(--panel)] to-[var(--panel-soft)] p-4 shadow-sm transition-all duration-500 before:absolute before:inset-0 before:rounded-2xl before:bg-gradient-to-r before:from-[var(--accent)]/5 before:to-transparent before:opacity-0 before:transition-opacity before:duration-500 hover:border-[var(--accent)]/40 hover:shadow-xl hover:shadow-[var(--accent)]/10 hover:before:opacity-100 sm:rounded-3xl sm:p-6 sm:before:rounded-3xl sm:hover:-translate-y-1">
                           <button type="button" onClick={() => updateField('experiences', draft.experiences.filter((_, i) => i !== idx))} className="absolute top-3 right-3 text-xs font-bold text-[var(--warning-text)] opacity-0 group-hover:opacity-100 transition-opacity hover:bg-[var(--warning-soft)] px-2 py-1 rounded-lg">Remove</button>
                           <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-                            <InputField label="Job Title" value={exp.title} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], title: e.target.value }; updateField('experiences', next); }} placeholder="e.g. Software Engineer" />
-                            <InputField label="Company" value={exp.company} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], company: e.target.value }; updateField('experiences', next); }} placeholder="e.g. Google" />
+                            <InputField label={careerCopy.experienceTitleLabel} value={exp.title} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], title: e.target.value }; updateField('experiences', next); }} placeholder={careerCopy.experienceTitlePlaceholder} />
+                            <InputField label={careerCopy.experienceCompanyLabel} value={exp.company} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], company: e.target.value }; updateField('experiences', next); }} placeholder={careerCopy.experienceCompanyPlaceholder} />
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <InputField type="date" label="Start Date" value={exp.startDate} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], startDate: e.target.value }; updateField('experiences', next); }} />
                               <InputField type="date" label="End Date" value={exp.endDate} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], endDate: e.target.value }; updateField('experiences', next); }} />
                             </div>
                           </div>
-                          <TextAreaField label="Description" value={exp.description} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], description: e.target.value }; updateField('experiences', next); }} placeholder="Describe your responsibilities and achievements..." minHeight="min-h-[80px]" />
+                          <TextAreaField label={careerCopy.experienceDescriptionLabel} value={exp.description} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], description: e.target.value }; updateField('experiences', next); }} placeholder={careerCopy.experienceDescriptionPlaceholder} minHeight="min-h-[80px]" />
                           <label className="flex items-center gap-2 cursor-pointer">
                             <input type="checkbox" checked={exp.isCurrent || false} onChange={(e) => { const next = [...draft.experiences]; next[idx] = { ...next[idx], isCurrent: e.target.checked, endDate: e.target.checked ? '' : next[idx].endDate }; updateField('experiences', next); }} className="accent-[var(--accent)]" />
-                            <span className="text-sm font-medium text-[var(--text)]">I currently work here</span>
+                            <span className="text-sm font-medium text-[var(--text)]">{careerCopy.experienceCurrentLabel}</span>
                           </label>
                         </div>
                       ))}

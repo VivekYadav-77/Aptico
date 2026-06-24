@@ -360,7 +360,7 @@ export function useProfileSettings(auth, analysis) {
 export const profileStatusOptions = [
   { value: 'student', label: 'Student' },
   { value: 'employee', label: 'Employee' },
-  { value: 'job-seeker', label: 'Job seeker' },
+  { value: 'job-seeker', label: 'Job seeker / बेरोजगारी' },
   { value: 'freelancer', label: 'Freelancer' },
   { value: 'founder', label: 'Founder' }
 ];
@@ -373,8 +373,133 @@ export const workModeOptions = [
 
 export const employmentTypeOptions = [
   { value: 'full-time', label: 'Full-time' },
+  { value: 'entry-level', label: 'Entry-level' },
   { value: 'internship', label: 'Internship' },
+  { value: 'apprenticeship', label: 'Apprenticeship' },
   { value: 'part-time', label: 'Part-time' },
   { value: 'contract', label: 'Contract' },
-  { value: 'freelance', label: 'Freelance' }
+  { value: 'freelance', label: 'Freelance' },
+  { value: 'actively-looking', label: 'Actively looking' }
 ];
+
+const professionalCareerCopy = {
+  modeTitle: 'Professional mode',
+  modeDescription: 'Use this section to describe your current role, work history, and role preferences.',
+  currentTitleLabel: 'Current Title',
+  currentTitlePlaceholder: 'e.g. Software Engineer',
+  currentCompanyLabel: 'Current Company',
+  currentCompanyPlaceholder: 'e.g. Tech Corp',
+  yearsExperienceLabel: 'Years of Experience',
+  yearsExperienceDisplayLabel: 'Experience',
+  industryLabel: 'Industry',
+  industryPlaceholder: 'e.g. Computer Software',
+  targetRoleLabel: 'Target Role',
+  targetRoleDisplayLabel: 'Target Role',
+  targetRolePlaceholder: 'e.g. Engineering Manager',
+  employmentTypeLabel: 'Employment Type',
+  employmentDisplayLabel: 'Employment',
+  availabilityLabel: 'Availability Note',
+  availabilityDisplayLabel: 'Availability',
+  availabilityPlaceholder: 'e.g. Available immediately, or 2 weeks notice',
+  overviewTitleLabel: 'Current Role',
+  overviewEmptyMessage: 'Add a summary and current role details to shape your profile story.',
+  overviewFallback: 'Not specified',
+  experienceSectionDescription: 'Add your work history entries. Most recent first.',
+  addExperienceLabel: '+ Add Experience',
+  emptyExperienceTitle: 'No experience added yet',
+  emptyExperienceMessage: 'Click "Add Experience" to start building your work history.',
+  publicExperienceEmptyMessage: 'No experience listed yet.',
+  experienceTitleLabel: 'Job Title',
+  experienceTitlePlaceholder: 'e.g. Software Engineer',
+  experienceCompanyLabel: 'Company',
+  experienceCompanyPlaceholder: 'e.g. Google',
+  experienceDescriptionLabel: 'Description',
+  experienceDescriptionPlaceholder: 'Describe your responsibilities and achievements...',
+  experienceCurrentLabel: 'I currently work here',
+  publicExperienceTitleFallback: 'Role',
+  publicExperienceCompanyFallback: 'Company'
+};
+
+const careerCopyByStatus = {
+  student: {
+    modeTitle: 'Student profile mode',
+    modeDescription: 'Use career fields for your academic focus, school, internships, projects, and first-role goals.',
+    currentTitleLabel: 'Academic / Career Focus',
+    currentTitlePlaceholder: 'e.g. Computer Science student focused on frontend engineering',
+    currentCompanyLabel: 'School / University',
+    currentCompanyPlaceholder: 'e.g. University of Example',
+    yearsExperienceLabel: 'Project or Internship Experience',
+    yearsExperienceDisplayLabel: 'Project / Internship Experience',
+    industryLabel: 'Field or Career Track',
+    industryPlaceholder: 'e.g. Software engineering, data analytics, product design',
+    targetRoleLabel: 'Target Internship / Entry Role',
+    targetRoleDisplayLabel: 'Target Internship / Entry Role',
+    targetRolePlaceholder: 'e.g. Frontend Intern, Junior Software Engineer',
+    employmentTypeLabel: 'Opportunity Type',
+    employmentDisplayLabel: 'Opportunity Type',
+    availabilityLabel: 'Availability / Graduation Note',
+    availabilityDisplayLabel: 'Availability',
+    availabilityPlaceholder: 'e.g. Available for summer internships, graduating in 2026',
+    overviewTitleLabel: 'Academic Focus',
+    overviewEmptyMessage: 'Add your academic focus, school, projects, and target role to shape your student profile.',
+    overviewFallback: 'Student focus not specified',
+    experienceSectionDescription: 'Add projects, internships, campus roles, volunteer work, or academic experience. Most relevant first.',
+    addExperienceLabel: '+ Add Experience',
+    emptyExperienceTitle: 'No student experience added yet',
+    emptyExperienceMessage: 'Add projects, internships, campus roles, volunteer work, or academic experience.',
+    publicExperienceEmptyMessage: 'Add projects, internships, campus roles, volunteer work, or academic experience.',
+    experienceTitleLabel: 'Project, Internship, or Role Title',
+    experienceTitlePlaceholder: 'e.g. Frontend Intern, Capstone Project Lead',
+    experienceCompanyLabel: 'Organization, School, or Team',
+    experienceCompanyPlaceholder: 'e.g. University Lab, Student Club, Startup',
+    experienceDescriptionLabel: 'What You Built or Contributed',
+    experienceDescriptionPlaceholder: 'Describe the project, responsibilities, skills used, and outcomes...',
+    experienceCurrentLabel: 'I am currently doing this',
+    publicExperienceTitleFallback: 'Project or role',
+    publicExperienceCompanyFallback: 'Organization or school'
+  },
+  'job-seeker': {
+    modeTitle: 'Job seeker profile mode',
+    modeDescription: 'Use career fields for your recent experience, target role, availability, and strongest proof of readiness.',
+    currentTitleLabel: 'Recent / Target Role',
+    currentTitlePlaceholder: 'e.g. Frontend Developer, Data Analyst, Product Intern',
+    currentCompanyLabel: 'Last Company or Open to Work',
+    currentCompanyPlaceholder: 'e.g. Open to work, Freelance, Previous company',
+    yearsExperienceLabel: 'Total Experience',
+    yearsExperienceDisplayLabel: 'Total Experience',
+    industryLabel: 'Target Industry',
+    industryPlaceholder: 'e.g. SaaS, fintech, education technology',
+    targetRoleLabel: 'Desired Role',
+    targetRoleDisplayLabel: 'Desired Role',
+    targetRolePlaceholder: 'e.g. Junior Frontend Developer',
+    employmentTypeLabel: 'Desired Employment Type',
+    employmentDisplayLabel: 'Desired Employment',
+    availabilityLabel: 'Availability / Notice Period',
+    availabilityDisplayLabel: 'Availability',
+    availabilityPlaceholder: 'e.g. Available immediately, 2 weeks notice, open to internships',
+    overviewTitleLabel: 'Recent / Target Role',
+    overviewEmptyMessage: 'Add your recent role, target role, availability, and proof of readiness.',
+    overviewFallback: 'Target role not specified',
+    experienceSectionDescription: 'Add previous roles, freelance work, projects, or career-building experience. Most relevant first.',
+    addExperienceLabel: '+ Add Experience',
+    emptyExperienceTitle: 'No experience added yet',
+    emptyExperienceMessage: 'Add previous roles, freelance work, projects, or career-building experience.',
+    publicExperienceEmptyMessage: 'Add previous roles, freelance work, projects, or career-building experience.',
+    experienceTitleLabel: 'Role, Project, or Experience Title',
+    experienceTitlePlaceholder: 'e.g. Frontend Developer, Portfolio Project',
+    experienceCompanyLabel: 'Company, Client, or Context',
+    experienceCompanyPlaceholder: 'e.g. Open-source, Freelance, Previous company',
+    experienceDescriptionLabel: 'Description',
+    experienceDescriptionPlaceholder: 'Describe your responsibilities, skills, project scope, or outcomes...',
+    experienceCurrentLabel: 'This is current',
+    publicExperienceTitleFallback: 'Role or project',
+    publicExperienceCompanyFallback: 'Company or context'
+  }
+};
+
+export function getCareerProfileCopy(currentStatus) {
+  return {
+    ...professionalCareerCopy,
+    ...(careerCopyByStatus[currentStatus] || {})
+  };
+}
