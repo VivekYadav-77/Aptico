@@ -34,7 +34,7 @@ export default function LegalPage() {
               <p className="leading-relaxed text-[var(--muted-strong)]">
                 Welcome to Aptico. We are committed to protecting your personal information and your right to privacy. 
                 If you have any questions or concerns about our policy, or our practices with regards to your personal information, 
-                please contact us at support@aptico.ai.
+                please contact us at try.vivekyadav@gmail.com.
               </p>
             </section>
 

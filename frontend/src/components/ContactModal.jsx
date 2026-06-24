@@ -21,7 +21,7 @@ export default function ContactModal({ isOpen, onClose }) {
       return;
     }
 
-    const recipient = 'support@aptico.ai';
+    const recipient = 'try.vivekyadav@gmail.com';
     const body = `From: ${name} (${email})\n\nMessage:\n${message}`;
     
     // Construct Gmail Compose URL

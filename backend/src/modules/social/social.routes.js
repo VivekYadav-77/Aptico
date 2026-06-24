@@ -747,6 +747,7 @@ export default async function socialRoutes(app) {
           actor_id: notifications.actorId,
           entity_id: notifications.entityId,
           entity_type: notifications.entityType,
+          connection_status: connections.status,
           message: notifications.message,
           is_read: notifications.isRead,
           created_at: notifications.createdAt,
@@ -759,6 +760,7 @@ export default async function socialRoutes(app) {
         .from(notifications)
         .leftJoin(users, eq(notifications.actorId, users.id))
         .leftJoin(userProfiles, eq(notifications.actorId, userProfiles.userId))
+        .leftJoin(connections, and(eq(notifications.entityId, connections.id), eq(notifications.entityType, 'connection')))
         .where(and(...filters))
         .orderBy(desc(notifications.createdAt))
         .limit(query.limit)

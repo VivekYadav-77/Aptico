@@ -7,7 +7,7 @@ import ProfileActivityPost from '../components/ProfileActivityPost.jsx';
 import ResumeBuilderModal from '../components/ResumeBuilderModal.jsx';
 import { getMyProfile, getPublicFeedPosts, getPublicProfile, getProfileFollowers, getProfileFollowing, getProfileConnections } from '../api/socialApi.js';
 import UserListModal from '../components/UserListModal.jsx';
-import { useProfileSettings } from '../hooks/useProfileSettings.js';
+import { getCareerProfileCopy, useProfileSettings } from '../hooks/useProfileSettings.js';
 import { selectAuth } from '../store/authSlice.js';
 import { selectCurrentAnalysis } from '../store/historySlice.js';
 import StickerShowcase from '../components/StickerShowcase.jsx';
@@ -286,6 +286,10 @@ export default function ProfilePage() {
   const readinessScore = Number(analysis?.confidenceScore || 0);
   const matchScore = analysis?.confidenceScore ? `${analysis.confidenceScore}%` : 'Pending';
   const preferredModes = Array.isArray(profile.preferredWorkModes) ? profile.preferredWorkModes : [];
+  const careerCopy = getCareerProfileCopy(profile.currentStatus);
+  const primaryCareerDetail = [profile.currentTitle, profile.currentCompany]
+    .filter(Boolean)
+    .join(profile.currentStatus === 'job-seeker' ? ' - ' : ' at ') || careerCopy.overviewFallback;
   const publicLinks = [
     profile.linkedin ? { name: 'LinkedIn', url: profile.linkedin } : null,
     profile.github ? { name: 'GitHub', url: profile.github } : null,
@@ -652,7 +656,7 @@ export default function ProfilePage() {
                 title="Professional Overview"
                 accentColor="#0ea5e9"
                 isEmpty={!profile.bio && !profile.currentTitle && !profile.currentCompany && !profile.industry}
-                emptyMessage="Add a summary and current role details to shape your profile story."
+                emptyMessage={careerCopy.overviewEmptyMessage}
               >
                 <div className="space-y-6">
                   <p className="whitespace-pre-wrap text-sm leading-relaxed text-[var(--text)] sm:text-base">
@@ -662,16 +666,16 @@ export default function ProfilePage() {
                   <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4 relative overflow-hidden">
                       <div className="absolute top-0 left-0 w-1 h-full bg-sky-500/50 rounded-r" />
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)] flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px]">badge</span>Current Role</p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)] flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px]">badge</span>{careerCopy.overviewTitleLabel}</p>
                       <p className="mt-2 text-sm font-bold text-[var(--text)]">
-                        {[profile.currentTitle, profile.currentCompany].filter(Boolean).join(' at ') || 'Not specified'}
+                        {primaryCareerDetail}
                       </p>
                     </div>
                     <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4 relative overflow-hidden">
                       <div className="absolute top-0 left-0 w-1 h-full bg-indigo-500/50 rounded-r" />
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)] flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px]">timeline</span>Experience</p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)] flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px]">timeline</span>{careerCopy.yearsExperienceDisplayLabel}</p>
                       <p className="mt-2 text-sm font-bold text-[var(--text)]">
-                        {profile.yearsExperience ? `${profile.yearsExperience} years` : 'Not specified'}
+                        {profile.yearsExperience || 'Not specified'}
                       </p>
                     </div>
                     <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4 relative overflow-hidden">
@@ -681,14 +685,14 @@ export default function ProfilePage() {
                     </div>
                     <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4 relative overflow-hidden">
                       <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500/50 rounded-r" />
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)] flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px]">work</span>Employment</p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)] flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px]">work</span>{careerCopy.employmentDisplayLabel}</p>
                       <p className="mt-2 text-sm font-bold text-[var(--text)]">
                         {profile.employmentType ? formatLabel(profile.employmentType) : 'Not specified'}
                       </p>
                     </div>
                     <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4 relative overflow-hidden">
                       <div className="absolute top-0 left-0 w-1 h-full bg-cyan-500/50 rounded-r" />
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)] flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px]">schedule</span>Availability</p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--muted)] flex items-center gap-1.5"><span className="material-symbols-outlined text-[14px]">schedule</span>{careerCopy.availabilityDisplayLabel}</p>
                       <p className="mt-2 text-sm font-bold text-[var(--text)]">{profile.availability || 'Not specified'}</p>
                     </div>
                     <div className="rounded-xl border border-[var(--border)] bg-[var(--panel-soft)]/50 p-4 relative overflow-hidden">
@@ -789,7 +793,7 @@ export default function ProfilePage() {
                 title="Experience"
                 accentColor="#6366f1"
                 isEmpty={!profile.experiences?.length}
-                emptyMessage="No experience listed yet."
+                emptyMessage={careerCopy.publicExperienceEmptyMessage}
               >
                 <div className="relative ml-2 border-l-2 border-[var(--border)] pl-6 sm:ml-4 sm:pl-8">
                   <div className="space-y-8 py-2">
@@ -798,8 +802,8 @@ export default function ProfilePage() {
                         <div className="absolute -left-[33px] top-1 h-4 w-4 rounded-full bg-[#6366f1] ring-4 ring-[var(--panel)] sm:-left-[41px]" />
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                           <div>
-                            <h3 className="text-base font-black text-[var(--text)] sm:text-lg">{experience.title || 'Role'}</h3>
-                            <p className="text-sm font-bold text-[var(--accent-strong)]">{experience.company || 'Company'}</p>
+                            <h3 className="text-base font-black text-[var(--text)] sm:text-lg">{experience.title || careerCopy.publicExperienceTitleFallback}</h3>
+                            <p className="text-sm font-bold text-[var(--accent-strong)]">{experience.company || careerCopy.publicExperienceCompanyFallback}</p>
                           </div>
                           <div className="w-max rounded-md bg-[var(--panel-soft)]/50 px-2 py-1 text-xs font-semibold text-[var(--muted-strong)] sm:text-right">
                             <p>{formatDateRange(experience.startDate, experience.endDate, experience.isCurrent)}</p>
@@ -1004,7 +1008,7 @@ export default function ProfilePage() {
 
                   <div className="space-y-3 border-t border-[var(--border)] pt-4">
                     <div className="flex items-start justify-between gap-3 text-sm">
-                      <span className="font-medium text-[var(--muted-strong)]">Target Role</span>
+                      <span className="font-medium text-[var(--muted-strong)]">{careerCopy.targetRoleDisplayLabel}</span>
                       <span className="max-w-[170px] text-right font-bold text-[var(--text)]">{profile.targetRole || 'Not set'}</span>
                     </div>
                     <div className="flex items-start justify-between gap-3 text-sm">

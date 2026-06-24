@@ -323,6 +323,8 @@ export default function HomeFeed() {
   const [profileListModal, setProfileListModal] = useState(null);
   const [connectUser, setConnectUser] = useState(null);
   const [connectNote, setConnectNote] = useState('');
+  const [connectError, setConnectError] = useState('');
+  const [connectSubmitting, setConnectSubmitting] = useState(false);
   const [toast, setToast] = useState('');
   const [highlightedPostId, setHighlightedPostId] = useState(null);
 
@@ -401,6 +403,13 @@ export default function HomeFeed() {
     };
   }, [focusedPostId, posts]);
 
+  useEffect(() => {
+    if (!toast) return undefined;
+
+    const timeout = setTimeout(() => setToast(''), 3500);
+    return () => clearTimeout(timeout);
+  }, [toast]);
+
   async function loadMore() {
     const loader = viewMode === 'mine' ? getMyPosts : getFeedPosts;
     const result = await loader({ limit: 20, offset, filterType });
@@ -416,10 +425,40 @@ export default function HomeFeed() {
 
   async function submitConnection(event) {
     event.preventDefault();
-    await sendConnectionRequest(connectUser.username, connectNote);
+    if (!connectUser?.username || connectSubmitting) return;
+
+    setConnectSubmitting(true);
+    setConnectError('');
+
+    try {
+      await sendConnectionRequest(connectUser.username, connectNote);
+      setPeople((current) => current.filter((person) => person.username !== connectUser.username));
+      setConnectUser(null);
+      setConnectNote('');
+      setToast('Connection request sent.');
+    } catch (requestError) {
+      const message = requestError.response?.data?.error || requestError.response?.data?.message || requestError.message || 'Could not send connection request.';
+      const alreadyPending = requestError.response?.status === 409 && message.toLowerCase().includes('already');
+
+      if (alreadyPending) {
+        setPeople((current) => current.filter((person) => person.username !== connectUser.username));
+        setConnectUser(null);
+        setConnectNote('');
+        setToast('Connection request is already pending.');
+      } else {
+        setConnectError(message);
+        setToast(message);
+      }
+    } finally {
+      setConnectSubmitting(false);
+    }
+  }
+
+  function closeConnectionModal() {
+    if (connectSubmitting) return;
     setConnectUser(null);
     setConnectNote('');
-    setToast('Connection request sent.');
+    setConnectError('');
   }
 
   function openComposer(type = '') {
@@ -535,7 +574,17 @@ export default function HomeFeed() {
                   <p className="truncate text-xs text-[var(--muted-strong)]">{person.headline || 'Career builder'}</p>
                 </div>
               </div>
-              <button type="button" className="app-button-secondary px-3 py-2" onClick={() => setConnectUser(person)}>Connect</button>
+              <button
+                type="button"
+                className="app-button-secondary px-3 py-2"
+                onClick={() => {
+                  setConnectUser(person);
+                  setConnectNote('');
+                  setConnectError('');
+                }}
+              >
+                Connect
+              </button>
             </div>
           ))}
         </div>
@@ -640,9 +689,12 @@ export default function HomeFeed() {
           <form onSubmit={submitConnection} className="w-full max-w-md rounded-lg border border-[var(--border)] bg-[var(--panel)] p-6">
             <h2 className="text-xl font-black text-[var(--text)]">Connect with {connectUser.name || connectUser.username}</h2>
             <textarea className="app-input mt-4 min-h-24" maxLength={150} placeholder="Add a short note" value={connectNote} onChange={(event) => setConnectNote(event.target.value)} />
+            {connectError ? (
+              <p className="mt-3 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm font-bold text-red-500">{connectError}</p>
+            ) : null}
             <div className="mt-4 flex justify-end gap-3">
-              <button type="button" className="app-button-secondary" onClick={() => setConnectUser(null)}>Cancel</button>
-              <button type="submit" className="app-button">Send request</button>
+              <button type="button" className="app-button-secondary" onClick={closeConnectionModal} disabled={connectSubmitting}>Cancel</button>
+              <button type="submit" className="app-button" disabled={connectSubmitting}>{connectSubmitting ? 'Sending...' : 'Send request'}</button>
             </div>
           </form>
         </div>

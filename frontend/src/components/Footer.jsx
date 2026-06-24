@@ -102,7 +102,7 @@ export default function Footer() {
               onClick={() => setIsContactOpen(true)}
             >
               <span className="min-w-0 truncate">
-                support@aptico.ai
+                try.vivekyadav@gmail.com
               </span>
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)] text-[#003824] transition-transform group-hover:scale-105">
                 <span className="material-symbols-outlined text-[16px]">send</span>

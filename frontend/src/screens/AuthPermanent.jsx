@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from '@/lib/router-compat.jsx';
+import { Link, useLocation, useNavigate, useSearchParams } from '@/lib/router-compat.jsx';
 import { useDispatch, useSelector, useStore } from 'react-redux';
 import {
   forgotPasswordRequest,
@@ -131,7 +131,7 @@ function GoogleButton({ onError, onSuccess }) {
     return <div className="app-panel-soft text-sm text-[var(--muted-strong)] w-full text-center">Add `NEXT_PUBLIC_GOOGLE_CLIENT_ID` to enable Google sign-in.</div>;
   }
 
-  return <div ref={buttonRef} className="min-h-[44px] flex justify-center w-full" />;
+  return <div ref={buttonRef} className="google-signin-button min-h-[44px] w-full" />;
 }
 
 function PasswordField({ id, label, value, onChange, visible, onToggle, required = true }) {
@@ -172,13 +172,18 @@ function getPostAuthPath(user) {
   return user?.role === 'admin' ? '/admin' : '/dashboard';
 }
 
+function getAuthTabForPath(pathname) {
+  return pathname === '/login' ? 'login' : 'signup';
+}
+
 export default function AuthPermanent() {
   const auth = useSelector(selectAuth);
   const dispatch = useDispatch();
   const store = useStore();
+  const location = useLocation();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [activeTab, setActiveTab] = useState('signup');
+  const [activeTab, setActiveTab] = useState(() => getAuthTabForPath(location.pathname));
   const [formState, setFormState] = useState({
     name: '',
     email: '',
@@ -215,6 +220,14 @@ export default function AuthPermanent() {
       navigate('/guest', { replace: true });
     }
   }, [auth.guestMode, auth.isAuthenticated, auth.user, navigate]);
+
+  useEffect(() => {
+    if (queryMode || actionToken) {
+      return;
+    }
+
+    setActiveTab(getAuthTabForPath(location.pathname));
+  }, [actionToken, location.pathname, queryMode]);
 
   useEffect(() => {
     if (screenMode !== 'verify' || !actionToken) {
@@ -382,6 +395,13 @@ export default function AuthPermanent() {
   function handleGuestMode() {
     dispatch(enterGuestMode());
     navigate('/guest', { replace: true });
+  }
+
+  function handleBackToLogin() {
+    setSearchParams({}, { replace: true });
+    setActiveTab('login');
+    resetMessages();
+    navigate('/login', { replace: true });
   }
 
   const isResetMode = screenMode === 'reset';
@@ -593,11 +613,7 @@ export default function AuthPermanent() {
                  {screenMode === 'forgot' || screenMode === 'reset' ? (
                    <button
                      type="button"
-                     onClick={() => {
-                       setSearchParams({}, { replace: true });
-                       setActiveTab('login');
-                       resetMessages();
-                     }}
+                     onClick={handleBackToLogin}
                      className="font-bold text-[var(--accent-strong)] hover:underline"
                    >
                      Back to login
