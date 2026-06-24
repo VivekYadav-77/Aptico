@@ -24,7 +24,8 @@ function isAllowedOrigin(origin) {
 export function buildServer() {
   const app = Fastify({
     logger: true,
-    bodyLimit: 5 * 1024 * 1024
+    bodyLimit: 5 * 1024 * 1024,
+    exposeHeadRoutes: false
   });
 
   // Infrastructure wiring stays in app bootstrap; domain modules only receive decorated dependencies.
@@ -85,6 +86,10 @@ export function buildServer() {
     reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
     reply.header('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
 
+    if (request.method === 'HEAD' && (request.url === '/health' || request.url === '/api/health')) {
+      return reply.code(204).send();
+    }
+
     if (requestOrigin) {
       if (!isAllowedOrigin(requestOrigin)) {
         return reply.code(403).send({
@@ -141,7 +146,9 @@ export function buildServer() {
     }
 
     if (hasRedisConfig()) {
-      await redisService.ping();
+      void redisService.ping().catch((error) => {
+        app.log.warn({ err: error }, 'Redis startup ping failed open.');
+      });
       return;
     }
 

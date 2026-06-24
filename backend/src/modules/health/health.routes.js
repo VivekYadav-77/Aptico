@@ -1,5 +1,9 @@
 export default async function healthRoutes(app) {
-  app.head('/', async (_request, reply) => reply.code(204).send());
+  app.route({
+    method: 'HEAD',
+    url: '/',
+    handler: async (_request, reply) => reply.code(204).send()
+  });
 
   app.get('/', async () => ({
     status: 'ok',
