@@ -131,7 +131,11 @@ function GoogleButton({ onError, onSuccess }) {
     return <div className="app-panel-soft text-sm text-[var(--muted-strong)] w-full text-center">Add `NEXT_PUBLIC_GOOGLE_CLIENT_ID` to enable Google sign-in.</div>;
   }
 
-  return <div ref={buttonRef} className="google-signin-button min-h-[44px] w-full" />;
+  return (
+    <div className="google-signin-button min-h-[44px] w-full">
+      <div ref={buttonRef} className="google-signin-button__surface" />
+    </div>
+  );
 }
 
 function PasswordField({ id, label, value, onChange, visible, onToggle, required = true }) {

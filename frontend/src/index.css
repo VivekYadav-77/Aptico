@@ -353,16 +353,30 @@ span {
 
 .google-signin-button {
   display: flex;
+  width: 100%;
   justify-content: center;
 }
 
-.google-signin-button > div {
-  max-width: 340px;
+.google-signin-button__surface {
+  width: min(100%, 340px);
+  height: 44px;
   overflow: hidden;
   border-radius: 9999px;
+  background: #fff;
+  line-height: 0;
+  isolation: isolate;
 }
 
-.google-signin-button iframe {
+.google-signin-button__surface > div {
+  width: 100% !important;
+  max-width: 100% !important;
+  overflow: hidden;
+  border-radius: inherit;
+}
+
+.google-signin-button__surface iframe {
+  display: block;
+  width: 100% !important;
   border-radius: 9999px !important;
 }
 
