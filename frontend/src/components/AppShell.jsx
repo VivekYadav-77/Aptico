@@ -181,7 +181,6 @@ export default function AppShell({ title, description, actions, children, banner
   const auth = useSelector(selectAuth);
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const location = useLocation();
   const [socialProfile, setSocialProfile] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -190,7 +189,6 @@ export default function AppShell({ title, description, actions, children, banner
   const searchInputRef = useRef(null);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const profileDropdownRef = useRef(null);
-  const [hubDropdownOpen, setHubDropdownOpen] = useState(false);
   const isAdmin = auth.user?.role === 'admin';
   const navItems = isAdmin ? [...NAV_ITEMS, ADMIN_NAV_ITEM] : NAV_ITEMS;
 
@@ -280,97 +278,6 @@ export default function AppShell({ title, description, actions, children, banner
             </button>
             <AppLogo />
           </div>
-
-          {/* Center: Desktop horizontal centered tabs (only when logged in) */}
-          {auth.isAuthenticated && (
-            <div className="hidden lg:flex items-center gap-1.5 p-1 rounded-xl bg-white/[0.02] border border-white/[0.04] shadow-sm">
-              {NAV_ITEMS.filter(item => ['/dashboard', '/analysis', '/jobs'].includes(item.to)).map((tab) => {
-                const isActive = location.pathname === tab.to;
-                return (
-                  <Link
-                    key={tab.to}
-                    to={tab.to}
-                    className={`group relative flex items-center gap-2 px-3.5 py-1.5 text-[13px] font-medium rounded-lg transition-all duration-200 ${
-                      isActive
-                        ? 'bg-white/[0.08] text-[var(--text)] shadow-sm'
-                        : 'text-[var(--muted-strong)] hover:text-[var(--text)] hover:bg-white/[0.04]'
-                    }`}
-                  >
-                    <span className={`material-symbols-outlined text-[16px] transition-all duration-200 ${isActive ? 'text-[var(--text)]' : 'text-[var(--muted-strong)] group-hover:text-[var(--text)]'}`}>{tab.icon}</span>
-                    <span className="relative z-10 tracking-wide">{tab.label}</span>
-                  </Link>
-                );
-              })}
-
-              {isAdmin ? (
-                <Link
-                  to="/admin"
-                  className={`group relative flex items-center gap-2 px-3.5 py-1.5 text-[13px] font-medium rounded-lg transition-all duration-200 ${
-                    location.pathname === '/admin'
-                      ? 'bg-[var(--accent)]/15 text-[var(--accent-strong)] shadow-sm'
-                      : 'text-[var(--muted-strong)] hover:text-[var(--text)] hover:bg-white/[0.04]'
-                  }`}
-                >
-                  <span className="material-symbols-outlined text-[16px]">admin_panel_settings</span>
-                  <span className="relative z-10 tracking-wide">Admin</span>
-                </Link>
-              ) : null}
-
-              {/* Apps Dropdown containing the remaining page routes */}
-              <div 
-                className="relative"
-                onMouseEnter={() => setHubDropdownOpen(true)}
-                onMouseLeave={() => setHubDropdownOpen(false)}
-              >
-                <button
-                  type="button"
-                  className={`group relative flex items-center gap-1.5 px-3.5 py-1.5 text-[13px] font-medium rounded-lg transition-all duration-200 cursor-pointer ${
-                    ['/squads', '/squad-leaderboard', '/people', '/wins', '/portfolio-generator', '/interview-prep', '/rewards', '/saved-jobs', '/analysis-history'].some(path => location.pathname === path)
-                      ? 'bg-white/[0.08] text-[var(--text)] shadow-sm'
-                      : 'text-[var(--muted-strong)] hover:text-[var(--text)] hover:bg-white/[0.04]'
-                  }`}
-                >
-                  <span className={`material-symbols-outlined text-[16px] transition-all duration-200 ${['/squads', '/squad-leaderboard', '/people', '/wins', '/portfolio-generator', '/interview-prep', '/rewards', '/saved-jobs', '/analysis-history'].some(path => location.pathname === path) ? 'text-[var(--text)]' : 'text-[var(--muted-strong)] group-hover:text-[var(--text)]'}`}>apps</span>
-                  <span className="relative z-10 tracking-wide">Apps</span>
-                  <span className="material-symbols-outlined text-[16px] transition-transform duration-200 group-hover:translate-y-0.5">expand_more</span>
-                </button>
-
-                {hubDropdownOpen && (
-                  <div className="absolute left-1/2 top-full z-[200] w-[360px] -translate-x-1/2 pt-3">
-                    <div className="rounded-3xl border border-white/[0.08] bg-[var(--panel)]/95 p-3 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.5)] backdrop-blur-3xl animate-fade-in-up origin-top">
-                      <div className="mb-2 px-3 pt-2">
-                        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--muted)]">Tools & Resources</p>
-                      </div>
-                      <div className="grid grid-cols-2 gap-1">
-                        {NAV_ITEMS.filter(item =>
-                          ['/squads', '/squad-leaderboard', '/people', '/wins', '/portfolio-generator', '/interview-prep', '/rewards', '/saved-jobs', '/analysis-history'].includes(item.to)
-                        ).map((subTab) => {
-                          const isSubActive = location.pathname === subTab.to;
-                          return (
-                            <Link
-                              key={subTab.to}
-                              to={subTab.to}
-                              onClick={() => setHubDropdownOpen(false)}
-                              className={`group flex items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all duration-200 ${
-                                isSubActive
-                                  ? 'bg-[var(--accent)]/15 text-[var(--text)]'
-                                  : 'text-[var(--muted-strong)] hover:bg-white/[0.04] hover:text-[var(--text)]'
-                              }`}
-                            >
-                              <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors duration-200 ${isSubActive ? 'bg-[var(--accent)]/20 text-[var(--accent-strong)]' : 'bg-white/[0.03] text-[var(--muted)] group-hover:bg-white/[0.08] group-hover:text-[var(--text)]'}`}>
-                                <span className="material-symbols-outlined text-[18px]">{subTab.icon}</span>
-                              </div>
-                              <span className="text-xs font-semibold tracking-wide">{subTab.label}</span>
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
 
           {/* Right: Search, Theme, Notifications, Profile Dropdown */}
           <div className="ml-auto flex min-w-0 items-center gap-2 sm:gap-3">
@@ -522,6 +429,21 @@ export default function AppShell({ title, description, actions, children, banner
         </div>
       </header>
 
+      {auth.isAuthenticated ? (
+        <aside
+          className="fixed left-0 z-40 hidden w-[var(--sidebar-width)] flex-col border-r border-[var(--border)] bg-[var(--shell)]/90 shadow-[8px_0_32px_-24px_rgba(0,0,0,0.45)] backdrop-blur-2xl lg:flex"
+          style={{
+            top: `${NAVBAR_HEIGHT}px`,
+            height: `calc(100vh - ${NAVBAR_HEIGHT}px)`,
+          }}
+        >
+          <div className="min-h-0 flex-1 overflow-y-auto px-4 py-5">
+            <p className="mb-3 px-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">Navigation</p>
+            <Navigation showAdmin={isAdmin} />
+          </div>
+        </aside>
+      ) : null}
+
       {/* ── MOBILE OVERLAY ─────────────────────────────────── */}
       {mobileMenuOpen && (
         <div
@@ -645,7 +567,12 @@ export default function AppShell({ title, description, actions, children, banner
       </div>
 
       {/* ── MAIN CONTENT ───────────────────────────────────── */}
-      <main className="px-4 pb-8 sm:px-6 lg:px-8 lg:pb-10" style={{ paddingTop: `calc(${NAVBAR_HEIGHT}px + 1.5rem)` }}>
+      <main
+        className={`px-4 pb-8 sm:px-6 lg:pr-8 lg:pb-10 ${
+          auth.isAuthenticated ? 'lg:pl-[calc(var(--sidebar-width)+2rem)]' : 'lg:pl-8'
+        }`}
+        style={{ paddingTop: `calc(${NAVBAR_HEIGHT}px + 1.5rem)` }}
+      >
         <section className="mx-auto mb-8 flex max-w-7xl flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl space-y-3">
             <p className="app-kicker">Aptico workspace</p>
