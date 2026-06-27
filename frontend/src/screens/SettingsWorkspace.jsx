@@ -871,7 +871,8 @@ export default function SettingsWorkspace() {
                             { value: 'modern', label: 'Modern (Professional Two-Column)' },
                             { value: 'minimal', label: 'Minimal (Swiss Clean)' },
                             { value: 'creative', label: 'Creative (Bold Gradient)' },
-                            { value: 'technical', label: 'Technical (Developer-Focused)' }
+                            { value: 'technical', label: 'Technical (Developer-Focused)' },
+                            { value: 'software', label: 'Software (One-Page Engineering)' }
                           ]}
                         />
                       </div>
