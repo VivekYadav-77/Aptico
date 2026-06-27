@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 
 /* ───── helpers ───── */
 function normalizeUrl(u) { return u && !u.startsWith('http') ? `https://${u}` : u || ''; }
@@ -46,6 +46,40 @@ function projectMeta(project) {
 
 function projectHeading(project) {
   return [project.title, projectMeta(project)].filter(Boolean).join(' | ');
+}
+
+function groupSoftwareSkills(skills) {
+  const groups = [
+    { label: 'Languages', match: ['typescript', 'javascript', 'python', 'java', 'c', 'c++', 'go', 'rust', 'sql'] },
+    { label: 'Frontend', match: ['react', 'next', 'redux', 'tanstack', 'tailwind', 'html', 'css', 'vite', 'framer'] },
+    { label: 'Backend', match: ['node', 'express', 'fastify', 'django', 'fastapi', 'celery', 'rest', 'api'] },
+    { label: 'Databases', match: ['postgres', 'mongodb', 'mysql', 'sqlite', 'redis', 'prisma', 'drizzle', 'mongoose'] },
+    { label: 'Cloud & DevOps', match: ['docker', 'github actions', 'nginx', 'aws', 'gcp', 'vercel', 'render', 'cloud'] },
+    { label: 'AI & Realtime', match: ['ai', 'llm', 'gemini', 'pydantic', 'sse', 'websocket', 'multi-agent'] },
+  ];
+  const remaining = [...skills];
+
+  const picked = groups
+    .map((group) => {
+      const items = remaining.filter((skill) => {
+        const value = String(skill || '').toLowerCase();
+        return group.match.some((matcher) => value.includes(matcher));
+      });
+
+      items.forEach((item) => {
+        const index = remaining.indexOf(item);
+        if (index >= 0) remaining.splice(index, 1);
+      });
+
+      return { label: group.label, items };
+    })
+    .filter((group) => group.items.length);
+
+  if (remaining.length) {
+    picked.push({ label: 'Additional', items: remaining });
+  }
+
+  return picked;
 }
 
 function useResumeData(profile, educationEntries) {
@@ -783,21 +817,198 @@ function TechnicalTemplate({ data }) {
 /* ─────────────────────────────────────────────
    TEMPLATE CONFIG
    ───────────────────────────────────────────── */
+function SoftwareTemplate({ data }) {
+  const blue = '#1d4ed8';
+  const dark = '#111827';
+  const muted = '#4b5563';
+  const skillGroups = groupSoftwareSkills(data.skills);
+
+  const s = {
+    page: { fontFamily: 'Arial, Helvetica, sans-serif', fontSize: '10pt', color: dark, padding: '30px 42px', maxWidth: '800px', margin: '0 auto', background: '#fff', lineHeight: 1.34 },
+    header: { textAlign: 'center', borderBottom: `1.5px solid ${dark}`, paddingBottom: 10, marginBottom: 14 },
+    name: { margin: 0, fontSize: '24pt', lineHeight: 1, fontWeight: 800, letterSpacing: '0.04em', color: dark, textTransform: 'uppercase' },
+    headline: { margin: '5px 0 7px', fontSize: '10.5pt', fontWeight: 700, color: blue },
+    contactRow: { display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '3px 10px', fontSize: '8.8pt', color: muted, lineHeight: 1.35 },
+    section: { marginTop: 12 },
+    sectionTitle: { margin: '0 0 6px', paddingBottom: 2, borderBottom: `1px solid ${dark}`, fontSize: '9.8pt', fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: dark },
+    text: { margin: 0, fontSize: '9.7pt', color: '#1f2937', lineHeight: 1.36 },
+    entryMeta: { display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, marginBottom: 2 },
+    entryTitle: { margin: 0, fontSize: '10.2pt', fontWeight: 800, color: dark },
+    entryCompany: { margin: '0 0 2px', fontSize: '9.4pt', fontWeight: 700, color: muted },
+    dateTxt: { fontSize: '9pt', fontWeight: 700, color: muted, whiteSpace: 'nowrap' },
+    bullet: { margin: '0 0 2px', paddingLeft: 10, fontSize: '9.5pt', color: '#1f2937', lineHeight: 1.34 },
+    skillRow: { margin: '0 0 3px', fontSize: '9.2pt', color: '#1f2937', lineHeight: 1.32 },
+    skillLabel: { fontWeight: 800, color: dark },
+    projectWrap: { marginBottom: 8 },
+  };
+
+  const contactItems = [...data.contact, ...data.links];
+
+  return (
+    <div style={s.page}>
+      <header style={s.header}>
+        <h1 style={s.name}>{data.fullName}</h1>
+        {data.headline && <p style={s.headline}>{data.headline}</p>}
+        {contactItems.length > 0 && (
+          <div style={s.contactRow}>
+            {contactItems.map((item, index) => (
+              <span key={index}>{item}{index < contactItems.length - 1 ? ' |' : ''}</span>
+            ))}
+          </div>
+        )}
+      </header>
+
+      {data.bio && (
+        <section style={s.section}>
+          <h2 style={s.sectionTitle}>Summary</h2>
+          <p style={s.text}>{data.bio}</p>
+        </section>
+      )}
+
+      {data.education.length > 0 && (
+        <section style={s.section}>
+          <h2 style={s.sectionTitle}>Education</h2>
+          {data.education.map((ed, index) => (
+            <div key={index} style={{ marginBottom: 6 }}>
+              <div style={s.entryMeta}>
+                <h3 style={s.entryTitle}>{[ed.degree, ed.field].filter(Boolean).join(' in ') || ed.school || 'Education'}</h3>
+                <span style={s.dateTxt}>{[ed.startYear, ed.endYear].filter(Boolean).join(' - ')}</span>
+              </div>
+              {ed.school && <p style={s.entryCompany}>{ed.school}</p>}
+              {ed.activities && <p style={s.text}>Relevant coursework: {ed.activities}</p>}
+            </div>
+          ))}
+        </section>
+      )}
+
+      {skillGroups.length > 0 && (
+        <section style={s.section}>
+          <h2 style={s.sectionTitle}>Technical Skills</h2>
+          {skillGroups.map((group) => (
+            <p key={group.label} style={s.skillRow}>
+              <span style={s.skillLabel}>{group.label}: </span>
+              {group.items.join(', ')}
+            </p>
+          ))}
+        </section>
+      )}
+
+      {data.projects.length > 0 && (
+        <section style={s.section}>
+          <h2 style={s.sectionTitle}>Projects</h2>
+          {data.projects.map((project, index) => (
+            <div key={index} style={s.projectWrap}>
+              <h3 style={{ ...s.entryTitle, ...projectWrapStyle }}>{project.title}</h3>
+              {projectMeta(project) && <p style={{ ...s.text, ...projectWrapStyle, color: muted }}>{projectMeta(project)}</p>}
+              <p style={{ ...s.bullet, ...projectWrapStyle }}>- {project.description}</p>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {data.experiences.length > 0 && (
+        <section style={s.section}>
+          <h2 style={s.sectionTitle}>Experience</h2>
+          {data.experiences.map((exp, index) => (
+            <div key={index} style={{ marginBottom: 8 }}>
+              <div style={s.entryMeta}>
+                <h3 style={s.entryTitle}>{exp.title || 'Role'}</h3>
+                <span style={s.dateTxt}>{dateRange(exp.startDate, exp.endDate, exp.isCurrent).replace(/\u2013/g, '-')}</span>
+              </div>
+              <p style={s.entryCompany}>{exp.company || 'Company'}</p>
+              {bulletLines(exp.description).map((line, bulletIndex) => (
+                <p key={bulletIndex} style={s.bullet}>- {line}</p>
+              ))}
+            </div>
+          ))}
+        </section>
+      )}
+
+      {data.licenses.length > 0 && (
+        <section style={s.section}>
+          <h2 style={s.sectionTitle}>Certifications</h2>
+          {data.licenses.map((license, index) => (
+            <div key={index} style={s.entryMeta}>
+              <h3 style={s.entryTitle}>{license.name}</h3>
+              <span style={s.dateTxt}>{license.issueDate}</span>
+            </div>
+          ))}
+        </section>
+      )}
+
+      {data.awards.length > 0 && (
+        <section style={s.section}>
+          <h2 style={s.sectionTitle}>Honors & Awards</h2>
+          {data.awards.map((award, index) => (
+            <div key={index} style={{ marginBottom: 5 }}>
+              <div style={s.entryMeta}>
+                <h3 style={s.entryTitle}>{award.title}</h3>
+                <span style={s.dateTxt}>{award.date}</span>
+              </div>
+              {award.issuer && <p style={s.entryCompany}>{award.issuer}</p>}
+              {award.description && <p style={s.text}>{award.description}</p>}
+            </div>
+          ))}
+        </section>
+      )}
+    </div>
+  );
+}
+
 const TEMPLATES = [
   { id: 'executive', label: 'Executive', desc: 'ATS-optimized single-column with bold navy header. Best for traditional industries.', icon: 'description', color: '#1e293b', Component: ExecutiveTemplate },
   { id: 'modern', label: 'Modern', desc: 'Professional two-column layout with full-width header and clean sidebar. Recruiter-ready and ATS-friendly.', icon: 'dashboard', color: '#2563eb', Component: ModernTemplate },
   { id: 'minimal', label: 'Minimal', desc: 'Swiss-clean serif typography with generous whitespace. Ideal for academia and design roles.', icon: 'article', color: '#6b7280', Component: MinimalTemplate },
   { id: 'creative', label: 'Creative', desc: 'Bold purple gradient header with card-based layout. Perfect for standing out in creative fields.', icon: 'palette', color: '#7c3aed', Component: CreativeTemplate },
   { id: 'technical', label: 'Technical', desc: 'Developer-inspired layout with monospace accents and code-block styling. Built for tech roles.', icon: 'terminal', color: '#10b981', Component: TechnicalTemplate },
+  { id: 'software', label: 'Software', desc: 'Compact one-page software engineering resume inspired by the provided PDF. Strong for internships and developer roles.', icon: 'integration_instructions', color: '#1d4ed8', Component: SoftwareTemplate },
 ];
 
 const COMPACT_RESUME_SCALE = 0.94;
 const A4_HEIGHT_RATIO = 297 / 210;
 const OVERFLOW_WARNING = 'This resume may export to 2 pages. Shorten summary, projects, or experience bullets for a one-page version.';
 const FITS_ONE_PAGE_MESSAGE = 'Fits on 1 page';
+const RESUME_SECTION_OPTIONS = [
+  { id: 'summary', label: 'Summary', icon: 'subject' },
+  { id: 'experience', label: 'Experience', icon: 'work_history' },
+  { id: 'skills', label: 'Skills', icon: 'psychology' },
+  { id: 'projects', label: 'Projects', icon: 'code_blocks' },
+  { id: 'education', label: 'Education', icon: 'school' },
+  { id: 'certifications', label: 'Certifications', icon: 'verified' },
+  { id: 'awards', label: 'Awards', icon: 'workspace_premium' },
+];
+const DEFAULT_SECTION_SELECTION = RESUME_SECTION_OPTIONS.reduce((acc, section) => ({
+  ...acc,
+  [section.id]: true,
+}), {});
+const CORE_SECTION_IDS = ['summary', 'experience', 'skills', 'projects', 'education'];
 
 function safeFileName(name) {
   return `${String(name || 'Your_Name').replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_') || 'Your_Name'}_Resume`;
+}
+
+function hasResumeSectionContent(data, sectionId) {
+  if (sectionId === 'summary') return Boolean(compactText(data.bio));
+  if (sectionId === 'experience') return data.experiences.length > 0;
+  if (sectionId === 'skills') return data.skills.length > 0;
+  if (sectionId === 'projects') return data.projects.length > 0;
+  if (sectionId === 'education') return data.education.length > 0;
+  if (sectionId === 'certifications') return data.licenses.length > 0;
+  if (sectionId === 'awards') return data.awards.length > 0;
+  return false;
+}
+
+function applyResumeSectionSelection(data, sectionSelection) {
+  return {
+    ...data,
+    bio: sectionSelection.summary ? data.bio : '',
+    experiences: sectionSelection.experience ? data.experiences : [],
+    skills: sectionSelection.skills ? data.skills : [],
+    projects: sectionSelection.projects ? data.projects : [],
+    education: sectionSelection.education ? data.education : [],
+    licenses: sectionSelection.certifications ? data.licenses : [],
+    awards: sectionSelection.awards ? data.awards : [],
+  };
 }
 
 function compactText(value) {
@@ -971,15 +1182,24 @@ export default function ResumeBuilderModal({ open, onClose, profile, educationEn
   const [selectedId, setSelectedId] = useState(profile?.resumeTemplate || 'executive');
   const [downloading, setDownloading] = useState(false);
   const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
+  const [sectionMenuOpen, setSectionMenuOpen] = useState(false);
+  const [sectionSelection, setSectionSelection] = useState(DEFAULT_SECTION_SELECTION);
   const [resumeOverflows, setResumeOverflows] = useState(false);
   const previewRef = useRef(null);
   const downloadMenuRef = useRef(null);
+  const sectionMenuRef = useRef(null);
 
   useEffect(() => {
     if (open && profile?.resumeTemplate) {
       setSelectedId(profile.resumeTemplate);
     }
   }, [open, profile?.resumeTemplate]);
+
+  useEffect(() => {
+    if (open) {
+      setSectionSelection(DEFAULT_SECTION_SELECTION);
+    }
+  }, [open]);
 
   useEffect(() => {
     if (!downloadMenuOpen) return undefined;
@@ -995,7 +1215,27 @@ export default function ResumeBuilderModal({ open, onClose, profile, educationEn
   }, [downloadMenuOpen]);
 
   const data = useResumeData(profile, educationEntries);
+  const availableSectionIds = useMemo(
+    () => new Set(RESUME_SECTION_OPTIONS.filter((section) => hasResumeSectionContent(data, section.id)).map((section) => section.id)),
+    [data]
+  );
+  const selectedSectionCount = RESUME_SECTION_OPTIONS.filter((section) => availableSectionIds.has(section.id) && sectionSelection[section.id]).length;
+  const availableSectionCount = availableSectionIds.size;
+  const resumeData = useMemo(() => applyResumeSectionSelection(data, sectionSelection), [data, sectionSelection]);
   const selected = TEMPLATES.find(t => t.id === selectedId) || TEMPLATES[0];
+
+  useEffect(() => {
+    if (!sectionMenuOpen) return undefined;
+
+    function handlePointerDown(event) {
+      if (!sectionMenuRef.current?.contains(event.target)) {
+        setSectionMenuOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown);
+    return () => document.removeEventListener('mousedown', handlePointerDown);
+  }, [sectionMenuOpen]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -1017,7 +1257,7 @@ export default function ResumeBuilderModal({ open, onClose, profile, educationEn
       window.cancelAnimationFrame(frameId);
       window.removeEventListener('resize', measureResumeHeight);
     };
-  }, [open, selectedId, profile, educationEntries]);
+  }, [open, selectedId, profile, educationEntries, sectionSelection]);
 
   const downloadPdf = useCallback(async () => {
     if (!previewRef.current || downloading) return;
@@ -1027,7 +1267,7 @@ export default function ResumeBuilderModal({ open, onClose, profile, educationEn
       const el = previewRef.current;
       const opt = {
         margin: 0,
-        filename: `${safeFileName(data.fullName)}.pdf`,
+        filename: `${safeFileName(resumeData.fullName)}.pdf`,
         image: { type: 'jpeg', quality: 0.98 },
         html2canvas: { scale: 2, useCORS: true, logging: false },
         jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
@@ -1039,20 +1279,20 @@ export default function ResumeBuilderModal({ open, onClose, profile, educationEn
     } finally {
       setDownloading(false);
     }
-  }, [data.fullName, downloading]);
+  }, [resumeData.fullName, downloading]);
 
   const downloadDocx = useCallback(async () => {
     if (downloading) return;
     setDownloading('docx');
     try {
-      const blob = await buildResumeDocx(data);
-      saveBlob(blob, `${safeFileName(data.fullName)}.docx`);
+      const blob = await buildResumeDocx(resumeData);
+      saveBlob(blob, `${safeFileName(resumeData.fullName)}.docx`);
     } catch (err) {
       console.error('DOCX generation failed:', err);
     } finally {
       setDownloading(false);
     }
-  }, [data, downloading]);
+  }, [resumeData, downloading]);
 
   const handleDownload = useCallback(async (format) => {
     setDownloadMenuOpen(false);
@@ -1079,10 +1319,104 @@ export default function ResumeBuilderModal({ open, onClose, profile, educationEn
           </div>
         </div>
         <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-3">
+          <div ref={sectionMenuRef} className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setSectionMenuOpen((value) => !value);
+                setDownloadMenuOpen(false);
+              }}
+              aria-haspopup="menu"
+              aria-expanded={sectionMenuOpen}
+              className="app-button-secondary flex h-9 items-center gap-1 px-2 py-2 text-xs sm:h-auto sm:gap-2 sm:px-4 sm:py-[0.85rem] sm:text-sm"
+            >
+              <span className="material-symbols-outlined text-[18px]">view_agenda</span>
+              <span className="hidden sm:inline">Sections</span>
+              <span className="rounded-full bg-[var(--accent-soft)] px-1.5 py-0.5 text-[10px] font-black text-[var(--accent-strong)]">
+                {selectedSectionCount}/{availableSectionCount || RESUME_SECTION_OPTIONS.length}
+              </span>
+            </button>
+            {sectionMenuOpen && (
+              <div role="menu" className="absolute right-0 top-[calc(100%+0.5rem)] z-30 w-80 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--panel)] shadow-2xl">
+                <div className="border-b border-[var(--border)] px-4 py-3">
+                  <p className="text-sm font-black text-[var(--text)]">Resume sections</p>
+                  <p className="mt-1 text-xs font-medium leading-relaxed text-[var(--muted-strong)]">Choose what appears in the preview and downloads.</p>
+                  <div className="mt-3 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSectionSelection(RESUME_SECTION_OPTIONS.reduce((next, section) => ({
+                        ...next,
+                        [section.id]: availableSectionIds.has(section.id),
+                      }), {}))}
+                      className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-bold text-[var(--text)] transition hover:bg-[var(--panel-soft)]"
+                    >
+                      Select all
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSectionSelection(RESUME_SECTION_OPTIONS.reduce((next, section) => ({
+                        ...next,
+                        [section.id]: availableSectionIds.has(section.id) && CORE_SECTION_IDS.includes(section.id),
+                      }), {}))}
+                      className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-xs font-bold text-[var(--text)] transition hover:bg-[var(--panel-soft)]"
+                    >
+                      Core only
+                    </button>
+                  </div>
+                </div>
+                <div className="max-h-[min(24rem,calc(100vh-9rem))] overflow-y-auto p-2">
+                  {RESUME_SECTION_OPTIONS.map((section) => {
+                    const available = availableSectionIds.has(section.id);
+                    const selectedSection = available && sectionSelection[section.id];
+
+                    return (
+                      <button
+                        key={section.id}
+                        type="button"
+                        role="menuitemcheckbox"
+                        aria-checked={selectedSection}
+                        disabled={!available}
+                        onClick={() => {
+                          if (!available) return;
+                          setSectionSelection((current) => ({
+                            ...current,
+                            [section.id]: !current[section.id],
+                          }));
+                        }}
+                        className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${
+                          available
+                            ? 'text-[var(--text)] hover:bg-[var(--panel-soft)]'
+                            : 'cursor-not-allowed text-[var(--muted)] opacity-50'
+                        }`}
+                      >
+                        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                          selectedSection ? 'bg-[var(--accent-soft)] text-[var(--accent-strong)]' : 'bg-[var(--panel-soft)] text-[var(--muted-strong)]'
+                        }`}>
+                          <span className="material-symbols-outlined text-[17px]">{section.icon}</span>
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-bold">{section.label}</span>
+                          {!available && <span className="block text-[11px] font-medium text-[var(--muted)]">No profile content yet</span>}
+                        </span>
+                        <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                          selectedSection ? 'border-[var(--accent)] bg-[var(--accent)] text-white' : 'border-[var(--border)] text-transparent'
+                        }`}>
+                          <span className="material-symbols-outlined text-[13px]">check</span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
           <div ref={downloadMenuRef} className="relative">
             <button
               type="button"
-              onClick={() => setDownloadMenuOpen((value) => !value)}
+              onClick={() => {
+                setDownloadMenuOpen((value) => !value);
+                setSectionMenuOpen(false);
+              }}
               disabled={Boolean(downloading)}
               aria-haspopup="menu"
               aria-expanded={downloadMenuOpen}
@@ -1193,7 +1527,7 @@ export default function ResumeBuilderModal({ open, onClose, profile, educationEn
                 width: `${100 / COMPACT_RESUME_SCALE}%`
               }}
             >
-              <selected.Component data={data} />
+              <selected.Component data={resumeData} />
             </div>
           </div>
           </div>
